@@ -46,8 +46,16 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <None Include="EndlessUsbTool.htm" />
     <None Include="res\EndlessUsbTool.rc2">
+      <Filter>Resource Files</Filter>
+    </None>
+    <None Include="res\EndlessUsbTool.css">
+      <Filter>Resource Files</Filter>
+    </None>
+    <None Include="res\EndlessUsbTool.htm">
+      <Filter>Resource Files</Filter>
+    </None>
+    <None Include="res\EndlessUsbTool.js">
       <Filter>Resource Files</Filter>
     </None>
   </ItemGroup>

@@ -1,0 +1,173 @@
+﻿<html>
+<head>
+<title>Endles USB Creator</title>
+<!--<meta http-equiv="X-UA-Compatible" content="IE=Edge" />-->
+<meta http-equiv="X-UA-Compatible" content="IE=9" />
+    
+<link type="text/css" rel="stylesheet" href="res:/CUS/#104" />
+<!--<link type="text/css" rel="stylesheet" href="EndlessUsbTool.css" />-->
+<script src="res:/CUS/#105" type=text/javascript></script>
+</head>
+        
+<body id="CEndlessUsbToolDlg">
+    <div id="MainContainer">
+        <div id="FirstPage" class="WizardPage">
+            <div class="FullWidthContent PageHeader">
+                <h1 id="FirstPageTitle" class="PageHeaderTitle">Endless USB Creator</h1>
+            </div>
+
+            <div class="FullWidthContent PageContent">
+                <div class="ContentPanel" id="LeftPanel">
+                    <div class="Button" id="TryEndlessButton">Try Endless</div>
+                    <div class="PanelImage" id="LeftPaneImage"> </div>
+                    <div class="PanelText" id="TryEndlessText">You can try Endless directly from a USB drive without making any changes to your computer.</div>
+                </div>
+                <div class="ContentPanel" id="RightPanel" >
+                    <div class="Button" id="InstallEndlessButton">Install Endless</div>
+                    <div class="PanelImage" id="RightPaneImage"></div>
+                    <div class="PanelText" id="InstallEndlessText">If you prefer having our full experience, you can install Endless as your new operating system.</div>
+                </div>
+                <div class="FullWidthContent">
+                    <a id="CompareOptionsLink">Compare the two options</a>
+                </div>
+                <div class="FullWidthContent">
+                    <select id="LanguageSelect">
+                        <option value="en_us">English (United States)</option>
+                        <option value="ro_ro">Română (România)</option>
+                    </select> 
+                </div>
+            </div>
+
+            <div class="FullWidthContent PageIndicator">
+                <ul>
+                    <li><span class="PageSelected" /></li>
+                    <li><span /></li>
+                    <li><span /></li>
+                    <li><span /></li>
+                </ul>
+            </div>
+        </div>
+
+        <div id="SelectFilePage" class="WizardPage hidden">
+            <div class="FullWidthContent PageHeader">
+                <div class="Button ButtonWithBorder" id="SelectFilePreviousButton">Previous</div>
+                <div class="Button ButtonRight" id="SelectFileNextButton">Next</div>
+                <h1 id="SelectFilePageTitle" class="PageHeaderTitle">Select OS Image</h1>
+            </div>
+
+            <div class="PageContent">
+                <div class="FullWidthContent">
+                    <div class="ContentTitle" id="OperatingSystemFound">Use an existing image file:</div>
+                    <input type="radio" name="OperatingSystemType" id="OperatingSystemTypeLocal" onclick="opSystemTypeSelected()" checked />
+                    <select id="LocalImagesSelect" class="selected">
+                        <option value="en_light_27">EOS 2_7 English Light - 2GB</option>
+                        <option value="en_full_27">EOS 2_7 English Full - 30GB</option>
+                    </select> 
+                    
+                    <div class="ContentTitle" id="DownloadOperatingSystem">Download a new image:</div>
+                    <input type="radio" name="OperatingSystemType" id="OperatingSystemTypeOnline" onclick="opSystemTypeSelected()" />
+                    <select id="OnlineImagesSelect">
+                        <option value="">-----</option>
+                        <option value="en_light_27">EOS 2_7 English Light - 2GB</option>
+                        <option value="en_full_27">EOS 2_7 English Full - 30GB</option>
+                    </select> 
+                </div>
+            </div>
+
+            <div class="FullWidthContent PageIndicator">
+                <ul>
+                    <li><span /></li>
+                    <li><span class="PageSelected" /></li>
+                    <li><span /></li>
+                    <li><span /></li>
+                </ul>
+            </div>
+        </div>
+
+        <div id="SelectUSBPage" class="WizardPage hidden">
+            <div class="FullWidthContent PageHeader">
+                <div class="Button ButtonWithBorder" id="SelectUSBPreviousButton">Previous</div>
+                <div class="Button ButtonRight" id="SelectUSBNextButton">Next</div>
+                <h1 id="SelectUSBPageTitle" class="PageHeaderTitle">Select USB Disk</h1>
+            </div>
+
+            <div class="PageContent">
+                <div class="FullWidthContent">
+                    <div class="ContentTitle" id="USBDisksFound">USB disk found:</div>
+                    <select id="USBDiskSelect" class="selected">
+                        <option value="disk1">John stick - 32GB</option>
+                        <option value="disk2">Old data - 64GB</option>
+                    </select>
+                    <div id="NewDiskNameContainer">
+                        <label for="NewDiskName" id="NewDiskNameLabel">New Name:</label>
+                        <span id="NewDiskName">EOS 2_7 English Light - 2GB</span>
+                    </div>
+
+                    <div id="AgreementContainer">
+                        <input type="checkbox" id="AgreementCheckbox" />
+                        <label for="AgreementCheckbox">I agree to erase all my files on my USB stick</label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="PageIndicator">
+                <ul>
+                    <li><span /></li>
+                    <li><span /></li>
+                    <li><span class="PageSelected" /></li>
+                    <li><span /></li>
+                </ul>
+            </div>
+        </div>
+
+        <div id="InstallingPage" class="WizardPage hidden">
+            <div class="FullWidthContent PageHeader">
+                <h1 id="InstallingPageTitle" class="PageHeaderTitle">Installing</h1>
+            </div>
+
+            <div class="PageContent">
+                <div class="ContentTitle" id="CreatingInstallerText">Creating installer USB</div>
+                <div class="ProgressBarContainer">
+                    <div id="ProgressBar"></div>
+                </div>
+
+                <div class="ContentTitle" id="SecureBootLabel">Secure Boot</div>
+                <div class="FullWidthContent" id="SecureBootContainer">
+                    <div id="SecureBootImage"></div>
+                    <div class="SecureBootText" id="SecureBootText1">Depending on the motherboard's BIOS/EFI firmware, the Secure Boot option will be found on the "Boot", "Security" or "Authentication" page.</div>
+                    <div class="SecureBootText"id="SecureBootText2">It must be set to "Disabled" or "Off" to allow you to boot from external media correctly.</div>
+                    <a id="SecureBootHowTo">How should I do it?</a>                    
+                </div>
+            </div>
+
+            <div class="PageIndicator">
+                <ul>
+                    <li><span /></li>
+                    <li><span /></li>
+                    <li><span /></li>
+                    <li><span class="PageSelected" /></li>
+                </ul>
+            </div>
+        </div>
+
+        <div id="ThankYouPage" class="WizardPage hidden">
+            <div class="MainHeader">
+                <h1 id="ThankYouPageTitle">Thank you</h1>
+            </div>
+
+            <div class="PageContent">
+                
+            </div>
+
+            <div class="PageIndicator">
+                <ul>
+                    <li><span /></li>
+                    <li><span /></li>
+                    <li><span /></li>
+                    <li><span class="PageSelected" /></li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

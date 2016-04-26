@@ -225,9 +225,11 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <None Include="EndlessUsbTool.htm">
+    <None Include="res\EndlessUsbTool.css" />
+    <None Include="res\EndlessUsbTool.htm">
       <DeploymentContent>true</DeploymentContent>
     </None>
+    <None Include="res\EndlessUsbTool.js" />
     <None Include="res\EndlessUsbTool.rc2" />
   </ItemGroup>
   <ItemGroup>

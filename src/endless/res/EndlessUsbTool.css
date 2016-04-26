@@ -1,0 +1,297 @@
+/* General CSS */
+
+* {
+    padding: 0px;
+    margin: 0px;
+	font-family:Tahoma;
+	color: #828385;	
+}
+
+body,
+html {
+	background-color: #f3f3f5;
+}
+
+#MainContainer {
+    width: 502px;
+    height: 399px;
+	border: 3px solid #828385;
+	border-radius: 10px;
+}
+
+.Button {
+	width: 170px;
+	height: 26px;
+	color: #ffffff;
+	background-color: #09b7b5;
+	border-radius: 5px;
+	text-align: center;
+	font-size: 18px;
+	cursor: pointer;
+}
+
+.ButtonWithBorder {
+	background-color: transparent;
+	color: #09b7b5;
+	border: 2px solid #09b7b5;
+} 
+
+.FullWidthContent {
+	width: 100%;
+	clear:both;
+}
+
+a {
+	color: #09b7b5;
+	cursor: pointer;
+}
+
+select {
+	border-radius: 5px;
+	border: 2px solid #09b7b5;
+	background-color: transparent;
+	color: #09b7b5;	
+	font-size: 14px;
+	cursor: pointer;
+	left-padding: 10px;
+}
+
+select>option {
+	color: #09b7b5;
+}
+
+select.selected {
+	border: 0px;
+	background-color: #09b7b5;
+	color: #ffffff;	
+}
+
+select.selected>option {
+	color: #ffffff;
+}
+
+.ContentTitle {
+	font-size: 20px;
+	padding-top: 35px;
+}
+
+
+/* Wizard page */
+.WizardPage {
+}
+
+.hidden {
+	display: none;
+}
+
+.PageHeader {
+    border-bottom: 2px solid #828385;
+	height: 42px;
+	cursor: move;
+}
+
+.PageHeader h1 {
+    height: 100%;
+    color: #828385; 
+	text-align: center;   
+    font-weight: normal; 
+	font-size: 24px;
+	margin-top: 8px;
+}
+
+.PageHeader .Button {
+	width: 120px;
+	float: left;
+	margin-left: 10px;
+	margin-top: 3px;
+}
+
+.PageHeader .ButtonRight {
+	float: right;	
+	margin-right: 10px;
+}
+
+.PageContent {
+	height: 310px;
+}
+
+/* Wizard Page indicator */
+.PageIndicator {
+	height: 40px;
+	text-align: center;
+}
+
+.PageIndicator ul {
+	display:inline-block;
+	margin-top: 10px;
+	/* hack for IE <=7 centering */
+	*display:inline;
+	*zoom:1;	
+}
+
+.PageIndicator ul li {
+	list-style: none;
+	float:left;	
+}
+
+.PageIndicator li span {
+	display:block;
+	width: 10px;
+	height: 10px;
+	margin:3px;
+	background-image:url("res:/IMG/#200");
+}
+
+.PageIndicator li span.PageSelected {
+	background-image: url("res:/IMG/#201");
+}
+
+
+/* First page */
+
+.ContentPanel {
+	float: left;
+	width: 50%;
+	height: 240px;	
+}
+
+.ContentPanel:hover {
+	background-color: #e3e3e5;
+	cursor: pointer;
+}
+
+.ContentPanel * {
+	margin: 0px auto;
+	margin-top: 10px;
+}
+
+.ContentPanel .Button {
+	margin-top: 30px;
+}
+
+.PanelImage {
+	width: 80px;
+	height: 80px;
+	background-repeat: no-repeat;
+}
+
+#LeftPaneImage {
+	background-image: url("res:/IMG/#202");
+}
+
+#RightPaneImage {
+	background-image: url("res:/IMG/#203");
+}
+
+.PanelText {
+	width: 70%;
+	font-size: 14px;
+}
+
+#FirstPage .PageContent .FullWidthContent {
+	height: 20px;
+	text-align: center;
+	padding-top: 10px;
+}
+
+#FirstPage a {
+	text-decoration: underline;
+}
+
+#LanguageSelect {
+	width: 260px;
+	height: 28px;
+}
+
+/* Select file Page */
+/* Select USB Page */
+
+#SelectFilePage .PageContent,
+#SelectUSBPage .PageContent,
+#InstallingPage .PageContent {
+	margin: 0px 20px;
+}
+
+#SelectFilePage select,
+#SelectUSBPage select {
+	width: 440px;
+	height: 36px;
+	margin-top: 20px;
+}
+
+#SelectFilePage .ContentTitle {
+	margin-left: 18px;
+	width: 440px;
+}
+
+#OperatingSystemFound {
+	background-repeat: no-repeat;
+	background-image: url("res:/IMG/#204");
+	background-position: right bottom;
+}
+
+#SelectUSBPage select,
+#NewDiskNameContainer {
+	width: 458px;
+}
+
+#NewDiskNameContainer {
+	margin-top: 10px;
+	font-size: 14px;
+}
+
+#NewDiskNameLabel {
+	margin: 0px 3px;
+}
+
+#AgreementContainer {
+	margin-top: 100px;
+	font-size: 13px;
+	margin-left: 3px;
+}
+
+/* Installing Page */
+
+.ProgressBarContainer {
+	width: 458px;
+	height: 23px;
+	border: 2px solid #828385;
+	margin-top: 5px;
+}
+
+#ProgressBar {
+	background-color: #d1d2d4;
+	width: 30%;
+	height: 100%
+}
+
+#SecureBootLabel {
+	padding-top: 20px;
+}
+
+#SecureBootContainer {
+	padding-top: 10px;
+}
+
+#SecureBootImage {
+	background: url("res:/IMG/#205") 0 0 no-repeat;
+	width: 165px;
+	height: 150px;
+	float: left;
+}
+
+.SecureBootText,
+#SecureBootHowTo {
+	float: right;
+	width: 280px;
+	
+}
+
+.SecureBootText {
+	padding-bottom: 12px;
+	font-size: 14px;
+}
+
+#InstallingPage a {
+	text-decoration: underline;
+}
