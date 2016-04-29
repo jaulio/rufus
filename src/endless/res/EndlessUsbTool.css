@@ -44,6 +44,7 @@ html {
 a {
 	color: #09b7b5;
 	cursor: pointer;
+	font-size: 15px;
 }
 
 select {
@@ -72,7 +73,7 @@ select.selected>option {
 
 .ContentTitle {
 	font-size: 20px;
-	padding-top: 35px;
+	margin-top: 35px;
 }
 
 
@@ -112,7 +113,8 @@ select.selected>option {
 }
 
 .PageContent {
-	height: 310px;
+	height: 308px;
+	border: 1px solid transparent;
 }
 
 /* Wizard Page indicator */
@@ -152,7 +154,7 @@ select.selected>option {
 .ContentPanel {
 	float: left;
 	width: 50%;
-	height: 240px;	
+	height: 230px;
 }
 
 .ContentPanel:hover {
@@ -208,7 +210,8 @@ select.selected>option {
 
 #SelectFilePage .PageContent,
 #SelectUSBPage .PageContent,
-#InstallingPage .PageContent {
+#InstallingPage .PageContent,
+#ThankYouPage .PageContent {
 	margin: 0px 20px;
 }
 
@@ -221,13 +224,22 @@ select.selected>option {
 
 #SelectFilePage .ContentTitle {
 	margin-left: 18px;
-	width: 440px;
+	min-height: 30px
 }
 
-#OperatingSystemFound {
+#ExistingImageFile {
+	width: 400px;
+	float: left;
+}
+
+#SelectFileButton {
+	margin-top: 35px; /* must match .ContentPanel margin-top */
+	width: 30px;
+	height: 30px;
+	float: right;
 	background-repeat: no-repeat;
 	background-image: url("res:/IMG/#204");
-	background-position: right bottom;
+	cursor: pointer;
 }
 
 #SelectUSBPage select,
@@ -266,7 +278,7 @@ select.selected>option {
 }
 
 #SecureBootLabel {
-	padding-top: 20px;
+	margin-top: 20px;
 }
 
 #SecureBootContainer {
@@ -294,4 +306,46 @@ select.selected>option {
 
 #InstallingPage a {
 	text-decoration: underline;
+}
+
+/* Thank you Page */
+
+#ThankYouPage .ContentTitle {
+	padding-left: 60px;
+	padding-top: 5px;
+	background-repeat: no-repeat;
+	background-position: left top;
+	min-height: 35px;
+}
+
+#ThankYouMessage {
+	background-image: url("res:/IMG/#206");
+}
+
+#ThankYouPage dl {
+	margin-top: 15px;
+	margin-left: 60px;
+	font-size: 14px;
+}
+
+#ThankYouPage dl dt {
+	float: left;
+	margin-right: 5px;
+	padding-left: 15px;
+	background-repeat: no-repeat;
+	background-image: url("res:/IMG/#201");
+	background-position: left center;
+}
+
+#SecureBootReminder {
+	background-image: url("res:/IMG/#207");
+}
+
+#ThankYouPage a {
+	text-decoration: underline;
+	margin-left: 60px;
+}
+
+#ThankYouPage .Button {
+	width: 26px;
 }

@@ -1,0 +1,171 @@
+# This file should be saved as UTF-8, no-BOM, in DOS mode (i.e. CR/LF as line terminators)
+
+######################## HOW TO ADD A NEW TRANSLATION ###########################
+# For a more comprehensive set of instructions, please see the *FULL* Localization guide at:
+# https://github.com/pbatard/rufus/wiki/Localization
+#
+# 0. Download the latest Rufus executable, start it and check the log for a line starting with 'LCID'
+#    (eg. LCID 0x1809).
+# 1. Save this file in the same directory where you have the Rufus executable.
+# 2. Copy the lines between ### TRANSLATOR START COPY ### and ### TRANSLATOR END COPY ### and paste them at
+#    the end of the file.
+# 3. Edit the 'l' line in the section you copied and:
+#    - replace the "en-US" IETF language tag for your language, eg: "fr-FR", "zh-CN".
+#      See http://en.wikipedia.org/wiki/IETF_language_tag as well as the table on page 9 of
+#      http://download.microsoft.com/download/9/5/E/95EF66AF-9026-4BB0-A41D-A4F81802D92C/%5BMS-LCID%5D.pdf
+#    - set the name of your language first in English and then, in parenthesis, in your own language.
+#      eg: "Chinese Simplified (简体中文)"
+#    - remove the end of the line starting with 0x0409 and replaced it with the LCID code you got in step 0.
+#      You also may want to look at the table on page 9 of the PDF above to add all the LCID codes your
+#      translation should cover. Make sure you separate these codes with a comma.
+# 4. Translate the messages that appear below into your language. The 'g' lines indicate the group a translated
+#    element belongs to. You shouldn't have to modify them.
+# 5. (Re)launch Rufus. If a 'rufus.loc' file is found in the current directory, it will be used over the one
+#    embedded in the application. Since there is only one translation in this file, it will be used by default
+# 6. Repeat steps 4 & 5 until you're happy with that translated elements. Note that you MUST restart Rufus every
+#    time you change your .loc file as there is no reload option.
+# 7. Once you are satisfied with your translation, you should pick up the official rufus.loc from:
+#    https://github.com/pbatard/rufus/raw/master/res/localization/rufus.loc
+#    You should then add your translation at the end of it, and confirm that it is still picked as the default
+#    for your system  You can also force the use of a translation by passing the option -l when starting Rufus.
+#    For instance, to have the "zh_CN" translation below apply, you could use either one of:
+#      rufus.exe -l zh-CN
+#      rufus.exe -l 0x0404
+#      rufus.exe -l 0x0804
+# 8. If you need to resize a control or a dialog to fid the translated text, use the 'm' (Move) or 's' (reSize)
+#    options. For an example of how these commands work, see https://github.com/pbatard/rufus/wiki/Localization
+#
+# Tips:
+# - Please make sure that you edit the language include *your* name and e-mail in MSG_176. It will be displayed
+#   in the About dialog and I want to give you credit for your work!
+# - I strongly recommend installing and using DbgView to check for translation errors, as you will get more
+#   information about how Rufus initallly parses the translation file plus reports of any issue found (with
+#   the line number). Download DbgView from: http://technet.microsoft.com/en-us/sysinternals/bb896647.aspx
+# - As shown below, you can break a long message over multiple lines, as long as these fragments begin and end
+#   with a double quote ("). Also be careful to keep the special symbols such as %d, %s, \\b, \",  \n.
+# - Don't forget to check the translation guide from https://github.com/pbatard/rufus/wiki/Localization
+
+# List of all languages included in this file (with base LCID)
+# l "en-US" "English (English)" 0x0409
+# l "ar-SA" "Arabic (العربية)" 0x0401
+# l "az-AZ" "Azerbaijani (Azərbaycanca)" 0x042c
+# l "bg-BG" "Bulgarian (Български)" 0x0402
+# l "zh-CN" "Chinese Simplified (简体中文)" 0x0804
+# l "zh-TW" "Chinese Traditional (正體中文)" 0x0404
+# l "hr-HR" "Croatian (Hrvatski)" 0x041a
+# l "cs-CZ" "Czech (Čeština)" 0x0405
+# l "da-DK" "Danish (Dansk)" 0x0406
+# l "nl-NL" "Dutch (Nederlands)" 0x0413
+# l "fi-FI" "Finnish (Suomi)" 0x040B
+# l "fr-FR" "French (Français)" 0x040c
+# l "de-DE" "German (Deutsch)" 0x0407
+# l "el-GR" "Greek (Ελληνικά)" 0x0408
+# l "hu-HU" "Hungarian (Magyar)" 0x040e
+# l "id-ID" "Indonesian (Bahasa Indonesia)" 0x0421
+# l "it-IT" "Italian (Italiano)" 0x0410
+# l "ja-JP" "Japanese (日本語)" 0x0411
+# l "ko-KR" "Korean (한국어)" 0x0412
+# l "lv-LV" "Latvian (Latviešu)" 0x0426
+# l "lt-LT" "Lithuanian (Lietuvių)" 0x0427
+# l "ms-MY" "Malay (Bahasa Malaysia)" 0x043e
+# l "nb-NO" "Norwegian (Norsk)" 0x0414
+# l "fa-IR" "Persian (فارسی)" 0x0429
+# l "pl-PL" "Polish (Polski)" 0x0415
+# l "pt-BR" "Portuguese Brazilian (Português do Brasil)" 0x0416
+# l "pt-PT" "Portuguese Standard (Português)" 0x0816
+# l "ro-RO" "Romanian (Română)" 0x0418
+# l "ru-RU" "Russian (Русский)" 0x0419
+# l "sr-SP" "Serbian (Latin)" 0x241a
+# l "sk-SK" "Slovak (Slovensky)" 0x041B
+# l "sl-SI" "Slovene (Slovenščina)" 0x0424
+# l "es-ES" "Spanish (Español)" 0x040a
+# l "sv-SE" "Swedish (Svenska)" 0x041d
+# l "th-TH" "Thai (ไทย)" 0x041e
+# l "tr-TR" "Turkish (Türkçe)" 0x041F
+# l "uk-UA" "Ukrainian (Українська)" 0x0422
+# l "vi-VN" "Vietnamese (Tiếng Việt)" 0x042a
+
+################################################################################
+############################ TRANSLATOR START COPY #############################
+################################################################################
+# See http://msdn.microsoft.com/en-us/goglobal/bb964664.aspx or
+# http://download.microsoft.com/download/9/5/E/95EF66AF-9026-4BB0-A41D-A4F81802D92C/%5BMS-LCID%5D.pdf
+# for the LCID (0x####) codes you should use
+l "en-US" "English (English)" 0x0409, 0x0809, 0x0c09, 0x1009, 0x1409, 0x1809, 0x1c09, 0x2009, 0x2409, 0x2809, 0x2c09, 0x3009, 0x3409, 0x3809, 0x3c09, 0x4009, 0x4409, 0x4809
+v 1.0.19
+
+# Main dialog
+g IDD_ENDLESSUSBTOOL_DIALOG
+t FirstPageTitle "Endless USB Creator"
+t TryEndlessButton "Try Endless"
+t TryEndlessText "You can try Endless directly from a USB drive without making any changes to your computer."
+t InstallEndlessButton "Install Endless"
+t InstallEndlessText "If you prefer having our full experience, you can install Endless as your new operating system."
+t CompareOptionsLink "Compare the two options"
+t SelectFilePreviousButton "Previous"
+t SelectFileNextButton "Next"
+t SelectFilePageTitle "Select OS Image"
+t ExistingImageFile "Use an existing image file:"
+t DownloadNewImage "Download a new image:"
+t SelectUSBPreviousButton "Previous"
+t SelectUSBNextButton "Next"
+t SelectUSBPageTitle "Select USB Disk"
+t USBDisksFound "USB disk found:"
+t NewDiskNameLabel "New Name:"
+t AgreementCheckboxText "I agree to erase all my files on my USB stick"
+t InstallingPageTitle "Installing"
+t CreatingInstallerText "Creating installer USB"
+t SecureBootLabel "Secure Boot"
+t SecureBootText1 "Depending on the motherboard's BIOS/EFI firmware, the Secure Boot option will be found on the \"Boot\", \"Security\" or \"Authentication\" page."
+t SecureBootText2 "It must be set to \"Disabled\" or \"Off\" to allow you to boot from external media correctly."
+t SecureBootHowTo "How should I do it?"
+t ThankYouPageTitle "Thank you"
+t ThankYouMessage "Great! Your Endless Installer device is sucessfully created."
+t InstallerName "Name:"
+t InstallerVersion "Version:"
+t InstallerLanguage "Language:"
+t InstallerContent "Content:"
+t SecureBootReminder "Remember to switch off Secure Boot."
+t SecureBootHowToReminder "How should I do it?"
+
+################################################################################
+############################# TRANSLATOR END COPY ##############################
+################################################################################
+
+################################################################################
+l "ro-RO" "Romanian (Română)" 0x0418, 0x0818
+v 1.0.19
+b "en-US"
+
+# Main dialog
+g IDD_ENDLESSUSBTOOL_DIALOG
+t FirstPageTitle "Endless USB Creator"
+t TryEndlessButton "Încearcă Endless"
+t TryEndlessText "Puteți încerca Endless direct de pe un dispozitiv USB fără a face vreo modificări calculatorului."
+t InstallEndlessButton "Instalează Endless"
+t InstallEndlessText "Dacă preferați experiența completă, puteți să instalați Endless ca noul sistem de operare."
+t CompareOptionsLink "Compară cele două opțiuni"
+t SelectFilePreviousButton "Înapoi"
+t SelectFileNextButton "Înainte"
+t SelectFilePageTitle "Alege fisierul"
+t ExistingImageFile "Folosește un fișier existent:"
+t DownloadNewImage "Descarcă un fisier nou:"
+t SelectUSBPreviousButton "Înapoi"
+t SelectUSBNextButton "Înainte"
+t SelectUSBPageTitle "Alege USB"
+t USBDisksFound "Dispozitiv USB gasit:"
+t NewDiskNameLabel "Nume nou:"
+t AgreementCheckboxText "Sunt de acord să șteargă toate fișierele mele de pe stick-ul USB selectat"
+t InstallingPageTitle "Instalare in curs"
+t CreatingInstallerText "Creare dispozitiv USB pentru instalare"
+t SecureBootLabel "Secure Boot"
+t SecureBootText1 "În funcție de BIOS-ul/EFI plăcii de bază, opțiunea Secure Boot va fi găsită pe una din paginile \"Boot\", \"Securitate\" sau \"Autentificare\"."
+t SecureBootText2 "Acesta trebuie să fie setat pe \"Dezactivat\" sau \"Off\" pentru a vă permite pornirea sistemului de pe suport extern."
+t SecureBootHowTo "Cum ar trebui să fac?"
+t ThankYouPageTitle "Mulțumesc"
+t InstallerName "Nume:"
+t InstallerVersion "Versiune:"
+t InstallerLanguage "Limbă:"
+t InstallerContent "Conținut:"
+t SecureBootReminder "Nu uitați să dezactivați Boot Secure."
+t SecureBootHowToReminder "Cum ar trebui să fac?"

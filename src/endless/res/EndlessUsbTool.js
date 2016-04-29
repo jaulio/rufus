@@ -9,3 +9,8 @@ function opSystemTypeSelected() {
         document.getElementById("OnlineImagesSelect").className = "selected";
     }
 }
+
+function tmpChangePage(from, to) {
+    document.getElementById(from).className = "WizardPage hidden";
+    document.getElementById(to).className = "WizardPage";
+}

@@ -32,6 +32,7 @@
                 </div>
                 <div class="FullWidthContent">
                     <select id="LanguageSelect">
+                        <!-- These will be replaced at runtime by actual available languages in endless.loc -->
                         <option value="en_us">English (United States)</option>
                         <option value="ro_ro">Română (România)</option>
                     </select> 
@@ -57,14 +58,15 @@
 
             <div class="PageContent">
                 <div class="FullWidthContent">
-                    <div class="ContentTitle" id="OperatingSystemFound">Use an existing image file:</div>
+                    <div class="ContentTitle" id="ExistingImageFile">Use an existing image file:</div>
+                    <div id="SelectFileButton"></div>
                     <input type="radio" name="OperatingSystemType" id="OperatingSystemTypeLocal" onclick="opSystemTypeSelected()" checked />
                     <select id="LocalImagesSelect" class="selected">
                         <option value="en_light_27">EOS 2_7 English Light - 2GB</option>
                         <option value="en_full_27">EOS 2_7 English Full - 30GB</option>
                     </select> 
                     
-                    <div class="ContentTitle" id="DownloadOperatingSystem">Download a new image:</div>
+                    <div class="ContentTitle" id="DownloadNewImage">Download a new image:</div>
                     <input type="radio" name="OperatingSystemType" id="OperatingSystemTypeOnline" onclick="opSystemTypeSelected()" />
                     <select id="OnlineImagesSelect">
                         <option value="">-----</option>
@@ -105,7 +107,7 @@
 
                     <div id="AgreementContainer">
                         <input type="checkbox" id="AgreementCheckbox" />
-                        <label for="AgreementCheckbox">I agree to erase all my files on my USB stick</label>
+                        <label for="AgreementCheckbox" id="AgreementCheckboxText">I agree to erase all my files on my USB stick</label>
                     </div>
                 </div>
             </div>
@@ -122,6 +124,8 @@
 
         <div id="InstallingPage" class="WizardPage hidden">
             <div class="FullWidthContent PageHeader">
+                <div class="Button ButtonWithBorder" id="InstallingPageTempPrevious" onclick="tmpChangePage('InstallingPage', 'SelectUSBPage')">TMP Previous</div>
+                <div class="Button ButtonRight" id="InstallingPageTempNext" onclick="tmpChangePage('InstallingPage', 'ThankYouPage')">TMP Next</div>
                 <h1 id="InstallingPageTitle" class="PageHeaderTitle">Installing</h1>
             </div>
 
@@ -136,7 +140,7 @@
                     <div id="SecureBootImage"></div>
                     <div class="SecureBootText" id="SecureBootText1">Depending on the motherboard's BIOS/EFI firmware, the Secure Boot option will be found on the "Boot", "Security" or "Authentication" page.</div>
                     <div class="SecureBootText"id="SecureBootText2">It must be set to "Disabled" or "Off" to allow you to boot from external media correctly.</div>
-                    <a id="SecureBootHowTo">How should I do it?</a>                    
+                    <a id="SecureBootHowTo">How should I do it?</a>
                 </div>
             </div>
 
@@ -151,12 +155,23 @@
         </div>
 
         <div id="ThankYouPage" class="WizardPage hidden">
-            <div class="MainHeader">
-                <h1 id="ThankYouPageTitle">Thank you</h1>
+            <div class="FullWidthContent PageHeader">
+                <div class="Button ButtonWithBorder" id="ThankYouPageTempPrevious" onclick="tmpChangePage('ThankYouPage', 'InstallingPage')"><</div>
+                <div class="Button ButtonRight" id="CloseAppButton">X</div>
+                <h1 id="ThankYouPageTitle" class="PageHeaderTitle">Thank you</h1>
             </div>
 
             <div class="PageContent">
-                
+                <div class="ContentTitle" id="ThankYouMessage">Great! Your Endless Installer device is sucessfully created.</div>
+                <dl id="InstallerDataList">
+                    <dt id="InstallerName">Name:</dt><dd id="InstallerNameValue">EOS 2_7 English Light</dd>
+                    <dt id="InstallerVersion">Version:</dt><dd id="InstallerVersionValue">2.7</dd>
+                    <dt id="InstallerLanguage">Language:</dt><dd id="InstallerLanguageValue">English</dd>
+                    <dt id="InstallerContent">Content:</dt><dd id="InstallerContentValue">Compact (2 GB)</dd>
+                </dl>
+
+                <div class="ContentTitle" id="SecureBootReminder">Remember to switch off Secure Boot.</div>
+                <a id="SecureBootHowToReminder">How should I do it?</a>
             </div>
 
             <div class="PageIndicator">

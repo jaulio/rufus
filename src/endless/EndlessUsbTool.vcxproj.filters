@@ -13,6 +13,15 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
+    <Filter Include="Header Files\Rufus Headers">
+      <UniqueIdentifier>{c17b5888-430f-425f-9c1b-a2bbbbd25ad9}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\Rufus Sources">
+      <UniqueIdentifier>{e4f8130e-30b4-4470-afc7-4353abdbe67d}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Resource Files\Images">
+      <UniqueIdentifier>{d0eb9995-ab80-4a76-b789-54ade241a598}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <Text Include="ReadMe.txt" />
@@ -30,7 +39,19 @@
     <ClInclude Include="targetver.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Resource.h">
+    <ClInclude Include="..\msapi_utf8.h">
+      <Filter>Header Files\Rufus Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\localization.h">
+      <Filter>Header Files\Rufus Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\rufus.h">
+      <Filter>Header Files\Rufus Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="localization_data.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="resource.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
@@ -43,6 +64,18 @@
     </ClCompile>
     <ClCompile Include="stdafx.cpp">
       <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\stdfn.c">
+      <Filter>Source Files\Rufus Sources</Filter>
+    </ClCompile>
+    <ClCompile Include="..\localization.c">
+      <Filter>Source Files\Rufus Sources</Filter>
+    </ClCompile>
+    <ClCompile Include="..\stdio.c">
+      <Filter>Source Files\Rufus Sources</Filter>
+    </ClCompile>
+    <ClCompile Include="..\parser.c">
+      <Filter>Source Files\Rufus Sources</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -58,6 +91,7 @@
     <None Include="res\EndlessUsbTool.js">
       <Filter>Resource Files</Filter>
     </None>
+    <None Include="res\endless.loc" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="EndlessUsbTool.rc">
@@ -67,6 +101,30 @@
   <ItemGroup>
     <Image Include="res\EndlessUsbTool.ico">
       <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="res\images\checked_sign.png">
+      <Filter>Resource Files\Images</Filter>
+    </Image>
+    <Image Include="res\images\left_panel_image.png">
+      <Filter>Resource Files\Images</Filter>
+    </Image>
+    <Image Include="res\images\magnifying_glass.png">
+      <Filter>Resource Files\Images</Filter>
+    </Image>
+    <Image Include="res\images\right_panel_image.png">
+      <Filter>Resource Files\Images</Filter>
+    </Image>
+    <Image Include="res\images\secure_boot.png">
+      <Filter>Resource Files\Images</Filter>
+    </Image>
+    <Image Include="res\images\warning_sign.png">
+      <Filter>Resource Files\Images</Filter>
+    </Image>
+    <Image Include="res\images\wizard_page_indicator.png">
+      <Filter>Resource Files\Images</Filter>
+    </Image>
+    <Image Include="res\images\wizard_page_indicator_selected.png">
+      <Filter>Resource Files\Images</Filter>
     </Image>
   </ItemGroup>
 </Project>

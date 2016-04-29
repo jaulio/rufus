@@ -30,10 +30,22 @@
 #include <stddef.h>
 
 #include "rufus.h"
+
+#ifdef ENDLESSUSB_TOOL
+#include "endless\resource.h"
+#else // ENDLESSUSB_TOOL
 #include "resource.h"
+#endif // ENDLESSUSB_TOOL
+
 #include "msapi_utf8.h"
 #include "localization.h"
+
+#ifdef ENDLESSUSB_TOOL
+#include "endless\localization_data.h"
+BOOL global_is_default_localization = FALSE;
+#else // ENDLESSUSB_TOOL
 #include "localization_data.h"
+#endif // ENDLESSUSB_TOOL
 
 /*
  * List of supported locale commands, with their parameter syntax:
@@ -250,7 +262,11 @@ BOOL dispatch_loc_cmd(loc_cmd* lcmd)
 	}
 
 	// Don't process UI commands when we're dealing with the default
+#ifdef ENDLESSUSB_TOOL
+	if (msg_table == default_msg_table && !global_is_default_localization) {
+#else
 	if (msg_table == default_msg_table) {
+#endif // ENDLESSUSB_TOOL
 		free_loc_cmd(lcmd);
 		return TRUE;
 	}
@@ -345,12 +361,16 @@ void apply_localization(int dlg_id, HWND hDlg)
 				break;
 			case LC_MOVE:
 				if (hCtrl != NULL) {
+#ifndef ENDLESSUSB_TOOL
 					ResizeMoveCtrl(hDlg, hCtrl, lcmd->num[0], lcmd->num[1], 0, 0, fScale);
+#endif // ENDLESSUSB_TOOL
 				}
 				break;
 			case LC_SIZE:
 				if (hCtrl != NULL) {
+#ifndef ENDLESSUSB_TOOL
 					ResizeMoveCtrl(hDlg, hCtrl, 0, 0, lcmd->num[0], lcmd->num[1], fScale);
+#endif // ENDLESSUSB_TOOL
 				}
 				break;
 			}
@@ -425,7 +445,11 @@ static char *output_msg[2];
 static uint64_t last_msg_time[2] = { 0, 0 };
 
 static void PrintInfoMessage(char* msg) {
+#ifdef ENDLESSUSB_TOOL
+	uprintf(msg);
+#else // ENDLESSUSB_TOOL
 	SetWindowTextU(hInfo, msg);
+#endif // ENDLESSUSB_TOOL
 }
 static void PrintStatusMessage(char* msg) {
 	SendMessageLU(hStatus, SB_SETTEXTW, SBT_OWNERDRAW | SB_SECTION_LEFT, msg);
