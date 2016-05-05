@@ -7,6 +7,9 @@
 #include "EndlessUsbToolDlg.h"
 #include "afxdialogex.h"
 
+#include <windowsx.h>
+#include <dbt.h>
+
 // Rufus include files
 extern "C" {
 #include "rufus.h"
@@ -26,6 +29,36 @@ WORD selected_langid = MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT);
 extern const loc_control_id control_id[];
 extern loc_dlg_list loc_dlg[];
 extern char** msg_table;
+
+// Trying to reuse as much as rufus as possible
+HWND hDeviceList = NULL, hBootType = NULL, hPartitionScheme = NULL, hFileSystem = NULL, hClusterSize = NULL, hLabel = NULL;
+HWND hNBPasses = NULL, hDiskID = NULL;
+HINSTANCE hMainInstance = NULL;
+
+BOOL detect_fakes = FALSE;
+
+char app_dir[MAX_PATH], system_dir[MAX_PATH], sysnative_dir[MAX_PATH];
+char* image_path = NULL;
+// Number of steps for each FS for FCC_STRUCTURE_PROGRESS
+const int nb_steps[FS_MAX] = { 5, 5, 12, 1, 10 };
+BOOL format_op_in_progress = FALSE;
+BOOL allow_dual_uefi_bios, togo_mode, force_large_fat32, enable_ntfs_compression = FALSE, lock_drive = TRUE;
+BOOL zero_drive = FALSE, preserve_timestamps, list_non_usb_removable_drives = FALSE;
+BOOL use_own_c32[NB_OLD_C32] = { FALSE, FALSE };
+uint16_t rufus_version[3], embedded_sl_version[2];
+char embedded_sl_version_str[2][12] = { "?.??", "?.??" };
+char embedded_sl_version_ext[2][32];
+uint32_t dur_mins, dur_secs;
+StrArray DriveID, DriveLabel;
+BOOL enable_HDDs = FALSE, use_fake_units, enable_vmdk;
+
+static HANDLE format_thid = NULL;
+
+void UpdateProgress(int op, float percent)
+{
+    luprintf("UpdateProgress called with %d, %f", op, percent);
+}
+
 };
 
 #include "localization.h"
@@ -53,6 +86,7 @@ extern char** msg_table;
 //Select USB page elements
 #define ELEMENT_SELUSB_PREV_BUTTON      "SelectUSBPreviousButton"
 #define ELEMENT_SELUSB_NEXT_BUTTON      "SelectUSBNextButton"
+#define ELEMENT_SELUSB_USB_DRIVES       "USBDiskSelect"
 //Installing page elements
 #define ELEMENT_SECUREBOOT_HOWTO        "SecureBootHowTo"
 //Thank You page elements
@@ -103,11 +137,13 @@ END_DHTML_EVENT_MAP()
 
 
 CEndlessUsbToolDlg::CEndlessUsbToolDlg(CWnd* pParent /*=NULL*/)
-	: CDHtmlDialog(IDD_ENDLESSUSBTOOL_DIALOG, IDR_HTML_ENDLESSUSBTOOL_DIALOG, pParent),
-	m_selectedLocale(NULL),
-	m_fullInstall(false),
-	m_localizationFile(""),
-	m_spHtmlDoc3(NULL)
+    : CDHtmlDialog(IDD_ENDLESSUSBTOOL_DIALOG, IDR_HTML_ENDLESSUSBTOOL_DIALOG, pParent),
+    m_selectedLocale(NULL),
+    m_fullInstall(false),
+    m_localizationFile(""),
+    m_shellNotificationsRegister(0),
+    m_lastDevicesRefresh(0),
+    m_spHtmlDoc3(NULL)
 {
 	m_hIcon = AfxGetApp()->LoadIcon(IDR_MAINFRAME);
 }
@@ -147,6 +183,48 @@ error:
 	uprintf("OnDocumentComplete Exit with error");
 }
 
+void CEndlessUsbToolDlg::InitRufus()
+{
+    // RADU: try to remove the need for this
+    hMainDialog = m_hWnd;
+    hDeviceList = m_hWnd;
+    hBootType = m_hWnd;
+    hPartitionScheme = m_hWnd;
+    hFileSystem = m_hWnd;
+    hClusterSize = m_hWnd;
+    hLabel = m_hWnd;
+    hNBPasses = m_hWnd;
+    hDiskID = m_hWnd;
+
+    hMainInstance = AfxGetResourceHandle();
+
+    // Retrieve the current application directory as well as the system & sysnative dirs
+    if (GetCurrentDirectoryU(sizeof(app_dir), app_dir) == 0) {
+        uprintf("Could not get current directory: %s", WindowsErrorString());
+        app_dir[0] = 0;
+    }
+    if (GetSystemDirectoryU(system_dir, sizeof(system_dir)) == 0) {
+        uprintf("Could not get system directory: %s", WindowsErrorString());
+        safe_strcpy(system_dir, sizeof(system_dir), "C:\\Windows\\System32");
+    }
+    // Construct Sysnative ourselves as there is no GetSysnativeDirectory() call
+    // By default (64bit app running on 64 bit OS or 32 bit app running on 32 bit OS)
+    // Sysnative and System32 are the same
+    safe_strcpy(sysnative_dir, sizeof(sysnative_dir), system_dir);
+    // But if the app is 32 bit and the OS is 64 bit, Sysnative must differ from System32
+#if (!defined(_WIN64) && !defined(BUILD64))
+    if (is_x64()) {
+        if (GetSystemWindowsDirectoryU(sysnative_dir, sizeof(sysnative_dir)) == 0) {
+            uprintf("Could not get Windows directory: %s", WindowsErrorString());
+            safe_strcpy(sysnative_dir, sizeof(sysnative_dir), "C:\\Windows");
+        }
+        safe_strcat(sysnative_dir, sizeof(sysnative_dir), "\\Sysnative");
+    }
+#endif
+
+}
+
+
 // CEndlessUsbToolDlg message handlers
 
 BOOL CEndlessUsbToolDlg::OnInitDialog()
@@ -182,12 +260,20 @@ BOOL CEndlessUsbToolDlg::OnInitDialog()
 	//  Set the window region
 	SetWindowRgn(static_cast<HRGN>(rgn.GetSafeHandle()), TRUE);
 
-	// RADU: try to remove the need for this
-	hMainDialog = m_hWnd;
-
+	// Init localization before doing anything else
 	LoadLocalizationData();
 
+	InitRufus();
+
 	return TRUE;  // return TRUE  unless you set the focus to a control
+}
+
+void CEndlessUsbToolDlg::Uninit()
+{
+    StrArrayDestroy(&DriveID);
+    StrArrayDestroy(&DriveLabel);
+
+    exit_localization();
 }
 
 // If you add a minimize button to your dialog, you will need the code below
@@ -224,6 +310,165 @@ void CEndlessUsbToolDlg::OnPaint()
 HCURSOR CEndlessUsbToolDlg::OnQueryDragIcon()
 {
 	return static_cast<HCURSOR>(m_hIcon);
+}
+
+BOOL CEndlessUsbToolDlg::PreTranslateMessage(MSG* pMsg)
+{
+    // disable closing by escape key
+    if (pMsg->message == WM_KEYDOWN && pMsg->wParam == VK_ESCAPE) {
+        return TRUE;
+    }
+
+    return CDHtmlDialog::PreTranslateMessage(pMsg);
+}
+
+/*
+* Device Refresh Timer
+*/
+void CALLBACK CEndlessUsbToolDlg::RefreshTimer(HWND hWnd, UINT uMsg, UINT_PTR idEvent, DWORD dwTime)
+{
+    // DO NOT USE WM_DEVICECHANGE - IT MAY BE FILTERED OUT BY WINDOWS!
+    ::SendMessage(hWnd, UM_MEDIA_CHANGE, 0, 0);
+}
+
+LRESULT CEndlessUsbToolDlg::WindowProc(UINT message, WPARAM wParam, LPARAM lParam)
+{
+    if (message >= CB_GETEDITSEL && message < CB_MSGMAX) {
+        CComPtr<IHTMLElement> pElement;
+        CComPtr<IHTMLSelectElement> selectElement;
+        CComPtr<IHTMLOptionElement> optionElement;
+        HRESULT hr;
+
+        hr = m_spHtmlDoc3->getElementById(CComBSTR(ELEMENT_SELUSB_USB_DRIVES), &pElement);
+        IFFALSE_GOTOERROR(SUCCEEDED(hr) && pElement != NULL, "Error when querying for languages HTML element.");
+
+        hr = pElement.QueryInterface<IHTMLSelectElement>(&selectElement);
+        IFFALSE_GOTOERROR(SUCCEEDED(hr), "Error querying for IHTMLSelectElement interface");
+
+        switch (message) {
+        case CB_RESETCONTENT:
+        {
+            hr = selectElement->put_length(0);
+            IFFALSE_GOTOERROR(SUCCEEDED(hr), "Error clearing elements from USB drive list.");
+            break;
+        }
+
+        case CB_ADDSTRING:
+        {
+            CComBSTR text = (wchar_t*)lParam;
+            long index = 0;
+            hr = AddEntryToSelect(selectElement, text, text, &index);
+            IFFALSE_GOTOERROR(SUCCEEDED(hr), "Error adding item in USB drive list.");
+            return index;
+        }
+
+        case CB_SETCURSEL:
+        case CB_SETITEMDATA:
+        case CB_GETITEMDATA:
+        {
+            CComPtr<IDispatch> pDispatch;
+            CComBSTR valueBSTR;
+            long index = (long)wParam;
+            long value = (long)lParam;
+
+            hr = selectElement->item(CComVariant(index), CComVariant(0), &pDispatch);
+            IFFALSE_GOTOERROR(SUCCEEDED(hr) && pDispatch != NULL, "Error when querying for element at requested index.");
+
+            hr = pDispatch.QueryInterface<IHTMLOptionElement>(&optionElement);
+            IFFALSE_GOTOERROR(SUCCEEDED(hr), "Error when querying for IHTMLOptionElement interface");
+
+            if (message == CB_SETITEMDATA) {
+                hr = ::VarBstrFromI4(value, LOCALE_SYSTEM_DEFAULT, 0, &valueBSTR);
+                IFFALSE_GOTOERROR(SUCCEEDED(hr), "Error converting int value to BSTR.");
+
+                hr = optionElement->put_value(valueBSTR);
+                IFFALSE_GOTOERROR(SUCCEEDED(hr), "Error setting value for requested element.");
+            }
+            else if (message == CB_GETITEMDATA) {
+                hr = optionElement->get_value(&valueBSTR);
+                IFFALSE_GOTOERROR(SUCCEEDED(hr), "Error getting value for requested element.");
+
+                hr = ::VarI4FromStr(valueBSTR, LOCALE_SYSTEM_DEFAULT, 0, &value);
+                IFFALSE_GOTOERROR(SUCCEEDED(hr), "Error converting BSTR to int value.");
+                return value;
+            }
+            else if (message == CB_SETCURSEL) {
+                hr = optionElement->put_selected(VARIANT_TRUE);
+                IFFALSE_GOTOERROR(SUCCEEDED(hr), "Error setting selected for requested element.");
+            }
+
+            break;
+        }
+
+        case CB_GETCURSEL:
+        {
+            long index = -1;
+            hr = selectElement->get_selectedIndex(&index);
+            IFFALSE_GOTOERROR(SUCCEEDED(hr), "Error querying for selected index.");
+
+            return index;
+        }
+
+        case CB_GETCOUNT:
+        {
+            long count = 0;
+            hr = selectElement->get_length(&count);
+            IFFALSE_GOTOERROR(SUCCEEDED(hr), "Error querying for list count.");
+
+            return count;
+        }
+
+        default:
+            luprintf("Untreated CB message %d(0x%X)", message, message);
+            break;
+        }
+
+        return 0;
+
+    error:
+        uprintf("CEndlessUsbToolDlg::WindowProc called with %d (%d, %d); FAILURE %x", message, lParam, wParam, hr);
+        return -1;
+    } else {
+        switch (message) {
+        case UM_MEDIA_CHANGE:
+            wParam = DBT_CUSTOMEVENT;
+            // Fall through
+        case WM_DEVICECHANGE:
+            // The Windows hotplug subsystem sucks. Among other things, if you insert a GPT partitioned
+            // USB drive with zero partitions, the only device messages you will get are a stream of
+            // DBT_DEVNODES_CHANGED and that's it. But those messages are also issued when you get a
+            // DBT_DEVICEARRIVAL and DBT_DEVICEREMOVECOMPLETE, and there's a whole slew of them so we
+            // can't really issue a refresh for each one we receive
+            // What we do then is arm a timer on DBT_DEVNODES_CHANGED, if it's been more than 1 second
+            // since last refresh/arm timer, and have that timer send DBT_CUSTOMEVENT when it expires.
+            // DO *NOT* USE WM_DEVICECHANGE AS THE MESSAGE FROM THE TIMER PROC, as it may be filtered!
+            // For instance filtering will occur when (un)plugging in a FreeBSD UFD on Windows 8.
+            // Instead, use a custom user message, such as UM_MEDIA_CHANGE, to set DBT_CUSTOMEVENT.
+            if (format_thid == NULL) {
+                switch (wParam) {
+                case DBT_DEVICEARRIVAL:
+                case DBT_DEVICEREMOVECOMPLETE:
+                case DBT_CUSTOMEVENT:	// Sent by our timer refresh function or for card reader media change
+                    m_lastDevicesRefresh = _GetTickCount64();
+                    KillTimer(TID_REFRESH_TIMER);
+                    GetUSBDevices((DWORD)ComboBox_GetItemData(hDeviceList, ComboBox_GetCurSel(hDeviceList)));
+                    return (INT_PTR)TRUE;
+                case DBT_DEVNODES_CHANGED:
+                    // If it's been more than a second since last device refresh, arm a refresh timer
+                    if (_GetTickCount64() > m_lastDevicesRefresh + 1000) {
+                        m_lastDevicesRefresh = _GetTickCount64();
+                        SetTimer(TID_REFRESH_TIMER, 1000, RefreshTimer);
+                    }
+                    break;
+                default:
+                    break;
+                }
+            }
+            break;
+        }
+    }
+
+    return CDHtmlDialog::WindowProc(message, wParam, lParam);
 }
 
 // Disable context menu
@@ -266,7 +511,7 @@ void CEndlessUsbToolDlg::LoadLocalizationData()
 
 	init_localization();
 
-	loc_data = (BYTE*)GetResource(AfxGetResourceHandle(), MAKEINTRESOURCEA(IDR_LC_ENDLESS_LOC), _RT_RCDATA, "embedded.loc", &loc_size, FALSE);
+	loc_data = (BYTE*)GetResource(hMainInstance, MAKEINTRESOURCEA(IDR_LC_ENDLESS_LOC), _RT_RCDATA, "embedded.loc", &loc_size, FALSE);
 	if ((GetTempPathU(sizeof(tmp_path), tmp_path) == 0)
 		|| (GetTempFileNameU(tmp_path, APPLICATION_NAME, 0, m_localizationFile) == 0)
 		|| (m_localizationFile[0] == 0)) {
@@ -375,19 +620,7 @@ void CEndlessUsbToolDlg::AddLanguagesToUI()
 	list_for_each_entry(lcmd, &locale_list, loc_cmd, list) {
 		luprintf("Language available : %s", lcmd->txt[1]);
 
-		pElement = NULL;
-		hr = m_spHtmlDoc->createElement(CComBSTR("option"), &pElement);
-		IFFALSE_RETURN(SUCCEEDED(hr), "Error when creating the option element");
-
-		optionElement = NULL;
-		hr = pElement.QueryInterface<IHTMLOptionElement>(&optionElement);
-		IFFALSE_RETURN(SUCCEEDED(hr), "Error when querying for IHTMLSelectElement interface");
-
-		optionElement->put_selected(m_selectedLocale == lcmd ? TRUE : FALSE);
-		optionElement->put_value(UTF8ToBSTR(lcmd->txt[0]));
-		optionElement->put_text(UTF8ToBSTR(lcmd->txt[1]));
-
-		hr = selectElement->add(pElement, CComVariant(index++));
+		hr = AddEntryToSelect(selectElement, UTF8ToBSTR(lcmd->txt[0]), UTF8ToBSTR(lcmd->txt[1]), NULL, m_selectedLocale == lcmd ? TRUE : FALSE);
 		IFFALSE_RETURN(SUCCEEDED(hr), "Error adding the new option element to the select element");
 	}
 }
@@ -414,6 +647,57 @@ void CEndlessUsbToolDlg::ChangePage(PCTSTR oldPage, PCTSTR newPage)
 error:
 	// RADU: LOG the HR value
 	return;
+}
+
+HRESULT CEndlessUsbToolDlg::AddEntryToSelect(PCTSTR selectId, const CComBSTR &value, const CComBSTR &text, long *outIndex, BOOL selected)
+{
+    CComPtr<IHTMLElement> pElement;
+    CComPtr<IHTMLSelectElement> selectElement;
+    HRESULT hr;
+
+    hr = m_spHtmlDoc3->getElementById(CComBSTR(selectId), &pElement);
+    IFFALSE_GOTOERROR(SUCCEEDED(hr) && pElement != NULL, "Error when querying for select element.");
+
+    hr = pElement.QueryInterface<IHTMLSelectElement>(&selectElement);
+    IFFALSE_GOTOERROR(SUCCEEDED(hr), "Error querying for IHTMLSelectElement interface");
+
+    return AddEntryToSelect(selectElement, value, text, outIndex, selected);
+
+error:
+    luprintf("AddEntryToSelect error on select [%s] and entry (%s, %s)", selectId, text, value);
+    return hr;
+}
+
+HRESULT CEndlessUsbToolDlg::AddEntryToSelect(CComPtr<IHTMLSelectElement> &selectElem, const CComBSTR &value, const CComBSTR &text, long *outIndex, BOOL selected)
+{
+    CComPtr<IHTMLElement> pElement;
+    CComPtr<IHTMLOptionElement> optionElement;
+    HRESULT hr;
+
+    hr = m_spHtmlDoc->createElement(CComBSTR("option"), &pElement);
+    IFFALSE_GOTOERROR(SUCCEEDED(hr), "Error when creating the option element");
+
+    hr = pElement.QueryInterface<IHTMLOptionElement>(&optionElement);
+    IFFALSE_GOTOERROR(SUCCEEDED(hr), "Error when querying for IHTMLOptionElement interface");
+
+    optionElement->put_selected(selected);
+    optionElement->put_value(value);
+    optionElement->put_text(text);
+
+    long length;
+    hr = selectElem->get_length(&length);
+    IFFALSE_GOTOERROR(SUCCEEDED(hr), "Error querying the select element length.");
+    if (outIndex != NULL) {
+        *outIndex = length;
+    }
+
+    hr = selectElem->add(pElement, CComVariant(length));
+    IFFALSE_GOTOERROR(SUCCEEDED(hr), "Error adding the new option element to the select element");
+
+    return S_OK;
+error:
+    luprintf("AddEntryToSelect error on adding entry (%ls, %ls)", text, value);
+    return hr;
 }
 
 //HRESULT CEndlessUsbToolDlg::OnHtmlSelectStart(IHTMLElement* pElement)
@@ -492,6 +776,21 @@ HRESULT CEndlessUsbToolDlg::OnSelectFilePreviousClicked(IHTMLElement* pElement)
 
 HRESULT CEndlessUsbToolDlg::OnSelectFileNextClicked(IHTMLElement* pElement)
 {
+    LPITEMIDLIST pidlDesktop = NULL;
+    SHChangeNotifyEntry NotifyEntry;
+
+    GetUSBDevices(0);
+
+    // Register MEDIA_INSERTED/MEDIA_REMOVED notifications for card readers
+    if (SUCCEEDED(SHGetSpecialFolderLocation(0, CSIDL_DESKTOP, &pidlDesktop))) {
+        NotifyEntry.pidl = pidlDesktop;
+        NotifyEntry.fRecursive = TRUE;
+        // NB: The following only works if the media is already formatted.
+        // If you insert a blank card, notifications will not be sent... :(
+        m_shellNotificationsRegister = SHChangeNotifyRegister(m_hWnd, 0x0001 | 0x0002 | 0x8000,
+            SHCNE_MEDIAINSERTED | SHCNE_MEDIAREMOVED, UM_MEDIA_CHANGE, 1, &NotifyEntry);
+    }
+
 	ChangePage(_T("SelectFilePage"), _T("SelectUSBPage"));
 
 	return S_OK;
@@ -507,6 +806,7 @@ HRESULT CEndlessUsbToolDlg::OnSelectFileButtonClicked(IHTMLElement* pElement)
 // Select USB Page Handlers
 HRESULT CEndlessUsbToolDlg::OnSelectUSBPreviousClicked(IHTMLElement* pElement)
 {
+	LeavingDevicesPage();
 	ChangePage(_T("SelectUSBPage"), _T("SelectFilePage"));
 
 	return S_OK;
@@ -514,14 +814,24 @@ HRESULT CEndlessUsbToolDlg::OnSelectUSBPreviousClicked(IHTMLElement* pElement)
 
 HRESULT CEndlessUsbToolDlg::OnSelectUSBNextClicked(IHTMLElement* pElement)
 {
+	LeavingDevicesPage();
 	ChangePage(_T("SelectUSBPage"), _T("InstallingPage"));
 
 	return S_OK;
 }
 
+void CEndlessUsbToolDlg::LeavingDevicesPage()
+{
+    if (m_shellNotificationsRegister != 0) {
+        SHChangeNotifyDeregister(m_shellNotificationsRegister);
+        m_shellNotificationsRegister = 0;
+    }
+}
+
 // Thank You Page Handlers
 HRESULT CEndlessUsbToolDlg::OnCloseAppClicked(IHTMLElement* pElement)
 {
+	Uninit();
 	AfxPostQuitMessage(0);
 
 	return S_OK;
@@ -529,7 +839,7 @@ HRESULT CEndlessUsbToolDlg::OnCloseAppClicked(IHTMLElement* pElement)
 
 void CEndlessUsbToolDlg::OnClose()
 {
-	exit_localization();
+	Uninit();
 
 	CDHtmlDialog::OnClose();
 }

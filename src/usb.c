@@ -628,7 +628,9 @@ BOOL GetUSBDevices(DWORD devnum)
 				StrArrayAdd(&DriveLabel, label);
 
 				IGNORE_RETVAL(ComboBox_SetItemData(hDeviceList, ComboBox_AddStringU(hDeviceList, entry), drive_index));
+#ifndef ENDLESSUSB_TOOL
 				maxwidth = max(maxwidth, GetEntryWidth(hDeviceList, entry));
+#endif // !ENDLESSUSB_TOOL
 				safe_closehandle(hDrive);
 				safe_free(devint_detail_data);
 				break;
@@ -651,9 +653,11 @@ BOOL GetUSBDevices(DWORD devnum)
 	if (!found)
 		i = 0;
 	IGNORE_RETVAL(ComboBox_SetCurSel(hDeviceList, i));
+#ifndef ENDLESSUSB_TOOL
 	SendMessage(hMainDialog, WM_COMMAND, (CBN_SELCHANGE<<16) | IDC_DEVICE, 0);
 	SendMessage(hMainDialog, WM_COMMAND, (CBN_SELCHANGE<<16) | IDC_FILESYSTEM,
 		ComboBox_GetCurSel(hFileSystem));
+#endif // !ENDLESSUSB_TOOL
 	r = TRUE;
 
 out:

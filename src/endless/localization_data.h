@@ -54,12 +54,20 @@ const loc_control_id control_id[] = {
 	LOC_CTRL_HTML(SecureBootText2),
 	LOC_CTRL_HTML(SecureBootHowTo),
 	LOC_CTRL_HTML(ThankYouPageTitle),
+	LOC_CTRL_HTML(ThankYouMessage),
 	LOC_CTRL_HTML(InstallerName),
 	LOC_CTRL_HTML(InstallerVersion),
 	LOC_CTRL_HTML(InstallerLanguage),
 	LOC_CTRL_HTML(InstallerContent),
 	LOC_CTRL_HTML(SecureBootReminder),
 	LOC_CTRL_HTML(SecureBootHowToReminder),
+	LOC_CTRL(MSG_020),
+	LOC_CTRL(MSG_021),
+	LOC_CTRL(MSG_022),
+	LOC_CTRL(MSG_023),
+	LOC_CTRL(MSG_024),
+	LOC_CTRL(MSG_025),
+	LOC_CTRL(MSG_046),
 };
 
 // Dialog data

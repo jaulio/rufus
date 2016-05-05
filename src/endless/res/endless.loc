@@ -120,13 +120,23 @@ t SecureBootText1 "Depending on the motherboard's BIOS/EFI firmware, the Secure 
 t SecureBootText2 "It must be set to \"Disabled\" or \"Off\" to allow you to boot from external media correctly."
 t SecureBootHowTo "How should I do it?"
 t ThankYouPageTitle "Thank you"
-t ThankYouMessage "Great! Your Endless Installer device is sucessfully created."
+t ThankYouMessage "Great! Your Endless Installer device is successfully created."
 t InstallerName "Name:"
 t InstallerVersion "Version:"
 t InstallerLanguage "Language:"
 t InstallerContent "Content:"
 t SecureBootReminder "Remember to switch off Secure Boot."
 t SecureBootHowToReminder "How should I do it?"
+
+# *Short* size names. These can be used as suffixes
+t MSG_020 "bytes"
+t MSG_021 "KB"
+t MSG_022 "MB"
+t MSG_023 "GB"
+t MSG_024 "TB"
+t MSG_025 "PB"
+
+t MSG_046 "%s (Disk %d) [%s]"
 
 ################################################################################
 ############################# TRANSLATOR END COPY ##############################

@@ -54,6 +54,18 @@
     <ClInclude Include="resource.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\usb.h">
+      <Filter>Header Files\Rufus Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\drive.h">
+      <Filter>Header Files\Rufus Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\smart.h">
+      <Filter>Header Files\Rufus Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\dos.h">
+      <Filter>Header Files\Rufus Headers</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="EndlessUsbTool.cpp">
@@ -75,6 +87,39 @@
       <Filter>Source Files\Rufus Sources</Filter>
     </ClCompile>
     <ClCompile Include="..\parser.c">
+      <Filter>Source Files\Rufus Sources</Filter>
+    </ClCompile>
+    <ClCompile Include="..\usb.c">
+      <Filter>Source Files\Rufus Sources</Filter>
+    </ClCompile>
+    <ClCompile Include="..\smart.c">
+      <Filter>Source Files\Rufus Sources</Filter>
+    </ClCompile>
+    <ClCompile Include="..\drive.c">
+      <Filter>Source Files\Rufus Sources</Filter>
+    </ClCompile>
+    <ClCompile Include="..\format.c">
+      <Filter>Source Files\Rufus Sources</Filter>
+    </ClCompile>
+    <ClCompile Include="..\dos.c">
+      <Filter>Source Files\Rufus Sources</Filter>
+    </ClCompile>
+    <ClCompile Include="..\dos_locale.c">
+      <Filter>Source Files\Rufus Sources</Filter>
+    </ClCompile>
+    <ClCompile Include="..\iso.c">
+      <Filter>Source Files\Rufus Sources</Filter>
+    </ClCompile>
+    <ClCompile Include="..\syslinux.c">
+      <Filter>Source Files\Rufus Sources</Filter>
+    </ClCompile>
+    <ClCompile Include="..\icon.c">
+      <Filter>Source Files\Rufus Sources</Filter>
+    </ClCompile>
+    <ClCompile Include="..\vhd.c">
+      <Filter>Source Files\Rufus Sources</Filter>
+    </ClCompile>
+    <ClCompile Include="..\badblocks.c">
       <Filter>Source Files\Rufus Sources</Filter>
     </ClCompile>
   </ItemGroup>

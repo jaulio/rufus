@@ -53,6 +53,11 @@ protected:
 	afx_msg void OnPaint();
 	afx_msg HCURSOR OnQueryDragIcon();
 	afx_msg void OnClose();
+
+	BOOL PreTranslateMessage(MSG* pMsg);
+	static void CALLBACK RefreshTimer(HWND hWnd, UINT uMsg, UINT_PTR idEvent, DWORD dwTime);
+	LRESULT WindowProc(UINT message, WPARAM wParam, LPARAM lParam);
+
 	DECLARE_MESSAGE_MAP()
 	DECLARE_DHTML_EVENT_MAP()
 
@@ -66,12 +71,24 @@ private:
 	bool m_fullInstall;
 	loc_cmd* m_selectedLocale;
 	char m_localizationFile[MAX_PATH] = "";
+	ULONG m_shellNotificationsRegister;
+	uint64_t m_lastDevicesRefresh;
 
 	CComPtr<IHTMLDocument3> m_spHtmlDoc3;
+
+	void InitRufus();
 
 	void LoadLocalizationData();
 	void AddLanguagesToUI();
 	void ApplyRufusLocalization();
 
 	void ChangePage(PCTSTR oldPage, PCTSTR newPage);
+
+	HRESULT AddEntryToSelect(PCTSTR selectId, const CComBSTR &value, const CComBSTR &text, long *outIndex, BOOL selected = FALSE);
+	HRESULT AddEntryToSelect(CComPtr<IHTMLSelectElement> &selectElem, const CComBSTR &value, const CComBSTR &text, long *outIndex, BOOL selected = FALSE);
+
+	void LeavingDevicesPage();
+
+
+	void Uninit();
 };
