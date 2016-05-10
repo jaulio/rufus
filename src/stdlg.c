@@ -66,6 +66,8 @@ static WNDPROC update_original_proc = NULL;
 
 extern loc_cmd* selected_locale;
 
+
+#ifndef ENDLESSUSB_TOOL
 /*
  * We need a sub-callback to read the content of the edit box on exit and update
  * our path, else if what the user typed does match the selection, it is discarded.
@@ -229,6 +231,7 @@ fallback:
 	safe_free(bi.lpszTitle);
 	dialog_showing--;
 }
+#endif // !ENDLESSUSB_TOOL
 
 /*
  * Return the UTF8 path of a file selected through a load or save dialog
@@ -390,6 +393,8 @@ char* FileDialog(BOOL save, char* path, const ext_t* ext, DWORD options)
 	dialog_showing--;
 	return filepath;
 }
+
+#ifndef ENDLESSUSB_TOOL
 
 /*
  * Create the application status bar
@@ -1722,3 +1727,4 @@ INT_PTR MyDialogBox(HINSTANCE hInstance, int Dialog_ID, HWND hWndParent, DLGPROC
 	safe_free(rcTemplate);
 	return ret;
 }
+#endif // !ENDLESSUSB_TOOL

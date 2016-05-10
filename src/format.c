@@ -1586,12 +1586,21 @@ DWORD WINAPI FormatThread(void* param)
 	PF_INIT(GetThreadUILanguage, Kernel32);
 	PF_INIT(SetThreadUILanguage, Kernel32);
 
+#ifdef ENDLESSUSB_TOOL
+    fs = FS_FAT32;
+    bt = BT_IMG;
+    pt = PARTITION_STYLE_MBR;
+    tt = TT_BIOS;
+    use_large_fat32 = 0;
+    windows_to_go = 0;
+#else
 	fs = (int)ComboBox_GetItemData(hFileSystem, ComboBox_GetCurSel(hFileSystem));
 	bt = (int)ComboBox_GetItemData(hBootType, ComboBox_GetCurSel(hBootType));
 	pt = GETPARTTYPE((int)ComboBox_GetItemData(hPartitionScheme, ComboBox_GetCurSel(hPartitionScheme)));
 	tt = GETTARGETTYPE((int)ComboBox_GetItemData(hPartitionScheme, ComboBox_GetCurSel(hPartitionScheme)));
 	use_large_fat32 = (fs == FS_FAT32) && ((SelectedDrive.DiskSize > LARGE_FAT32_SIZE) || (force_large_fat32));
 	windows_to_go = (togo_mode) && HAS_TOGO(img_report) && (Button_GetCheck(GetDlgItem(hMainDialog, IDC_WINDOWS_TO_GO)) == BST_CHECKED);
+#endif
 	// Find out if we need to add any extra partitions
 	if ((windows_to_go) && (tt == TT_UEFI) && (pt == PARTITION_STYLE_GPT))
 		// According to Microsoft, every GPT disk (we RUN Windows from) must have an MSR due to not having hidden sectors

@@ -445,11 +445,7 @@ static char *output_msg[2];
 static uint64_t last_msg_time[2] = { 0, 0 };
 
 static void PrintInfoMessage(char* msg) {
-#ifdef ENDLESSUSB_TOOL
-	uprintf(msg);
-#else // ENDLESSUSB_TOOL
 	SetWindowTextU(hInfo, msg);
-#endif // ENDLESSUSB_TOOL
 }
 static void PrintStatusMessage(char* msg) {
 	SendMessageLU(hStatus, SB_SETTEXTW, SBT_OWNERDRAW | SB_SECTION_LEFT, msg);

@@ -124,14 +124,12 @@
 
         <div id="InstallingPage" class="WizardPage hidden">
             <div class="FullWidthContent PageHeader">
-                <div class="Button ButtonWithBorder" id="InstallingPageTempPrevious" onclick="tmpChangePage('InstallingPage', 'SelectUSBPage')">TMP Previous</div>
-                <div class="Button ButtonRight" id="InstallingPageTempNext" onclick="tmpChangePage('InstallingPage', 'ThankYouPage')">TMP Next</div>
                 <h1 id="InstallingPageTitle" class="PageHeaderTitle">Installing</h1>
             </div>
 
             <div class="PageContent">
                 <div class="ContentTitle" id="CreatingInstallerText">Creating installer USB</div>
-                <div class="ProgressBarContainer">
+                <div class="ProgressBarContainer" id="ProgressBarContainer">
                     <div id="ProgressBar"></div>
                 </div>
 
@@ -156,7 +154,6 @@
 
         <div id="ThankYouPage" class="WizardPage hidden">
             <div class="FullWidthContent PageHeader">
-                <div class="Button ButtonWithBorder" id="ThankYouPageTempPrevious" onclick="tmpChangePage('ThankYouPage', 'InstallingPage')"><</div>
                 <div class="Button ButtonRight" id="CloseAppButton">X</div>
                 <h1 id="ThankYouPageTitle" class="PageHeaderTitle">Thank you</h1>
             </div>

@@ -122,6 +122,9 @@
     <ClCompile Include="..\badblocks.c">
       <Filter>Source Files\Rufus Sources</Filter>
     </ClCompile>
+    <ClCompile Include="..\stdlg.c">
+      <Filter>Source Files\Rufus Sources</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="res\EndlessUsbTool.rc2">
@@ -137,6 +140,7 @@
       <Filter>Resource Files</Filter>
     </None>
     <None Include="res\endless.loc" />
+    <None Include="..\..\res\uefi\uefi-ntfs.img" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="EndlessUsbTool.rc">
