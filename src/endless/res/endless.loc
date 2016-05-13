@@ -267,7 +267,7 @@ t MSG_302 " %s din %s (%s/sec)"
 t MSG_303 "Ceva este în neregulă cu fișierul selectat."
 t MSG_304 "Începe descărcarea..."
 
-# Image languages, should be in the same order as in releases-json
+# Image languages
 t MSG_400 "Suplu :)"
 t MSG_401 "Engleză Complet"
 t MSG_402 "Spaniolă Complet"

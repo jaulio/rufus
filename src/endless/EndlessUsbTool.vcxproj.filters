@@ -25,6 +25,12 @@
     <Filter Include="Header Files\json">
       <UniqueIdentifier>{d9d02c0e-ffa3-47dc-af4d-ea54dc23f1a2}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Header Files\gpt">
+      <UniqueIdentifier>{c0b7778b-6aae-455f-ba0c-8eb933a20b7b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\gpt">
+      <UniqueIdentifier>{d7d3f9b4-b736-4776-913c-a241b6a15836}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <Text Include="ReadMe.txt" />
@@ -77,6 +83,12 @@
     </ClInclude>
     <ClInclude Include="json\json.h">
       <Filter>Header Files\json</Filter>
+    </ClInclude>
+    <ClInclude Include="gpt\gpt.h">
+      <Filter>Header Files\gpt</Filter>
+    </ClInclude>
+    <ClInclude Include="gpt\gpt_errors.h">
+      <Filter>Header Files\gpt</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -142,6 +154,9 @@
     </ClCompile>
     <ClCompile Include="jsoncpp.cpp">
       <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="gpt\gpt.c">
+      <Filter>Source Files\gpt</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

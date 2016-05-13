@@ -111,6 +111,7 @@ private:
     CMap<CString, LPCTSTR, pFileImageEntry_t, pFileImageEntry_t> m_imageFiles;
     CList<CString> m_imageIndexToPath;
     CList<RemoteImageEntry_t> m_remoteImages;
+    static CMap<CString, LPCTSTR, uint32_t, uint32_t> m_personalityToLocaleMsg;
 
 	CComPtr<IHTMLDocument3> m_spHtmlDoc3;
     CComPtr<IHTMLElement> m_spStatusElem;
@@ -149,4 +150,9 @@ private:
     void ErrorOccured(const CString errorMessage);
 
     HRESULT CallJavascript(LPCTSTR method, CComVariant parameter1, CComVariant parameter2 = NULL);
+
+    static bool ParseImgFileName(const CString& filename, CString &personality, CString &version);
+    static void GetImgDisplayName(CString &displayName, const CString &version, const CString &personality, ULONGLONG size);
+
+    static ULONGLONG GetExtractedSize(const CString& filename);
 };

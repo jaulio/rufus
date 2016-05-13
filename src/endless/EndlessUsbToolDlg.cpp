@@ -63,11 +63,13 @@ int dialog_showing = 0;
 #include "localization.h"
 // End Rufus include files
 
+#include "gpt/gpt.h"
+
 #ifdef _DEBUG
 #define new DEBUG_NEW
 #endif
 
-#define IFFALSE_GOTOERROR(__CONDITION__, __ERRROR_MSG__) if(!(__CONDITION__)) { uprintf(__ERRROR_MSG__); goto error; }
+#define IFFALSE_GOTOERROR(__CONDITION__, __ERRROR_MSG__) if(!(__CONDITION__)) { if(strlen(__ERRROR_MSG__)) uprintf(__ERRROR_MSG__); goto error; }
 #define IFFALSE_RETURN(__CONDITION__, __ERRROR_MSG__) if(!(__CONDITION__)) { uprintf(__ERRROR_MSG__); return; }
 #define IFFALSE_RETURN_VALUE(__CONDITION__, __ERRROR_MSG__, __RET__) if(!(__CONDITION__)) { uprintf(__ERRROR_MSG__); return __RET__; }
 #define IFFALSE_BREAK(__CONDITION__, __ERRROR_MSG__) if(!(__CONDITION__)) { uprintf(__ERRROR_MSG__); break; }
@@ -103,6 +105,7 @@ int dialog_showing = 0;
 #define ELEMENT_SELUSB_PREV_BUTTON      "SelectUSBPreviousButton"
 #define ELEMENT_SELUSB_NEXT_BUTTON      "SelectUSBNextButton"
 #define ELEMENT_SELUSB_USB_DRIVES       "USBDiskSelect"
+#define ELEMENT_SELUSB_NEW_DISK_NAME    "NewDiskName"
 //Installing page elements
 #define ELEMENT_SECUREBOOT_HOWTO        "SecureBootHowTo"
 #define ELEMENT_INSTALL_STATUS          "CreatingInstallerText"
@@ -141,6 +144,8 @@ enum custom_message {
 #define RELEASE_JSON_FILE RELEASE_JSON_FILE_UNPCK _T(CHAR_JSON_GZIP)
 #define RELEASE_JSON_URL RELEASE_JSON_URLPATH RELEASE_JSON_FILE
 
+
+#define ENDLESS_OS "Endless OS"
 
 // utility method for quick char* UTF8 conversion to BSTR
 CComBSTR UTF8ToBSTR(const char *txt) {
@@ -224,6 +229,7 @@ BEGIN_DISPATCH_MAP(CEndlessUsbToolDlg, CDHtmlDialog)
     DISP_FUNCTION(CEndlessUsbToolDlg, "Debug", JavascriptDebug, VT_EMPTY, VTS_BSTR)
 END_DISPATCH_MAP()
 
+CMap<CString, LPCTSTR, uint32_t, uint32_t> CEndlessUsbToolDlg::m_personalityToLocaleMsg;
 
 CEndlessUsbToolDlg::CEndlessUsbToolDlg(CWnd* pParent /*=NULL*/)
     : CDHtmlDialog(IDD_ENDLESSUSBTOOL_DIALOG, IDR_HTML_ENDLESSUSBTOOL_DIALOG, pParent),
@@ -248,6 +254,11 @@ CEndlessUsbToolDlg::CEndlessUsbToolDlg(CWnd* pParent /*=NULL*/)
 	m_hIcon = AfxGetApp()->LoadIcon(IDR_MAINFRAME);
     m_closingApplicationEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
     m_releasesJsonFile = "";
+
+    m_personalityToLocaleMsg.SetAt(L"base", MSG_400);
+    m_personalityToLocaleMsg.SetAt(L"en", MSG_401);
+    m_personalityToLocaleMsg.SetAt(L"es", MSG_402);
+    m_personalityToLocaleMsg.SetAt(L"pt_BR", MSG_403);
 }
 
 void CEndlessUsbToolDlg::DoDataExchange(CDataExchange* pDX)
@@ -798,7 +809,7 @@ LRESULT CEndlessUsbToolDlg::WindowProc(UINT message, WPARAM wParam, LPARAM lPara
             bool isReleaseJsonDownload = downloadStatus->jobName == DownloadManager::GetJobName(DownloadType_t::DownloadTypeReleseJson);
             // DO STUFF
             if (downloadStatus->error) {
-                ErrorOccured(UTF8ToCString((MSG_300)));
+                ErrorOccured(UTF8ToCString(lmprintf(MSG_300)));
             } else if (downloadStatus->done) {
                 uprintf("Download done for %ls", downloadStatus->jobName);
 
@@ -1193,21 +1204,25 @@ void CEndlessUsbToolDlg::UpdateFileEntries()
         if ((findFileData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0) continue;
         CString currentFile = findFileData.cFileName;
         CString extension = CSTRING_GET_LAST(currentFile, '.');
-        if (extension != L"gz" && extension != L"xz" && extension != L"img") continue;
+        if (extension != L"gz" && extension != L"xz") continue;
 
-        if (!PathFileExists(findFileData.cFileName)) continue;
+        if (!PathFileExists(findFileData.cFileName)) continue; // file is present
+        if (!PathFileExists(CString(findFileData.cFileName) + L".asc")) continue; // signature file is present
 
         try {
+            CString displayName, personality, version;
+            if (!ParseImgFileName(currentFile, personality, version)) continue;
+            if (0 == GetExtractedSize(currentFile)) continue;
             CFile file(findFileData.cFileName, CFile::modeRead);
-            CString displayText = file.GetFileName() + " - ";
-            displayText += SizeToHumanReadable(file.GetLength(), FALSE, use_fake_units);
+            GetImgDisplayName(displayName, version, personality, file.GetLength());
 
+            // add entry to list or update it
             pFileImageEntry_t currentEntry = NULL;
             if (!m_imageFiles.Lookup(file.GetFilePath(), currentEntry)) {
                 currentEntry = new FileImageEntry_t;
                 currentEntry->autoAdded = TRUE;
                 currentEntry->filePath = file.GetFilePath();
-                AddEntryToSelect(selectElement, CComBSTR(currentEntry->filePath), CComBSTR(displayText), &currentEntry->htmlIndex, 0);
+                AddEntryToSelect(selectElement, CComBSTR(currentEntry->filePath), CComBSTR(displayName), &currentEntry->htmlIndex, 0);
                 IFFALSE_RETURN(SUCCEEDED(hr), "Error adding item in image file list.");
 
                 m_imageFiles.SetAt(currentEntry->filePath, currentEntry);
@@ -1419,9 +1434,10 @@ void CEndlessUsbToolDlg::UpdateDownloadOptions()
         persImages = (*it)[JSON_IMG_PERS_IMAGES];
         IFFALSE_CONTINUE(!persImages.isNull(), "Error: No personality_images entry found.");
 
-        int personalityIndex = 0;
+        uint32_t personalityMsgId = 0;
         for (Json::ValueIterator persIt = personalities.begin(); persIt != personalities.end(); persIt++) {
             IFFALSE_CONTINUE(persIt->isString(), "Entry is not string, continuing");
+            IFFALSE_CONTINUE(m_personalityToLocaleMsg.Lookup(CString(persIt->asCString()), personalityMsgId), "Unknown personality. Continuing.");
 
             persImage = persImages[persIt->asString()];
             IFFALSE_CONTINUE(!persImage.isNull(), CString("Personality image entry not found - ") + persIt->asCString());
@@ -1436,25 +1452,19 @@ void CEndlessUsbToolDlg::UpdateDownloadOptions()
 
             RemoteImageEntry_t remoteImage;
             remoteImage.compressedSize = fullImage[JSON_IMG_COMPRESSED_SIZE].asUInt64();
+            remoteImage.extractedSize = 0;
             //remoteImage.extractedSize = fullImage[JSON_IMG_EXTRACTED_SIZE].asUInt64();
             remoteImage.urlFile = fullImage[JSON_IMG_URL_FILE].asCString();
             remoteImage.urlSignature = fullImage[JSON_IMG_URL_SIG].asCString();
 
             // Create display name
-            remoteImage.displayName = "Endless OS ";
-            remoteImage.displayName += (*it)[JSON_IMG_VERSION].asCString();
-            remoteImage.displayName += " ";
-            remoteImage.displayName += UTF8ToCString(lmprintf(MSG_400 + personalityIndex));
-            remoteImage.displayName += " - ";
-            remoteImage.displayName += SizeToHumanReadable(remoteImage.compressedSize, FALSE, use_fake_units);
+            GetImgDisplayName(remoteImage.displayName, CString((*it)[JSON_IMG_VERSION].asCString()), CString(persIt->asCString()), remoteImage.compressedSize);
 
             // Create dowloadJobName
             remoteImage.downloadJobName = (*it)[JSON_IMG_VERSION].asCString();
             remoteImage.downloadJobName += persIt->asCString();
 
             m_remoteImages.AddTail(remoteImage);
-
-            personalityIndex++;
         }
     }
 
@@ -1511,6 +1521,29 @@ HRESULT CEndlessUsbToolDlg::OnSelectFileNextClicked(IHTMLElement* pElement)
         m_shellNotificationsRegister = SHChangeNotifyRegister(m_hWnd, 0x0001 | 0x0002 | 0x8000,
             SHCNE_MEDIAINSERTED | SHCNE_MEDIAREMOVED, UM_MEDIA_CHANGE, 1, &NotifyEntry);
     }
+
+    // Get display name with actual image size, not compressed
+    CString selectedImage, personality, version;
+    ULONGLONG size = 0;
+    if (m_useLocalFile) {
+        selectedImage = image_path;
+        selectedImage = CSTRING_GET_LAST(selectedImage, '\\');
+        size = GetExtractedSize(selectedImage);
+    } else {
+        RemoteImageEntry_t remote = m_remoteImages.GetAt(m_remoteImages.FindIndex(m_selectedRemoteIndex));
+        DownloadType_t downloadType = m_fullInstall ? DownloadType_t::DownloadTypeInstallerImage : DownloadType_t::DownloadTypeLiveImage;
+        selectedImage = CSTRING_GET_LAST(remote.urlFile, '/');
+        size = remote.extractedSize;
+    }
+
+    if (ParseImgFileName(selectedImage, personality, version)) {
+        GetImgDisplayName(selectedImage, version, personality, size);
+    } else {
+        uprintf("Cannot parse data from file name %ls; using default %s", selectedImage, ENDLESS_OS);
+        selectedImage = _T(ENDLESS_OS);
+    }
+
+    SetElementText(_T(ELEMENT_SELUSB_NEW_DISK_NAME), CComBSTR(selectedImage));
 
 	ChangePage(_T(ELEMENT_FILE_PAGE), _T(ELEMENT_USB_PAGE));
 
@@ -1617,7 +1650,7 @@ HRESULT CEndlessUsbToolDlg::OnSelectUSBNextClicked(IHTMLElement* pElement)
     } else {
         RemoteImageEntry_t remote = m_remoteImages.GetAt(m_remoteImages.FindIndex(m_selectedRemoteIndex));
         DownloadType_t downloadType = m_fullInstall ? DownloadType_t::DownloadTypeInstallerImage : DownloadType_t::DownloadTypeLiveImage;
-        // add img.gz file to download
+        // add image file to download
         CString localFile = GET_LOCAL_PATH(CSTRING_GET_LAST(remote.urlFile, '/'));
         CString url = CString(RELEASE_JSON_URLPATH) + remote.urlFile;
 
@@ -1757,4 +1790,70 @@ HRESULT CEndlessUsbToolDlg::CallJavascript(LPCTSTR method, CComVariant parameter
     IFFALSE_RETURN_VALUE(SUCCEEDED(hr), "Error when calling method.", E_FAIL);
 
     return S_OK;
+}
+
+bool CEndlessUsbToolDlg::ParseImgFileName(const CString& filename, CString &personality, CString &version)
+{
+    // parse filename to get personality and version
+    CString lastPart;
+    PCTSTR t1 = _T("-"), t2 = _T(".");
+    int pos = 0;
+
+    // RADU: Add some more validation here for the filename
+    CString resToken = filename.Tokenize(t1, pos);
+    CString product;
+    int elemIndex = 0;
+    while (!resToken.IsEmpty()) {
+        switch (elemIndex) {
+        case 0: product = resToken; break;
+        case 1: version = resToken; break;
+        case 4: lastPart = resToken; break;
+        }
+        resToken = filename.Tokenize(t1, pos);
+        elemIndex++;
+    };
+    IFFALSE_GOTOERROR(!version.IsEmpty() && !lastPart.IsEmpty() && product == "eos", "");
+
+    pos = 0;
+    resToken = lastPart.Tokenize(t2, pos);
+    elemIndex = 0;
+    while (!resToken.IsEmpty()) {
+        switch (elemIndex) {
+        case 1: personality = resToken; break;
+        case 4: goto error; break; // we also have diskX
+        }
+        resToken = lastPart.Tokenize(t2, pos);
+        elemIndex++;
+    };
+    uint32_t msgId;
+    IFFALSE_GOTOERROR(!personality.IsEmpty() && m_personalityToLocaleMsg.Lookup(personality, msgId), "");
+
+    return true;
+error:
+    return false;
+}
+
+void CEndlessUsbToolDlg::GetImgDisplayName(CString &displayName, const CString &version, const CString &personality, ULONGLONG size)
+{
+    // RADU: we also do this for Remote files; move to new method
+    // Create display name
+    displayName = _T(ENDLESS_OS);
+    displayName += " ";
+    displayName += version;
+    displayName += " ";
+    displayName += UTF8ToCString(lmprintf(m_personalityToLocaleMsg[personality]));
+    displayName += " - ";
+    displayName += SizeToHumanReadable(size, FALSE, use_fake_units);
+}
+
+ULONGLONG CEndlessUsbToolDlg::GetExtractedSize(const CString& filename)
+{
+    CString ext = CSTRING_GET_LAST(filename, '.');
+    int compression_type;
+    if (ext == "gz") compression_type = BLED_COMPRESSION_GZIP;
+    else if (ext == "xz") compression_type = BLED_COMPRESSION_XZ;
+    else return 0;
+
+    CStringA asciiFileName(filename);
+    return get_archive_disk_image_size(asciiFileName, compression_type);
 }

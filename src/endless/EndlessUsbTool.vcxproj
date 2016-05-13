@@ -227,6 +227,8 @@
     <ClInclude Include="DownloadManager.h" />
     <ClInclude Include="EndlessUsbTool.h" />
     <ClInclude Include="EndlessUsbToolDlg.h" />
+    <ClInclude Include="gpt\gpt.h" />
+    <ClInclude Include="gpt\gpt_errors.h" />
     <ClInclude Include="json\json-forwards.h" />
     <ClInclude Include="json\json.h" />
     <ClInclude Include="localization_data.h" />
@@ -414,6 +416,12 @@
     <ClCompile Include="DownloadManager.cpp" />
     <ClCompile Include="EndlessUsbTool.cpp" />
     <ClCompile Include="EndlessUsbToolDlg.cpp" />
+    <ClCompile Include="gpt\gpt.c">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
     <ClCompile Include="jsoncpp.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">NotUsing</PrecompiledHeader>
