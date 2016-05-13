@@ -2,18 +2,6 @@ function clog(msg) {
     window.external.Debug(msg);
 }
 
-
-function opSystemTypeSelected() {
-    var local = document.getElementById("OperatingSystemTypeLocal");
-    if (local.checked) {
-        document.getElementById("LocalImagesSelect").className = "selected";
-        document.getElementById("OnlineImagesSelect").className = "";
-    } else {
-        document.getElementById("LocalImagesSelect").className = "";
-        document.getElementById("OnlineImagesSelect").className = "selected";
-    }
-}
-
 var currentPercent = -1;
 var progressWidth = 0;
 var containerWidth = 0;
@@ -30,5 +18,24 @@ function setProgress(percent) {
         progressWidth = containerWidth * percent;
         clog("Setting " + progressWidth);
         bar.style.width = Math.ceil(progressWidth) + "px";
+    }
+}
+
+function enableDownload(enable) {
+    document.getElementById("OperatingSystemTypeOnline").disabled = !enable;
+    document.getElementById("OnlineImagesSelect").disabled = !enable;
+}
+
+function showElement(id, show) {
+    var classname = "hidden";
+    var elem = document.getElementById(id);
+    if (elem == null) {
+        clog("No element found with id " + id);
+        return;
+    }
+    if (show) {
+        elem.className = elem.className.replace(classname, "");
+    } else if (elem.className.indexOf(classname) == -1) {
+        elem.className += " " + classname;
     }
 }

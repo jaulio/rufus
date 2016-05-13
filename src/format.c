@@ -1477,7 +1477,14 @@ static BOOL WriteDrive(HANDLE hPhysicalDrive, HANDLE hSourceImage)
 	if (img_report.compression_type != BLED_COMPRESSION_NONE) {
 		uprintf("Writing Compressed Image...");
 		bled_init(_uprintf, update_progress, &FormatStatus);
-		bled_uncompress_with_handles(hSourceImage, hPhysicalDrive, img_report.compression_type);
+#ifndef ENDLESSUSB_TOOL
+		bled_uncompress_with_handles(hSourceImage, hPhysicalDrive, img_report.compression_type)
+#else
+/// RADU: propose this change to rufus
+		if (-1 == bled_uncompress_with_handles(hSourceImage, hPhysicalDrive, img_report.compression_type)) {
+				FormatStatus = ERROR_SEVERITY_ERROR | FAC(FACILITY_STORAGE) | ERROR_NO_MEDIA_IN_DRIVE;
+		}
+#endif // !ENDLESSUSB_TOOL
 		bled_exit();
 	} else {
 		uprintf(hSourceImage?"Writing Image...":"Zeroing drive...");

@@ -30,6 +30,13 @@ html {
 	cursor: pointer;
 }
 
+.Button.disabled {
+    background-color: transparent;
+    color: #828385;
+    border: 2px solid #828385;
+    cursor: not-allowed;
+}
+
 .ButtonWithBorder {
 	background-color: transparent;
 	color: #09b7b5;
@@ -157,10 +164,11 @@ select.selected>option {
 	height: 230px;
 }
 
+/*
 .ContentPanel:hover {
 	background-color: #e3e3e5;
 	cursor: pointer;
-}
+}*/
 
 .ContentPanel * {
 	margin: 0px auto;
@@ -345,6 +353,7 @@ select.selected>option {
 	margin-left: 60px;
 }
 
+#ErrorPage .Button,
 #ThankYouPage .Button {
 	width: 26px;
 }

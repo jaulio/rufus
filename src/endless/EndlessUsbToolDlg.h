@@ -5,6 +5,7 @@
 #pragma once
 
 #include "localization.h"
+#include "DownloadManager.h"
 
 typedef struct FileImageEntry {
     CString filePath;
@@ -13,6 +14,15 @@ typedef struct FileImageEntry {
     LONG htmlIndex;
     BOOL stillPresent;
 } FileImageEntry_t, *pFileImageEntry_t;
+
+typedef struct RemoteImageEntry {
+    ULONGLONG compressedSize;
+    ULONGLONG extractedSize;
+    CString urlFile;
+    CString urlSignature;
+    CString displayName;
+    CString downloadJobName;
+} RemoteImageEntry_t, *pRemoteImageEntry_t;
 
 // CEndlessUsbToolDlg dialog
 class CEndlessUsbToolDlg : public CDHtmlDialog
@@ -45,6 +55,8 @@ protected:
 	HRESULT OnSelectFileNextClicked(IHTMLElement* pElement);
 	HRESULT OnSelectFileButtonClicked(IHTMLElement* pElement);
     HRESULT OnSelectedImageFileChanged(IHTMLElement* pElement);
+    HRESULT OnSelectedRemoteFileChanged(IHTMLElement* pElement);
+    HRESULT OnSelectedImageTypeChanged(IHTMLElement* pElement);
 
 	// Select USB Page handlers
 	HRESULT OnSelectUSBPreviousClicked(IHTMLElement* pElement);
@@ -83,7 +95,7 @@ protected:
 private:
 	bool m_fullInstall;
 	loc_cmd* m_selectedLocale;
-	char m_localizationFile[MAX_PATH] = "";
+	char m_localizationFile[MAX_PATH];
 	ULONG m_shellNotificationsRegister;
 	uint64_t m_lastDevicesRefresh;
     BOOL m_lgpSet;
@@ -93,8 +105,12 @@ private:
     HANDLE m_closingApplicationEvent;
     HANDLE m_fileScanThread;
     HANDLE m_formatThread;
+    HANDLE m_scanImageThread;
+    bool m_useLocalFile;
+    UINT m_selectedRemoteIndex;
     CMap<CString, LPCTSTR, pFileImageEntry_t, pFileImageEntry_t> m_imageFiles;
     CList<CString> m_imageIndexToPath;
+    CList<RemoteImageEntry_t> m_remoteImages;
 
 	CComPtr<IHTMLDocument3> m_spHtmlDoc3;
     CComPtr<IHTMLElement> m_spStatusElem;
@@ -102,7 +118,11 @@ private:
     CComDispatchDriver m_dispWindow;
     CComPtr<IDispatchEx> m_dispexWindow;
 
+    CString m_releasesJsonFile;
+    DownloadManager m_downloadManager;
+
 	void InitRufus();
+    void StartRufusFormatThread();
     static DWORD WINAPI RufusISOScanThread(LPVOID param);
 
 	void LoadLocalizationData();
@@ -111,6 +131,8 @@ private:
 
 	void ChangePage(PCTSTR oldPage, PCTSTR newPage);
 
+    HRESULT GetSelectElement(PCTSTR selectId, CComPtr<IHTMLSelectElement> &selectElem);
+    HRESULT ClearSelectElement(PCTSTR selectId);
 	HRESULT AddEntryToSelect(PCTSTR selectId, const CComBSTR &value, const CComBSTR &text, long *outIndex, BOOL selected = FALSE);
 	HRESULT AddEntryToSelect(CComPtr<IHTMLSelectElement> &selectElem, const CComBSTR &value, const CComBSTR &text, long *outIndex, BOOL selected = FALSE);
 
@@ -119,5 +141,12 @@ private:
     void UpdateFileEntries();
     static DWORD WINAPI FileScanThread(void* param);
 
+    void StartJSONDownload();
+    void UpdateDownloadOptions();
+
 	void Uninit();
+
+    void ErrorOccured(const CString errorMessage);
+
+    HRESULT CallJavascript(LPCTSTR method, CComVariant parameter1, CComVariant parameter2 = NULL);
 };
