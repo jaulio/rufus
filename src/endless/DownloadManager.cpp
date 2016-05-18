@@ -4,11 +4,6 @@ extern "C" {
     #include "rufus.h"
 }
 
-// RADU: include this from somewhere instead of redefining
-#define IFFALSE_GOTOERROR(__CONDITION__, __ERRROR_MSG__) if(!(__CONDITION__)) { uprintf(__ERRROR_MSG__); goto error; }
-#define IFFALSE_GOTO(__CONDITION__, __ERRROR_MSG__, __LABEL__) if(!(__CONDITION__)) { uprintf(__ERRROR_MSG__); goto __LABEL__; }
-#define IFFALSE_CONTINUE(__CONDITION__, __ERRROR_MSG__) if(!(__CONDITION__)) { uprintf(__ERRROR_MSG__); continue; }
-
 #define DOWNLOAD_JOB_PREFIX _T("Endless")
 
 volatile ULONG DownloadManager::m_refCount = 0;

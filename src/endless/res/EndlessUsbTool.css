@@ -2,46 +2,125 @@
 
 * {
     padding: 0px;
-    margin: 0px;
-	font-family:Tahoma;
-	color: #828385;	
+    margin: 0px;	
 }
 
-body,
-html {
-	background-color: #f3f3f5;
-}
+
+body {
+	font-family: Lato;
+	background: #363d41
+} 
 
 #MainContainer {
-    width: 502px;
-    height: 399px;
-	border: 3px solid #828385;
-	border-radius: 10px;
+    width: 746px;
+    height: 512px;
+	border: 1px solid #363d41;
+	border-radius: 8px 8px 0 0;
+	overflow: hidden;
 }
 
+/* Normal button */
 .Button {
-	width: 170px;
-	height: 26px;
-	color: #ffffff;
-	background-color: #09b7b5;
-	border-radius: 5px;
+	height: 31px;
 	text-align: center;
-	font-size: 18px;
 	cursor: pointer;
+	border: 1px solid;
+	border-color: #a1a1a1;
+	border-radius: 3px;
+	overflow: hidden;
 }
 
-.Button.disabled {
-    background-color: transparent;
-    color: #828385;
-    border: 2px solid #828385;
+.Button div {
+	color: #2e3436;	
+	padding-top: 8px;
+	padding-bottom: 6px;
+	text-align: center;
+	width: 100%;
+	height: 100%;
+	background: #fafafa; /*older than IE6 */
+	filter: progid:DXImageTransform.Microsoft.gradient( startColorstr='#fafafa', endColorstr='#e0e0e0', GradientType=0); /* IE6-9 */
+	background-image: linear-gradient(to bottom, #fafafa, #ededed 40%, #e0e0e0); /* IE10+ */
+	
+	text-shadow: 0 1px rgba(255, 255, 255, 0.76923); /* IE10+ */
+	box-shadow: inset 0 1px white, 0 1px white; /* IE10+ */
+	transition: all 200ms cubic-bezier(0.25, 0.46, 0.45, 0.94); /* IE10+ */
+	
+	font-size: 13px;
+	font-family: LatoMedium;
+	letter-spacing: 0.5px;
+}
+
+.Button div:hover {
+	color: #2e3436;
+	background: #444444; /*older than IE6 */
+	filter: progid:DXImageTransform.Microsoft.gradient( startColorstr='white', endColorstr='#ededed',GradientType=0 ); /* IE6-9 */
+	background-image: linear-gradient(to bottom, white, #f7f7f7 40%, #ededed); /* IE10+ */
+}
+
+.Button div:active {    
+	color: #8a8a8a;
+	background: #d6d6d6; /*older than IE6 */
+	filter: progid:DXImageTransform.Microsoft.gradient( startColorstr=#d6d6d6, endColorstr='#e0e0e0',GradientType=0 ); /* IE6-9 */
+	background-image: linear-gradient(to bottom, #d6d6d6, gainsboro 40%, #e0e0e0); /* IE10+ */	
+	
+	box-shadow: inset 0 1px rgba(0, 0, 0, 0.07), inset 0 2px 1px -2px rgba(0, 0, 0, 0.6), 0 1px white; /* IE10+ */
+    transition-duration: 50ms; /* IE10+ */
+}
+
+/* Blue button */
+.ButtonBlue {
+	width: 142px;
+	border-color: #1c5187;	
+}
+
+.ButtonBlue div {
+	color: white;
+	background: #5f9ddd; /*older than IE6 */
+	filter: progid:DXImageTransform.Microsoft.gradient( startColorstr='#5f9ddd', endColorstr='#3583d5',GradientType=0 ); /* IE6-9 */	
+	background-image: linear-gradient(to bottom, #5f9ddd, #4a90d9 40%, #3583d5);  /* IE10+ */
+	
+	text-shadow: 0 -1px rgba(0, 0, 0, 0.54353); /* IE10+ */
+	box-shadow: inset 0 1px rgba(255, 255, 255, 0.5), 0 1px white; /* IE10+ */
+	
+	font-family: LatoBlack;
+}
+
+.ButtonBlue div:hover {
+	color: white;
+	background: #85b4e5; /*older than IE6 */    
+	filter: progid:DXImageTransform.Microsoft.gradient( startColorstr='#85b4e5', endColorstr='#4a90d9',GradientType=0 ); /* IE6-9 */
+	background-image: linear-gradient(to bottom, #85b4e5, #5b9add 40%, #4a90d9); /* IE10+ */
+	
+	text-shadow: 0 -1px rgba(0, 0, 0, 0.51153); /* IE10+ */
+}
+
+.ButtonBlue div:active {
+	color: white;
+	background: #2b79cb; /*older than IE6 */    
+	filter: progid:DXImageTransform.Microsoft.gradient( startColorstr='#2b79cb', endColorstr='#3583d5',GradientType=0 )
+			progid:DXImageTransform.Microsoft.Shadow(color='#000000'); /* IE6-9 */
+	background-image: linear-gradient(to bottom, #2b79cb, #2e7fd3 40%, #3583d5); /* IE10+ */
+	
+	text-shadow: 0 -1px rgba(0, 0, 0, 0.62353); /* IE10+ */
+    box-shadow: inset 0 1px rgba(0, 0, 0, 0.07), inset 0 2px 1px -2px rgba(0, 0, 0, 0.6), 0 1px white; /* IE10+ */
+}
+
+/* Disabled button */
+.ButtonDisabled  {
+	border-color: #a8a8a8;
     cursor: not-allowed;
 }
 
-.ButtonWithBorder {
-	background-color: transparent;
-	color: #09b7b5;
-	border: 2px solid #09b7b5;
-} 
+.ButtonDisabled div,
+.ButtonDisabled div:hover {
+	color: #c7c7c7;
+	background: transparent; /*older than IE6 */
+	filter: none;
+	background-image: transparent;
+
+	text-shadow: none; /* IE10+ */
+	box-shadow: inset 0 1px rgba(255, 255, 255, 0), 0 1px rgba(255, 255, 255, 0); /* IE10+ */
+}
 
 .FullWidthContent {
 	width: 100%;
@@ -49,43 +128,50 @@ html {
 }
 
 a {
-	color: #09b7b5;
+	color: #2a76c6; /* #3164a4 */ ;
 	cursor: pointer;
-	font-size: 15px;
+	font-size: 13px;
+	text-decoration: underline;
+}
+
+a:hover {
+	color: #4a90d9;
+}
+
+a:active {
+	color: #2a76c6;
 }
 
 select {
 	border-radius: 5px;
-	border: 2px solid #09b7b5;
-	background-color: transparent;
-	color: #09b7b5;	
+	border: 2px solid #b9bcb5;
+	background-color: #ffffff;
+	color: #00000;	
 	font-size: 14px;
 	cursor: pointer;
-	left-padding: 10px;
+	padding-left: 10px;
+	height: 33px;
 }
 
-select>option {
-	color: #09b7b5;
-}
-
-select.selected {
-	border: 0px;
-	background-color: #09b7b5;
-	color: #ffffff;	
-}
-
-select.selected>option {
-	color: #ffffff;
+select:disabled {
+	border-width: 1px;
+	color: #b9bbbb;
+	background-color: transparent;
 }
 
 .ContentTitle {
-	font-size: 20px;
-	margin-top: 35px;
+	font-size: 16px;
+	margin-top: 40px;
+	color: #2e2e2e;
+	font-family: LatoBold;
+	min-height: 30px;
 }
 
 
 /* Wizard page */
 .WizardPage {
+	background-color: #e6e6e6;
+	color: #656565;
 }
 
 .hidden {
@@ -93,40 +179,51 @@ select.selected>option {
 }
 
 .PageHeader {
-    border-bottom: 2px solid #828385;
-	height: 42px;
+    border-bottom: 1px solid #a1a1a1;
+	border-radius: 8px 8px 0 0;
+	height: 34px;
 	cursor: move;
+	padding: 6px;
+	
+	font-size: medium;
+	
+	background: #f7f7f7; /*older than IE6 */
+	filter: progid:DXImageTransform.Microsoft.gradient( startColorstr='#f7f7f7', endColorstr='#ededed',GradientType=0 ); /* IE6-9 */
+	background-image: linear-gradient(to bottom, #f7f7f7, #ededed); /* IE10+ */
+	
+	box-shadow: inset 0 -1px #d9d9d9, inset 0 1px white; /* IE10+ */
 }
 
-.PageHeader h1 {
-    height: 100%;
-    color: #828385; 
-	text-align: center;   
-    font-weight: normal; 
-	font-size: 24px;
-	margin-top: 8px;
+.PageHeader .PageHeaderTitle {
+    color: black;
+	text-align: center;
+	font-family: LatoBlack;    
+	font-size: 18px;
+	padding-top: 7px;
+    padding-left: 12px;
+    padding-right: 12px;
+	margin: 0px auto;	
+	letter-spacing: 0.5px;
+	max-width: 570px;
 }
 
 .PageHeader .Button {
-	width: 120px;
+	width: 80px;
 	float: left;
-	margin-left: 10px;
-	margin-top: 3px;
 }
 
 .PageHeader .ButtonRight {
 	float: right;	
-	margin-right: 10px;
 }
 
-.PageContent {
-	height: 308px;
-	border: 1px solid transparent;
+.PageContent {	
+	height: 415px;
+	border: 1px solid transparent;	
 }
 
 /* Wizard Page indicator */
 .PageIndicator {
-	height: 40px;
+	height: 50px;
 	text-align: center;
 }
 
@@ -145,9 +242,9 @@ select.selected>option {
 
 .PageIndicator li span {
 	display:block;
-	width: 10px;
-	height: 10px;
-	margin:3px;
+	width: 6px;
+	height: 6px;
+	margin: 2px;
 	background-image:url("res:/IMG/#200");
 }
 
@@ -155,38 +252,61 @@ select.selected>option {
 	background-image: url("res:/IMG/#201");
 }
 
+.ContentContainer {
+	margin: 0px auto;
+	border-top: 1px solid #d0d0d0;
+}
+
+.PageSubtitle {
+	text-align: center;
+	height: 55px;
+	margin-top: 35px;
+	font-size: 17px;
+}
+
+.RoundedCornersContainer {
+	width: 100%;
+	border: 1px solid #cecece;
+	border-radius: 10px;
+	background: #dbdbdb;
+	overflow: hidden;
+}
+
 
 /* First page */
+
+#FirstPage .ContentContainer {
+	height: 328px;
+	width: 670px;
+	border: 0;
+	border-bottom: 1px solid #d0d0d0;
+}
 
 .ContentPanel {
 	float: left;
 	width: 50%;
-	height: 230px;
+	height: 330px;
 }
-
-/*
-.ContentPanel:hover {
-	background-color: #e3e3e5;
-	cursor: pointer;
-}*/
 
 .ContentPanel * {
 	margin: 0px auto;
-	margin-top: 10px;
 }
 
 .ContentPanel .Button {
-	margin-top: 30px;
+	margin-top: 35px;
 }
 
 .PanelImage {
-	width: 80px;
-	height: 80px;
+	width: 174px;
+	height: 124px;
 	background-repeat: no-repeat;
+	margin-top: 30px;
+	background-position: center; 
 }
 
 #LeftPaneImage {
 	background-image: url("res:/IMG/#202");
+	height: 99px;
 }
 
 #RightPaneImage {
@@ -194,23 +314,26 @@ select.selected>option {
 }
 
 .PanelText {
-	width: 70%;
+	width: 75%;
 	font-size: 14px;
+	margin-top: 25px;
+	text-align: center;
+	height: 50px;
+}
+
+#LeftPanel .PanelText {
+	height: 75px;
+	overflow: hidden;
 }
 
 #FirstPage .PageContent .FullWidthContent {
-	height: 20px;
+	height: 25px;
 	text-align: center;
 	padding-top: 10px;
 }
 
-#FirstPage a {
-	text-decoration: underline;
-}
-
 #LanguageSelect {
-	width: 260px;
-	height: 28px;
+	width: 254px;	
 }
 
 /* Select file Page */
@@ -219,141 +342,334 @@ select.selected>option {
 #SelectFilePage .PageContent,
 #SelectUSBPage .PageContent,
 #InstallingPage .PageContent,
-#ThankYouPage .PageContent {
-	margin: 0px 20px;
+#ThankYouPage .PageContent  {
+	margin: 0px auto;
+}
+
+#SelectFilePage #SelectFileLocalNotPresent {
+	width: 662px;
+}
+
+#SelectFilePage #SelectFileLocalPresent,
+#SelectUSBPage .ContentContainer {
+	width: 515px;
+	padding-left: 20px;
+}
+	
+#SelectUSBPage .ContentContainer {
+	padding-left: 40px;
 }
 
 #SelectFilePage select,
-#SelectUSBPage select {
-	width: 440px;
-	height: 36px;
-	margin-top: 20px;
+#SelectUSBPage select, 
+#NewDiskNameContainer  {
+	width: 460px;
 }
 
 #SelectFilePage .ContentTitle {
-	margin-left: 18px;
-	min-height: 30px
+	margin-left: 20px;	
 }
 
 #ExistingImageFile {
-	width: 400px;
-	float: left;
+	width: 410px;
+	float: left;	
 }
 
 #SelectFileButton {
-	margin-top: 35px; /* must match .ContentPanel margin-top */
-	width: 30px;
+	margin-top: 40px; /* must match .ContentPanel margin-top */
+	margin-right: 48px; /* must match .ContentPanel margin-top */
+	width: 25px;
 	height: 30px;
 	float: right;
 	background-repeat: no-repeat;
 	background-image: url("res:/IMG/#204");
 	cursor: pointer;
+	clear: right;
 }
 
-#SelectUSBPage select,
-#NewDiskNameContainer {
-	width: 458px;
+#DownloadNewImage {
+	margin-top: 60px;
 }
+
+#SelectFilePage .Fieldset {	
+	width: 320px;
+	height: 254px;
+	border: 1px solid #cecece;
+	border-radius: 10px;
+	margin-top: 46px;
+}
+
+#SelectFilePage .Fieldset * {
+	margin: 0px auto;
+	text-align: center;
+}
+
+#SelectFilePage .Fieldset:first-child {
+	float: left;
+}
+
+#SelectFilePage .Fieldset:first-child  + .Fieldset{
+	float: right;
+}
+
+#SelectFilePage .Fieldset .FieldsetTitle{
+	font-size: 26px;
+	font-family: LatoLight;
+	color: #000000;	
+	margin-top: -18px;
+}
+
+#SelectFilePage .Fieldset .FieldsetTitle span {
+	background-color: #e6e6e6;
+	min-width: 235px;
+	padding: 0px 15px;
+}
+
+#SelectFilePage .Fieldset .FieldsetTitle b {
+	font-family: LatoBold;
+}
+
+#SelectFilePage .Fieldset .FieldsetTitle sup {
+	font-size: 16px;
+	font-family: LatoBold;
+}
+
+#SelectFilePage .Fieldset .FieldsetSubtitle {
+	margin-top: 9px;
+	font-family: LatoMedium;
+}
+
+#SelectFilePage .Fieldset .FieldsetDescription {
+	margin-top: 19px;
+	font-size: 13px;
+	max-width: 225px;
+	height: 123px;
+}
+
+#SelectFilePage .Fieldset:first-child  + .Fieldset .FieldsetDescription{
+	max-width: 240px;
+	height: 65px;
+}
+
+#SelectFilePage .Fieldset select {
+	margin-top: 20px;
+	margin-bottom: 5px;
+}
+
+#SelectFilePage .Fieldset select,
+#SelectFilePage .Fieldset .Button {
+	width: 191px;
+}
+
+#NoInternetConnection {
+	color: #000000;
+	font-size: 13px;
+	text-align: center;
+}
+
+#OfflineText {
+	font-family: LatoBold;
+}
+
 
 #NewDiskNameContainer {
 	margin-top: 10px;
-	font-size: 14px;
+	font-size: 13px;
+}
+	
+#NewDiskNameContainer  div{
+	width: 46%;
+	float: left;
 }
 
-#NewDiskNameLabel {
-	margin: 0px 3px;
+#NewDiskNameContainer label {
+	display: block;
+	font-family: LatoBold;
+	margin-bottom: 5px;
+}
+
+#NewDiskSizeLabel,
+#NewDiskSize{
+	float: right;
+	clear: both;
 }
 
 #AgreementContainer {
-	margin-top: 100px;
+	margin-top: 100px;	
+}
+
+#AgreementContainer * {
+	color: black;
 	font-size: 13px;
-	margin-left: 3px;
+	font-family: LatoMedium;
+	margin-top: 40px;
 }
 
 /* Installing Page */
 
-.ProgressBarContainer {
-	width: 458px;
-	height: 23px;
-	border: 2px solid #828385;
-	margin-top: 5px;
+#InstallingPage .ContentContainer,
+#ThankYouPage .ContentContainer,
+#ErrorPage .ContentContainer {
+	border: 0;
+	width: 572px;
+}
+
+#InstallingPage .ContentTitle {
+	width: 100%;
+	text-align: center;
+	font-size: 18px;
+	font-family: Lato;
+	margin-top: 44px;
+}
+
+#InstallStepDescription,
+#CurrentStepText {
+	font-family: LatoBold;
+}
+
+#HideCornersContainer {
+	margin: 0px auto 16px;
+	width: 493px; /* ProgressBarContainer width+2*border */
+	height: 5px; /* ProgressBarContainer height+2*border */
+	overflow: hidden;
+	box-shadow: 0 1px white; /* IE10+ */	
+}
+
+#HideCornersContainer,
+#ProgressBarContainer,
+#ProgressBar {
+	border-radius: 4px;
+}
+
+#ProgressBarContainer,
+#ProgressBar {
+	height: 3px;
+	border: 1px solid;
+
+}
+
+#ProgressBarContainer {
+	width: 491px;
+	border-color: #a8a8a7;
+	background: #ced0cf; /*older than IE6 */
+	filter: progid:DXImageTransform.Microsoft.gradient( startColorstr='#ced0cf', endColorstr='#c4c5c5', GradientType=0); /* IE6-9 */
+	background-image: linear-gradient(to bottom, #ced0cf, #dcdedd 50%, #c4c5c5); /* IE10+ */
 }
 
 #ProgressBar {
-	background-color: #d1d2d4;
-	height: 100%
+	width: 100px;
+	margin-left: -1px;
+	margin-top: -1px;
+	border-color:#366aa7;
+	height: 3px;
+	background: #769ecb; /*older than IE6 */
+	filter: progid:DXImageTransform.Microsoft.gradient( startColorstr='#769ecb', endColorstr='#5486bd', GradientType=0); /* IE6-9 */
+	background-image: linear-gradient(to bottom, #769ecb, #7ba7d3 50%, #5486bd); /* IE10+ */
 }
 
-#SecureBootLabel {
-	margin-top: 20px;
+#InstallingPage .ContentContainer .FullWidthContent {
+	text-align: center;
+	font-size: 13px;
 }
 
 #SecureBootContainer {
-	padding-top: 10px;
+	height: 249px;	
+	margin-top: 35px;
+}
+
+#SecureBootLabel {
+	margin-top: 39px;
+	font-family: LatoBold;
+	color: black;
+	font-size: 14px;	
 }
 
 #SecureBootImage {
 	background: url("res:/IMG/#205") 0 0 no-repeat;
-	width: 165px;
-	height: 150px;
-	float: left;
+	width: 296px;
+	height: 249px;
+	float: right;
 }
 
+.SecureBootText {	
+	padding-bottom: 24px;
+	font-size: 13px;
+}
+
+#SecureBootText2 {
+	padding-bottom: 10px;
+}
+
+#SecureBootLabel,
 .SecureBootText,
 #SecureBootHowTo {
-	float: right;
-	width: 280px;
-	
-}
-
-.SecureBootText {
-	padding-bottom: 12px;
-	font-size: 14px;
-}
-
-#InstallingPage a {
-	text-decoration: underline;
+	padding-left: 40px;
+	max-width: 225px;
 }
 
 /* Thank you Page */
 
-#ThankYouPage .ContentTitle {
-	padding-left: 60px;
-	padding-top: 5px;
-	background-repeat: no-repeat;
-	background-position: left top;
-	min-height: 35px;
-}
-
-#ThankYouMessage {
+#InstallOkImage {
+	width: 91px;
+	height: 72px;
 	background-image: url("res:/IMG/#206");
+	margin: 40px auto 0px;
 }
 
-#ThankYouPage dl {
-	margin-top: 15px;
-	margin-left: 60px;
-	font-size: 14px;
+#ErrorMessage,
+#ThankYouMessage {
+	margin: 23px auto;
+	max-width: 310px;
+	text-align: center;
 }
 
-#ThankYouPage dl dt {
-	float: left;
-	margin-right: 5px;
-	padding-left: 15px;
-	background-repeat: no-repeat;
-	background-image: url("res:/IMG/#201");
-	background-position: left center;
+.ImageDataRow {
+	text-align: center;
+	margin: 0px auto;
+	font-size: 13px;
+}
+
+.ImageDataRow label {
 }
 
 #SecureBootReminder {
+	margin-top: 38px;	
+	height: 113px;
+	font-size: 13px;	
+
+}
+
+#ReminderTextContainer {
+	margin-left: 40px;
+	margin-right: 40px;
+}
+
+#SecureBootReminder1 {
+	padding-top: 31px;
+	font-family: LatoBold;	
+}
+
+#SecureBootReminder2 {
+	margin-right: 5px;
+}
+
+/* Error Page */
+
+#ErrorImage {
+	width: 80px;
+	height: 75px;
 	background-image: url("res:/IMG/#207");
+	margin: 65px auto 0px;
 }
 
-#ThankYouPage a {
-	text-decoration: underline;
-	margin-left: 60px;
+#ErrorMessageSuggestion {
+	margin-bottom: 25px;
+	max-width: 275px;
 }
 
-#ErrorPage .Button,
-#ThankYouPage .Button {
-	width: 26px;
+#ErrorPage .PageContent .Button {
+	margin: 35px auto;
+}
+#ErrorPage a {
+	margin: 35px auto;
 }

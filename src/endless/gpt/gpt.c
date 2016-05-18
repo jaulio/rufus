@@ -143,8 +143,7 @@ uint64_t get_disk_size(struct ptable *pt)
 
 uint64_t get_archive_disk_image_size(const char *filepath, int compression_type)
 {
-    uint8_t buffer[CHUNK_SIZE];
-    int bytes_read;
+    int64_t bytes_read;
     int size;
     int64_t result = 0;
     struct ptable pt;
@@ -153,7 +152,7 @@ uint64_t get_archive_disk_image_size(const char *filepath, int compression_type)
 
     bled_init(_uprintf, NULL, NULL);
     size = sizeof(pt); // should be 2048
-    bytes_read = bled_uncompress_to_buffer(filepath, &pt, size, compression_type);
+    bytes_read = bled_uncompress_to_buffer(filepath, (char*)&pt, size, compression_type);
     bled_exit();
 
     if (bytes_read < size) {

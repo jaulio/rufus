@@ -1,33 +1,35 @@
-﻿<html>
+<html>
 <head>
 <title>Endles USB Creator</title>
-<!--<meta http-equiv="X-UA-Compatible" content="IE=Edge" />-->
-<meta http-equiv="X-UA-Compatible" content="IE=9" />
+<meta http-equiv="X-UA-Compatible" content="IE=10" />
     
+<link type="text/css" rel="stylesheet" href="res:/CUS/#105" />
 <link type="text/css" rel="stylesheet" href="res:/CUS/#104" />
-<!--<link type="text/css" rel="stylesheet" href="EndlessUsbTool.css" />-->
-<script src="res:/CUS/#105" type=text/javascript></script>
+
+<script src="res:/CUS/#106" type=text/javascript></script>
 </head>
         
 <body id="CEndlessUsbToolDlg">
     <div id="MainContainer">
         <div id="FirstPage" class="WizardPage">
-            <div class="FullWidthContent PageHeader">
-                <h1 id="FirstPageTitle" class="PageHeaderTitle">Endless USB Creator</h1>
+            <div class="PageHeader">
+                <div id="FirstPageTitle" class="PageHeaderTitle">Endless USB Creator</div>
             </div>
 
             <div class="FullWidthContent PageContent">
-                <div class="ContentPanel" id="LeftPanel">
-                    <div class="Button" id="TryEndlessButton">Try Endless</div>
-                    <div class="PanelImage" id="LeftPaneImage"> </div>
-                    <div class="PanelText" id="TryEndlessText">You can try Endless directly from a USB drive without making any changes to your computer.</div>
-                </div>
-                <div class="ContentPanel" id="RightPanel" >
-                    <div class="Button disabled" id="InstallEndlessButton">Install Endless</div>
-                    <div class="PanelImage" id="RightPaneImage"></div>
-                    <div class="PanelText" id="InstallEndlessText">If you prefer having our full experience, you can install Endless as your new operating system.</div>
-                </div>
-                <div class="FullWidthContent">
+				<div class="ContentContainer">                    
+					<div class="ContentPanel" id="LeftPanel">
+						<div class="PanelImage" id="LeftPaneImage"> </div>
+						<div class="PanelText" id="TryEndlessText">Run Endless directly from a USB drive. This option runs slower than the full install but you won't have to make changes to your computer.</div>
+						<div class="Button ButtonBlue"><div id="TryEndlessButton">Try Endless</div></div>
+					</div>
+					<div class="ContentPanel" id="RightPanel" >                    
+						<div class="PanelImage" id="RightPaneImage"></div>
+						<div class="PanelText" id="InstallEndlessText">To get our full experience, replace your current operating system and files with Endless OS and it's 100+ offline apps.</div>
+						<div class="Button ButtonBlue ButtonDisabled"><div id="InstallEndlessButton">Install Endless</div></div>
+					</div>
+				</div>
+                <div class="FullWidthContent">				
                     <a id="CompareOptionsLink">Compare the two options</a>
                 </div>
                 <div class="FullWidthContent">
@@ -50,30 +52,52 @@
         </div>
 
         <div id="SelectFilePage" class="WizardPage hidden">
-            <div class="FullWidthContent PageHeader">
-                <div class="Button ButtonWithBorder" id="SelectFilePreviousButton">Previous</div>
-                <div class="Button ButtonRight" id="SelectFileNextButton">Next</div>
-                <h1 id="SelectFilePageTitle" class="PageHeaderTitle">Select OS Image</h1>
+            <div class="PageHeader">
+                <div class="Button"><div id="SelectFilePreviousButton">Previous</div></div>
+                <div class="Button ButtonBlue ButtonRight ButtonDisabled" id="SelectFileNextButtonC"><div id="SelectFileNextButton">Next</div></div>
+                <div id="SelectFilePageTitle" class="PageHeaderTitle">Select Your OS</div>
             </div>
 
             <div class="PageContent">
-                <div class="FullWidthContent">
-                    <div class="ContentTitle" id="ExistingImageFile">Use an existing image file:</div>
+                <div class="FullWidthContent PageSubtitle">
+					<div id="SelectFileSubtitle">Select the Endless OS version you'd like to install.</div>
+					<div id="NoInternetConnection" class="hidden">
+						<span id="OfflineText">You are offline.</span> <span id="ExtraOfflineText">Change your Network Settings to connect to the Internet.</span>
+					</div>
+				</div>
+				<div class="ContentContainer hidden" id="SelectFileLocalPresent">
+                    <div class="ContentTitle" id="ExistingImageFile">Operating system found:</div>
                     <div id="SelectFileButton"></div>
-                    <input type="radio" name="OperatingSystemType" id="OperatingSystemTypeLocal" checked />
-                    <select id="LocalImagesSelect" onclick="document.getElementById('OperatingSystemTypeLocal').checked = true;">
-                        <option id="LocalImagesLoadingText">Loading available local images...</option>
+                    <input style="clear:both" type="radio" name="OperatingSystemType" id="OperatingSystemTypeLocal" checked="true" />
+                    <select id="LocalImagesSelect" onclick="selectImageClicked('OperatingSystemTypeLocal');" disabled="disabled">                        
                     </select> 
                     
-                    <div class="ContentTitle" id="DownloadNewImage">Download a new image:</div>
+                    <div class="ContentTitle" id="DownloadNewImage">Download new file:</div>
                     <input type="radio" name="OperatingSystemType" id="OperatingSystemTypeOnline" disabled="disabled"/>
-                    <select id="OnlineImagesSelect" onclick="document.getElementById('OperatingSystemTypeOnline').checked = true;" disabled="disabled">
-                        <option id="RemoteImagesLoadingText">Loading available download images...</option>
-                    </select> 
-                    <div id="NoInternetConnection" class="hidden">
-                        <span id="OfflineText">You are offline.</span> <span id="ExtraOfflineText">Change your Network Settings to connect to the Internet.</span>
-                    </div>
+                    <select id="OnlineImagesSelect" onclick="selectImageClicked('OperatingSystemTypeOnline');" disabled="disabled">                        
+                    </select>                    
                 </div>
+				
+				<div class="ContentContainer" id="SelectFileLocalNotPresent">
+					<div class="Fieldset">
+						<div class="FieldsetTitle"><span>Endless OS <b id="LightVersionText">Light</b> <sup>beta</sup></span></div>
+						<div class="FieldsetSubtitle" id="LightDownloadSubtitle">2GB download</div>
+						<div class="FieldsetDescription" id="LightDownloadDescription">This version is great for users who have access to the internet and can therefore install their favorite apps later. It does not contain any content pre-installed.</div>
+						<div id="DownloadLightButtonC" class="Button ButtonBlue ButtonDisabled"><div id="DownloadLightButton">Download EOS Light</div></div>
+					</div>
+					
+					<div class="Fieldset">
+						<div class="FieldsetTitle"><span>Endless OS <b id="FullVersionText">Full</b> <sup>beta</sup></span></div>
+						<div class="FieldsetSubtitle" id="FullDownloadSubtitle">16GB download</div>
+						<div class="FieldsetDescription" id="FullDownloadDescription">Pre-loaded with over 100 apps and content., this version is great for installing with computers that won't have access to the internet.</div>
+						<div class="FullWidthContent">
+							<select id="DownloadLanguageSelect" disabled="disabled" onchange="remoteSelectionChanged();">
+								<!-- These will be added at runtime -->
+							</select> 
+						</div>
+						<div id="DownloadFullButtonC" class="Button ButtonBlue ButtonDisabled"><div id="DownloadFullButton">Download EOS Full</div></div>						
+					</div>
+				</div>				
             </div>
 
             <div class="FullWidthContent PageIndicator">
@@ -85,31 +109,36 @@
                 </ul>
             </div>
         </div>
-
+		
         <div id="SelectUSBPage" class="WizardPage hidden">
-            <div class="FullWidthContent PageHeader">
-                <div class="Button ButtonWithBorder" id="SelectUSBPreviousButton">Previous</div>
-                <div class="Button ButtonRight" id="SelectUSBNextButton">Next</div>
-                <h1 id="SelectUSBPageTitle" class="PageHeaderTitle">Select USB Disk</h1>
+            <div class="PageHeader">
+                <div class="Button"><div id="SelectUSBPreviousButton">Previous</div></div>
+                <div id="SelectUSBNextButtonC" class="Button ButtonBlue ButtonRight ButtonDisabled"><div id="SelectUSBNextButton">Next</div></div>
+                <div id="SelectUSBPageTitle" class="PageHeaderTitle">Select USB Device</div>
             </div>
 
             <div class="PageContent">
-                <div class="FullWidthContent">
+                <div class="FullWidthContent PageSubtitle" id="SelectUSBSubtitle">Select the device where you'd like to install Endless OS.</div>
+				<div class="ContentContainer">
                     <div class="ContentTitle" id="USBDisksFound">USB disk found:</div>
-                    <select id="USBDiskSelect" class="selected">
-                        <option value="disk1">John stick - 32GB</option>
-                        <option value="disk2">Old data - 64GB</option>
+                    <select id="USBDiskSelect" disabled="disabled">
+                        <!-- These will be added at runtime -->
                     </select>
                     <div id="NewDiskNameContainer">
-                        <label for="NewDiskName" id="NewDiskNameLabel">New Name:</label>
-                        <span id="NewDiskName">EOS 2_7 English Light - 2GB</span>
-                    </div>
-
-                    <div id="AgreementContainer">
-                        <input type="checkbox" id="AgreementCheckbox" />
-                        <label for="AgreementCheckbox" id="AgreementCheckboxText">I agree to erase all my files on my USB stick</label>
-                    </div>
-                </div>
+						<div>
+							<label for="NewDiskName" id="NewDiskNameLabel">USB's new name will appear as:</label>
+							<span id="NewDiskName">EOS 2_7 English Light</span>
+						</div>
+						<div>						
+							<label for="NewDiskSize" id="NewDiskSizeLabel">Size:</label>
+							<span id="NewDiskSize">2GB</span>
+						</div>                    
+					</div>
+                </div>				
+				<div class="ContentContainer" id="AgreementContainer">
+                    <input type="checkbox" id="AgreementCheckbox" />
+                    <label for="AgreementCheckbox" id="AgreementCheckboxText">I agree to erase all of my files on this USB device.</label>
+                </div>				
             </div>
 
             <div class="PageIndicator">
@@ -123,23 +152,33 @@
         </div>
 
         <div id="InstallingPage" class="WizardPage hidden">
-            <div class="FullWidthContent PageHeader">
-                <h1 id="InstallingPageTitle" class="PageHeaderTitle">Installing</h1>
+            <div class="PageHeader">
+                <div id="InstallingPageTitle" class="PageHeaderTitle">Installing</div>
             </div>
 
             <div class="PageContent">
-                <div class="ContentTitle" id="CreatingInstallerText">Creating installer USB</div>
-                <div class="ProgressBarContainer" id="ProgressBarContainer">
-                    <div id="ProgressBar"></div>
-                </div>
-
-                <div class="ContentTitle" id="SecureBootLabel">Secure Boot</div>
-                <div class="FullWidthContent" id="SecureBootContainer">
-                    <div id="SecureBootImage"></div>
-                    <div class="SecureBootText" id="SecureBootText1">Depending on the motherboard's BIOS/EFI firmware, the Secure Boot option will be found on the "Boot", "Security" or "Authentication" page.</div>
-                    <div class="SecureBootText"id="SecureBootText2">It must be set to "Disabled" or "Off" to allow you to boot from external media correctly.</div>
-                    <a id="SecureBootHowTo">How should I do it?</a>
-                </div>
+				<div class="ContentContainer">
+					<div class="ContentTitle">
+						<span id="CurrentStepText">Step 1</span> <span id="TotalStepsText">of 5:</span> <span id="CurrentStepDescription">: Downloading</span>
+					</div>
+					<div id="HideCornersContainer">
+						<div class="ProgressBarContainer" id="ProgressBarContainer">
+							<div id="ProgressBar"></div>
+						</div>
+					</div>
+					<div class="FullWidthContent">
+						<span id="InstallStepDescription">Download progress</span>
+						<span id="InstallStepStatus">512Mb of 2.12 Gb (500k / sec)</span>
+					</div>
+					
+					<div id="SecureBootContainer" class="RoundedCornersContainer">
+						<div id="SecureBootImage"></div>
+						<div id="SecureBootLabel">Secure Boot</div>
+						<div class="SecureBootText" id="SecureBootText1">Depending on the motherboard's BIOS/EFI firmware, the Secure Boot option will be found on the "Boot", "Security" or "Authentication" page.	</div>
+						<div class="SecureBootText" id="SecureBootText2">It must be set to "Disabled" or "Off" to allow you to boot from external media correctly.</div>
+						<a id="SecureBootHowTo">How should I do it?</a>												
+					</div>
+				</div>
             </div>
 
             <div class="PageIndicator">
@@ -153,22 +192,36 @@
         </div>
 
         <div id="ThankYouPage" class="WizardPage hidden">
-            <div class="FullWidthContent PageHeader">
-                <div class="Button ButtonRight CloseButton" id="CloseAppButton">X</div>
-                <h1 id="ThankYouPageTitle" class="PageHeaderTitle">Thank you</h1>
+            <div class="PageHeader">
+				<div class="Button ButtonBlue ButtonRight"><div id="CloseAppButton">Close</div></div>
+                <div id="ThankYouPageTitle" class="PageHeaderTitle">Thank you</div>
             </div>
 
             <div class="PageContent">
-                <div class="ContentTitle" id="ThankYouMessage">Great! Your Endless Installer device is sucessfully created.</div>
-                <dl id="InstallerDataList">
-                    <dt id="InstallerName">Name:</dt><dd id="InstallerNameValue">EOS 2_7 English Light</dd>
-                    <dt id="InstallerVersion">Version:</dt><dd id="InstallerVersionValue">2.7</dd>
-                    <dt id="InstallerLanguage">Language:</dt><dd id="InstallerLanguageValue">English</dd>
-                    <dt id="InstallerContent">Content:</dt><dd id="InstallerContentValue">Compact (2 GB)</dd>
-                </dl>
-
-                <div class="ContentTitle" id="SecureBootReminder">Remember to switch off Secure Boot.</div>
-                <a id="SecureBootHowToReminder">How should I do it?</a>
+				<div class="ContentContainer">
+					<div id="InstallOkImage"></div>
+					<div class="ContentTitle" id="ThankYouMessage">Great! Your EOS2_7 English Light Installer device is sucessfully created.</div>
+					<div class="ImageDataRow">
+						<label for="InstallerVersionValue" id="InstallerVersion">Version:</label>
+						<span id="InstallerVersionValue">2.7</span>
+					</div>
+					<div class="ImageDataRow">
+						<label for="InstallerLanguageValue" id="InstallerLanguage">Language:</label>
+						<span id="InstallerLanguageValue">English</span>
+					</div>
+					<div class="ImageDataRow">
+						<label for="InstallerContentValue" id="InstallerContent">Content:</label>
+						<span id="InstallerContentValue">Compact (2 GB)</span>
+					</div>
+                
+					<div id="SecureBootReminder" class="RoundedCornersContainer">
+						<div id="ReminderTextContainer">
+							<div id="SecureBootReminder1">Restart your computer and select "boot from USB" to <install> <try> Endless.</div>
+							<span id="SecureBootReminder2">Remember to switch off Secure Boot in order to boot from external media correctly.</span>
+							<a id="SecureBootHowToReminder">How should I do it?</a>
+						</div>
+					</div>
+				</div>
             </div>
 
             <div class="PageIndicator">
@@ -181,13 +234,28 @@
             </div>
         </div>
         <div id="ErrorPage" class="WizardPage hidden">
-            <div class="FullWidthContent PageHeader">
-                <div class="Button ButtonRight CloseButton" id="CloseAppButton1">X</div>
-                <h1 id="ErrorPageTitle" class="PageHeaderTitle">Error</h1>
+            <div class="PageHeader">
+                <div class="Button ButtonRight"><div id="CloseAppButton1">Finish</div></div>
+                <div id="ErrorPageTitle" class="PageHeaderTitle">Thank you</div>
             </div>
 
             <div class="PageContent">
-                <div class="ContentTitle" id="ErrorMessage">Something went wrong while flashing the USB device.</div>
+				<div class="ContentContainer">
+					<div id="ErrorImage"></div>
+					<div class="ContentTitle" id="ErrorMessage">Oops, something is wrong with your Endless OS file.</div>
+					<div class="ImageDataRow" id="ErrorMessageSuggestion">Please try to download it again or contact us so we can help you troubleshoot.</div>
+					<div class="Button ButtonBlue"><div id="DownloadButton">Download</div></div>
+					<div class="ImageDataRow"><a id="EndlessSupport">Endless Support</a></div>
+				</div>
+            </div>
+			
+			<div class="PageIndicator">
+                <ul>
+                    <li><span /></li>
+                    <li><span /></li>
+                    <li><span /></li>
+                    <li><span class="PageSelected" /></li>
+                </ul>
             </div>
         </div>
 

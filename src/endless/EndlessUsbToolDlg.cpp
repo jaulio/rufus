@@ -69,12 +69,7 @@ int dialog_showing = 0;
 #define new DEBUG_NEW
 #endif
 
-#define IFFALSE_GOTOERROR(__CONDITION__, __ERRROR_MSG__) if(!(__CONDITION__)) { if(strlen(__ERRROR_MSG__)) uprintf(__ERRROR_MSG__); goto error; }
-#define IFFALSE_RETURN(__CONDITION__, __ERRROR_MSG__) if(!(__CONDITION__)) { uprintf(__ERRROR_MSG__); return; }
-#define IFFALSE_RETURN_VALUE(__CONDITION__, __ERRROR_MSG__, __RET__) if(!(__CONDITION__)) { uprintf(__ERRROR_MSG__); return __RET__; }
-#define IFFALSE_BREAK(__CONDITION__, __ERRROR_MSG__) if(!(__CONDITION__)) { uprintf(__ERRROR_MSG__); break; }
-#define IFFALSE_CONTINUE(__CONDITION__, __ERRROR_MSG__) if(!(__CONDITION__)) { uprintf(__ERRROR_MSG__); continue; }
-
+#define HTML_BUTTON_ID(__id__)          (__id__##"C")
 // HTML element ids and classes
 // pages
 #define ELEMENT_FIRST_PAGE              "FirstPage"
@@ -86,6 +81,8 @@ int dialog_showing = 0;
 
 //classes
 #define CLASS_PAGE_HEADER_TITLE         "PageHeaderTitle"
+#define CLASS_PAGE_HEADER               "PageHeader"
+#define CLASS_BUTTON_DISABLED           "ButtonDisabled"
 //First page elements
 #define ELEMENT_TRY_BUTTON              "TryEndlessButton"
 #define ELEMENT_INSTALL_BUTTON          "InstallEndlessButton"
@@ -100,18 +97,35 @@ int dialog_showing = 0;
 #define ELEMENT_IMAGE_TYPE_LOCAL        "OperatingSystemTypeLocal"
 #define ELEMENT_IMAGE_TYPE_REMOTE       "OperatingSystemTypeOnline"
 #define ELEMENT_SELFILE_NO_CONNECTION   "NoInternetConnection"
+#define ELEMENT_SELFILE_DOWN_LANG       "DownloadLanguageSelect"
+
+#define ELEMENT_LOCAL_FILES_FOUND       "SelectFileLocalPresent"
+#define ELEMENT_LOCAL_FILES_NOT_FOUND   "SelectFileLocalNotPresent"
+
+#define ELEMENT_DOWNLOAD_LIGHT_BUTTON   "DownloadLightButton"
+#define ELEMENT_DOWNLOAD_FULL_BUTTON    "DownloadFullButton"
 
 //Select USB page elements
 #define ELEMENT_SELUSB_PREV_BUTTON      "SelectUSBPreviousButton"
 #define ELEMENT_SELUSB_NEXT_BUTTON      "SelectUSBNextButton"
 #define ELEMENT_SELUSB_USB_DRIVES       "USBDiskSelect"
 #define ELEMENT_SELUSB_NEW_DISK_NAME    "NewDiskName"
+#define ELEMENT_SELUSB_NEW_DISK_SIZE    "NewDiskSize"
+#define ELEMENT_SELUSB_AGREEMENT        "AgreementCheckbox"
 //Installing page elements
 #define ELEMENT_SECUREBOOT_HOWTO        "SecureBootHowTo"
-#define ELEMENT_INSTALL_STATUS          "CreatingInstallerText"
+#define ELEMENT_INSTALL_DESCRIPTION     "InstallStepDescription"
+#define ELEMENT_INSTALL_STATUS          "InstallStepStatus"
+#define ELEMENT_INSTALL_STEP            "CurrentStepText"
+#define ELEMENT_INSTALL_STEPS_TOTAL     "TotalStepsText"
+#define ELEMENT_INSTALL_STEP_TEXT       "CurrentStepDescription"
+
 //Thank You page elements
 #define ELEMENT_SECUREBOOT_HOWTO2       "SecureBootHowToReminder"
 #define ELEMENT_CLOSE_BUTTON            "CloseAppButton"
+#define ELEMENT_INSTALLER_VERSION       "InstallerVersionValue"
+#define ELEMENT_INSTALLER_LANGUAGE      "InstallerVersionLanguage"
+#define ELEMENT_INSTALLER_CONTENT       "InstallerContentValue"
 //Error page
 #define ELEMENT_ERROR_MESSAGE           "ErrorMessage"
 #define ELEMENT_ERROR_CLOSE_BUTTON      "CloseAppButton1"
@@ -119,7 +133,24 @@ int dialog_showing = 0;
 // Javascript methods
 #define JS_SET_PROGRESS                 "setProgress"
 #define JS_ENABLE_DOWNLOAD              "enableDownload"
+#define JS_ENABLE_ELEMENT               "enableElement"
+#define JS_ENABLE_BUTTON                "enableButton"
 #define JS_SHOW_ELEMENT                 "showElement"
+
+// Personalities
+
+#define PERSONALITY_BASE            L"base"
+#define PERSONALITY_ENGLISH         L"en"
+#define PERSONALITY_SPANISH         L"es"
+#define PERSONALITY_PORTUGHESE      L"pt_BR"
+
+static const wchar_t *globalAvailablePersonalities[] =
+{
+    PERSONALITY_BASE,
+    PERSONALITY_ENGLISH,
+    PERSONALITY_SPANISH,
+    PERSONALITY_PORTUGHESE
+};
 
 
 #define GET_LOCAL_PATH(__filename__) (CString(app_dir) + "\\" + __filename__)
@@ -129,7 +160,16 @@ enum custom_message {
     WM_FILES_CHANGED = UM_NO_UPDATE + 1,
     WM_FINISHED_IMG_SCANNING,
     WM_UPDATE_PROGRESS,
-    WM_FILE_DOWNLOAD_STATUS
+    WM_FILE_DOWNLOAD_STATUS,
+    WM_FINISHED_FILE_VERIFICATION
+};
+
+enum endless_action_type {    
+    OP_DOWNLOADING_FILES = OP_MAX,
+    OP_VERIFYING_SIGNATURE,
+    OP_FLASHING_DEVICE,
+    OP_NO_OPERATION_IN_PROGRESS,
+    OP_ENDLESS_MAX
 };
 
 #define TID_UPDATE_FILES                TID_REFRESH_TIMER + 1
@@ -144,8 +184,9 @@ enum custom_message {
 #define RELEASE_JSON_FILE RELEASE_JSON_FILE_UNPCK _T(CHAR_JSON_GZIP)
 #define RELEASE_JSON_URL RELEASE_JSON_URLPATH RELEASE_JSON_FILE
 
-
 #define ENDLESS_OS "Endless OS"
+#define EOS_PRODUCT_TEXT "eos"
+const wchar_t* mainWindowTitle = L"Endless USB Creator";
 
 // utility method for quick char* UTF8 conversion to BSTR
 CComBSTR UTF8ToBSTR(const char *txt) {
@@ -167,6 +208,29 @@ CString UTF8ToCString(const char *txt) {
 
     return return_value;
 }
+
+static LPCTSTR OperationToStr(int op)
+{
+    switch (op)
+    {
+    TOSTR(OP_ANALYZE_MBR);
+    TOSTR(OP_BADBLOCKS);
+    TOSTR(OP_ZERO_MBR);
+    TOSTR(OP_PARTITION);
+    TOSTR(OP_FORMAT);
+    TOSTR(OP_CREATE_FS);
+    TOSTR(OP_FIX_MBR);
+    TOSTR(OP_DOS);
+    TOSTR(OP_FINALIZE);
+    TOSTR(OP_DOWNLOADING_FILES);  
+    TOSTR(OP_VERIFYING_SIGNATURE);
+    TOSTR(OP_FLASHING_DEVICE);    
+    TOSTR(OP_NO_OPERATION_IN_PROGRESS);
+    TOSTR(OP_ENDLESS_MAX);
+    default: return _T("UNKNOWN_OPERATION");
+    }
+}
+
 
 extern "C" void UpdateProgress(int op, float percent)
 {
@@ -191,6 +255,7 @@ extern "C" void UpdateProgress(int op, float percent)
 BEGIN_DHTML_EVENT_MAP(CEndlessUsbToolDlg)
 	// For dragging the window
 	DHTML_EVENT_CLASS(DISPID_HTMLELEMENTEVENTS_ONMOUSEDOWN, _T(CLASS_PAGE_HEADER_TITLE), OnHtmlMouseDown)
+    DHTML_EVENT_CLASS(DISPID_HTMLELEMENTEVENTS_ONMOUSEDOWN, _T(CLASS_PAGE_HEADER), OnHtmlMouseDown)
 
 	// First Page Handlers		
     DHTML_EVENT_ONCLICK(_T(ELEMENT_TRY_BUTTON), OnTryEndlessSelected)
@@ -206,11 +271,14 @@ BEGIN_DHTML_EVENT_MAP(CEndlessUsbToolDlg)
     DHTML_EVENT_ONCHANGE(_T(ELEMENT_REMOTE_SELECT), OnSelectedRemoteFileChanged)
     DHTML_EVENT_ONCHANGE(_T(ELEMENT_IMAGE_TYPE_LOCAL), OnSelectedImageTypeChanged)
     DHTML_EVENT_ONCHANGE(_T(ELEMENT_IMAGE_TYPE_REMOTE), OnSelectedImageTypeChanged)
+    DHTML_EVENT_ONCLICK(_T(ELEMENT_DOWNLOAD_LIGHT_BUTTON), OnDownloadLightButtonClicked)
+    DHTML_EVENT_ONCLICK(_T(ELEMENT_DOWNLOAD_FULL_BUTTON), OnDownloadFullButtonClicked)
 
 	// Select USB Page handlers
 	DHTML_EVENT_ONCLICK(_T(ELEMENT_SELUSB_PREV_BUTTON), OnSelectUSBPreviousClicked)
 	DHTML_EVENT_ONCLICK(_T(ELEMENT_SELUSB_NEXT_BUTTON), OnSelectUSBNextClicked)
     DHTML_EVENT_ONCHANGE(_T(ELEMENT_SELUSB_USB_DRIVES), OnSelectedUSBDiskChanged)
+    DHTML_EVENT_ONCHANGE(_T(ELEMENT_SELUSB_AGREEMENT), OnAgreementCheckboxChanged)
 
 	// Installing Page handlers
 	DHTML_EVENT_ONCLICK(_T(ELEMENT_SECUREBOOT_HOWTO), OnLinkClicked)
@@ -249,16 +317,22 @@ CEndlessUsbToolDlg::CEndlessUsbToolDlg(CWnd* pParent /*=NULL*/)
     m_spWindowElem(NULL),
     m_dispexWindow(NULL),
     m_downloadManager(),
-    m_useLocalFile(true)
+    m_useLocalFile(true),
+    m_selectedRemoteIndex(-1),
+    m_baseImageRemoteIndex(-1),
+    m_usbDeleteAgreement(false),
+    m_verifyImageThread(INVALID_HANDLE_VALUE),
+    m_currentStep(OP_NO_OPERATION_IN_PROGRESS)
 {
-	m_hIcon = AfxGetApp()->LoadIcon(IDR_MAINFRAME);
+    m_hIcon = AfxGetApp()->LoadIcon(IDR_MAINFRAME);
     m_closingApplicationEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
+    m_stopVerificationEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
     m_releasesJsonFile = "";
 
-    m_personalityToLocaleMsg.SetAt(L"base", MSG_400);
-    m_personalityToLocaleMsg.SetAt(L"en", MSG_401);
-    m_personalityToLocaleMsg.SetAt(L"es", MSG_402);
-    m_personalityToLocaleMsg.SetAt(L"pt_BR", MSG_403);
+    size_t personalitiesCount = sizeof(globalAvailablePersonalities) / sizeof(globalAvailablePersonalities[0]);
+    for (uint32_t index = 0; index < personalitiesCount; index++) {
+        m_personalityToLocaleMsg.SetAt(globalAvailablePersonalities[index], MSG_400 + index);
+    }
 }
 
 void CEndlessUsbToolDlg::DoDataExchange(CDataExchange* pDX)
@@ -286,12 +360,11 @@ void CEndlessUsbToolDlg::OnDocumentComplete(LPDISPATCH pDisp, LPCTSTR szUrl)
 	if (m_spHtmlDoc3 == NULL) {
 		HRESULT hr = m_spHtmlDoc->QueryInterface(IID_IHTMLDocument3, (void**)&m_spHtmlDoc3);
 		IFFALSE_GOTOERROR(SUCCEEDED(hr) && m_spHtmlDoc3 != NULL, "Error when querying IID_IHTMLDocument3 interface.");
-	}
+	}    
 
 	AddLanguagesToUI();
 	ApplyRufusLocalization(); //apply_localization(IDD_ENDLESSUSBTOOL_DIALOG, GetSafeHwnd());
-    UpdateFileEntries();
-    StartJSONDownload();
+    UpdateFileEntries(true);
 
 	return;
 error:
@@ -425,18 +498,24 @@ BOOL CEndlessUsbToolDlg::OnInitDialog()
 	SetWindowLong(m_hWnd, GWL_STYLE, GetWindowLong(m_hWnd, GWL_STYLE)
 		& (~(WS_CAPTION | WS_BORDER)));
 
+    // Move window
+    SetWindowPos(NULL, 0, 0, 748, 514, SWP_NOMOVE | SWP_NOZORDER);
+
 	//  Get the rectangle
 	CRect rect;
 	GetWindowRect(&rect);
 	int w = rect.Width();
 	int h = rect.Height();
 
-	int radius = 19;
-	CRgn rgn;
-	rgn.CreateRoundRectRgn(0, 0, w, h, radius, radius);
-	
+	int radius = 11;
+	CRgn rgnRound, rgnRect, rgnComp;
+	rgnRound.CreateRoundRectRgn(0, 0, w + 1, h + radius, radius, radius);        
+    rgnRect.CreateRectRgn(0, 0, w, h);
+    rgnComp.CreateRectRgn(0, 0, w, h);
+    int combineResult = rgnComp.CombineRgn(&rgnRect, &rgnRound, RGN_AND);
+
 	//  Set the window region
-	SetWindowRgn(static_cast<HRGN>(rgn.GetSafeHandle()), TRUE);
+	SetWindowRgn(static_cast<HRGN>(rgnComp.GetSafeHandle()), TRUE);
 
 	// Init localization before doing anything else
 	LoadLocalizationData();
@@ -448,6 +527,8 @@ BOOL CEndlessUsbToolDlg::OnInitDialog()
     CheckDlgButton(IDC_QUICK_FORMAT, BST_CHECKED);
 
     bool result = m_downloadManager.Init(m_hWnd, WM_FILE_DOWNLOAD_STATUS);
+
+    SetWindowTextW(L"");
 
 	return TRUE;  // return TRUE  unless you set the focus to a control
 }
@@ -461,10 +542,22 @@ void CEndlessUsbToolDlg::Uninit()
             uprintf("Waiting for scan files thread.");
             WaitForSingleObject(m_fileScanThread, INFINITE);
             m_fileScanThread = INVALID_HANDLE_VALUE;
-        }
+        }        
         CloseHandle(m_closingApplicationEvent);
         m_closingApplicationEvent = INVALID_HANDLE_VALUE;
     }
+
+    if (m_stopVerificationEvent != INVALID_HANDLE_VALUE) {
+        // wait for image verification thread
+        SetEvent(m_stopVerificationEvent);
+        if (m_verifyImageThread != INVALID_HANDLE_VALUE) {
+            uprintf("Waiting for verify image thread.");
+            WaitForSingleObject(m_verifyImageThread, INFINITE);
+            m_verifyImageThread = INVALID_HANDLE_VALUE;
+        }
+        CloseHandle(m_stopVerificationEvent);
+        m_stopVerificationEvent = INVALID_HANDLE_VALUE;
+    }    
 
     m_downloadManager.Uninit();
 
@@ -537,6 +630,8 @@ BOOL CEndlessUsbToolDlg::PreTranslateMessage(MSG* pMsg)
 {
     // disable any key
     if (pMsg->message == WM_KEYDOWN) {
+        return TRUE;
+    } else if(pMsg->message == WM_MOUSEWHEEL && (GetKeyState(VK_CONTROL) & 0x8000)) { // Scroll With Ctrl + Mouse Wheel
         return TRUE;
     }
 
@@ -669,12 +764,8 @@ LRESULT CEndlessUsbToolDlg::WindowProc(UINT message, WPARAM wParam, LPARAM lPara
         switch (message) {
         case WM_SETTEXT:
         {
-            if (m_spStatusElem == NULL) {
-                HRESULT hr = m_spHtmlDoc3->getElementById(_T(ELEMENT_INSTALL_STATUS), &m_spStatusElem);
-                IFFALSE_BREAK(SUCCEEDED(hr) && m_spStatusElem != NULL, "Error querying for status element.");
-            }
-            CComBSTR bstrStatus = (wchar_t*)lParam;
-            m_spStatusElem->put_innerText(bstrStatus);
+            uprintf("WM_SETTEXT %ls", (wchar_t*)lParam);
+            lParam = (LPARAM)mainWindowTitle;            
             break;
         }
         case WM_CLIENTSHUTDOWN:
@@ -764,9 +855,16 @@ LRESULT CEndlessUsbToolDlg::WindowProc(UINT message, WPARAM wParam, LPARAM lPara
             HRESULT hr;
             int op = (int)wParam;
             int percent = (int)lParam;
+            uprintf("Operation %ls(%d) with progress %d", OperationToStr(op), op, percent);
 
             hr = CallJavascript(_T(JS_SET_PROGRESS), CComVariant(percent));
             IFFALSE_BREAK(SUCCEEDED(hr), "Error when calling set progress.");
+
+            if (op == OP_VERIFYING_SIGNATURE || op == OP_FORMAT) {
+                CString downloadString;
+                downloadString.Format(L"%d%%", percent);
+                SetElementText(_T(ELEMENT_INSTALL_STATUS), CComBSTR(downloadString));
+            }
             break;
         }
         case UM_PROGRESS_EXIT:
@@ -776,6 +874,7 @@ LRESULT CEndlessUsbToolDlg::WindowProc(UINT message, WPARAM wParam, LPARAM lPara
         case UM_FORMAT_COMPLETED:
         {
             m_formatThread = INVALID_HANDLE_VALUE;
+            m_currentStep = OP_NO_OPERATION_IN_PROGRESS;
 
             if (!IS_ERROR(FormatStatus)) {
                 PrintInfo(0, MSG_210);
@@ -784,12 +883,10 @@ LRESULT CEndlessUsbToolDlg::WindowProc(UINT message, WPARAM wParam, LPARAM lPara
             } else if (SCODE_CODE(FormatStatus) == ERROR_CANCELLED) {
                 PrintInfo(0, MSG_211);
                 Uninit();
-                AfxPostQuitMessage(0);
-                //Notification(MSG_INFO, NULL, lmprintf(MSG_211), lmprintf(MSG_041));
+                AfxPostQuitMessage(0);            
             } else {
                 PrintInfo(0, MSG_212);
-                CString error = UTF8ToCString(StrError(FormatStatus, FALSE));
-                //Notification(MSG_ERROR, NULL, lmprintf(MSG_042), lmprintf(MSG_043, StrError(FormatStatus, FALSE)));
+                CString error = UTF8ToCString(StrError(FormatStatus, FALSE));                
                 ErrorOccured(error);
             }
             FormatStatus = 0;
@@ -816,7 +913,7 @@ LRESULT CEndlessUsbToolDlg::WindowProc(UINT message, WPARAM wParam, LPARAM lPara
                 if (isReleaseJsonDownload) {
                     UpdateDownloadOptions();
                 } else {
-                    StartRufusFormatThread();
+                    StartFileVerificationThread();
                 }
             } else {
                 uprintf("Download [%ls] progress %s of %s (%d of %d files)", downloadStatus->jobName,
@@ -825,20 +922,50 @@ LRESULT CEndlessUsbToolDlg::WindowProc(UINT message, WPARAM wParam, LPARAM lPara
                     downloadStatus->progress.FilesTransferred, downloadStatus->progress.FilesTotal);
 
                 if (!isReleaseJsonDownload) {
+                    static ULONGLONG startedTickCount = 0;
+                    static ULONGLONG startedBytes = 0;
+
                     RemoteImageEntry_t remote = m_remoteImages.GetAt(m_remoteImages.FindIndex(m_selectedRemoteIndex));
-                    int percent = downloadStatus->progress.BytesTransferred * 100 / remote.compressedSize;
-                    PostMessage(WM_UPDATE_PROGRESS, 0, (LPARAM)percent);
-                    // RADU: calculate download speed
-                    CString downloadString = UTF8ToCString(lmprintf(MSG_301));
-                    downloadString += UTF8ToCString(lmprintf(MSG_302,
-                        SizeToHumanReadable(downloadStatus->progress.BytesTransferred, FALSE, use_fake_units),
-                        SizeToHumanReadable(remote.compressedSize, FALSE, use_fake_units),
-                        "500kb"));
-                    SetWindowText(downloadString);
+                    ULONGLONG percent = downloadStatus->progress.BytesTransferred * 100 / remote.compressedSize;
+                    PostMessage(WM_UPDATE_PROGRESS, (WPARAM)OP_DOWNLOADING_FILES, (LPARAM)percent);
+
+                    // calculate speed
+                    CStringA speed("---");
+                    ULONGLONG currentTickCount = GetTickCount64();
+                    if (startedTickCount != 0) {
+                        ULONGLONG diffBytes = downloadStatus->progress.BytesTransferred - startedBytes;
+                        ULONGLONG diffMillis = currentTickCount - startedTickCount;
+                        double diffSeconds = diffMillis / 1000.0;
+                        speed = SizeToHumanReadable(diffBytes / diffSeconds, FALSE, use_fake_units);
+                    } else {
+                        startedTickCount = currentTickCount;
+                        startedBytes = downloadStatus->progress.BytesTransferred;
+                    }
+
+                    CStringA strDownloaded = SizeToHumanReadable(downloadStatus->progress.BytesTransferred, FALSE, use_fake_units);
+                    CStringA strTotal = SizeToHumanReadable(remote.compressedSize, FALSE, use_fake_units);
+                    // push to UI
+                    CString downloadString = UTF8ToCString(lmprintf(MSG_302, strDownloaded, strTotal, speed));
+                    SetElementText(_T(ELEMENT_INSTALL_STATUS), CComBSTR(downloadString));
                 }
             }
 
             delete downloadStatus;
+            break;
+        }
+        case WM_FINISHED_FILE_VERIFICATION:
+        {
+            BOOL result = (BOOL)wParam;
+            if (result) {
+                uprintf("Verification passed.");
+                StartRufusFormatThread();
+            }
+            else {
+                uprintf("Verification failed.");
+                // RADU: add more specific errors
+                FormatStatus = ERROR_SEVERITY_ERROR | FAC(FACILITY_STORAGE) | APPERR(ERROR_GEN_FAILURE);
+                PostMessage(UM_FORMAT_COMPLETED, (WPARAM)FALSE, 0);
+            }
             break;
         }
         default:
@@ -882,7 +1009,8 @@ HRESULT CEndlessUsbToolDlg::OnHtmlMouseDown(IHTMLElement* pElement)
 void CEndlessUsbToolDlg::LoadLocalizationData()
 {
 	const char* rufus_loc = "rufus.loc";
-	int lcid = GetUserDefaultUILanguage(); //0x0418;
+	//int lcid = 0x0418;
+    int lcid = GetUserDefaultUILanguage();
 	BYTE *loc_data;
 	DWORD loc_size, size;
 	char tmp_path[MAX_PATH] = "", loc_file[MAX_PATH] = "";
@@ -1012,7 +1140,8 @@ void CEndlessUsbToolDlg::ChangePage(PCTSTR oldPage, PCTSTR newPage)
 
 void CEndlessUsbToolDlg::ErrorOccured(CString errorMessage)
 {
-    SetElementText(_T(ELEMENT_ERROR_MESSAGE), CComBSTR(errorMessage));
+    uprintf("Error occured %ls", errorMessage);
+    //SetElementText(_T(ELEMENT_ERROR_MESSAGE), CComBSTR(errorMessage));
     ChangePage(_T(ELEMENT_INSTALL_PAGE), _T(ELEMENT_ERROR_PAGE));
 }
 
@@ -1093,6 +1222,16 @@ error:
     return hr;
 }
 
+bool CEndlessUsbToolDlg::IsButtonDisabled(IHTMLElement *pElement)
+{
+    CComPtr<IHTMLElement> parentElem;
+    CComBSTR className;
+    if (FAILED(pElement->get_parentElement(&parentElem)) || parentElem == NULL) return true;
+    if (pElement == NULL || FAILED(parentElem->get_className(&className)) || className ==  NULL) return true;
+    
+    return wcsstr(className, _T(CLASS_BUTTON_DISABLED)) != NULL;    
+}
+
 //HRESULT CEndlessUsbToolDlg::OnHtmlSelectStart(IHTMLElement* pElement)
 //{
 //	POINT pt;
@@ -1110,19 +1249,20 @@ HRESULT CEndlessUsbToolDlg::OnTryEndlessSelected(IHTMLElement* pElement)
 	m_fullInstall = false;
 
     ChangePage(_T(ELEMENT_FIRST_PAGE), _T(ELEMENT_FILE_PAGE));
+    StartJSONDownload();
 
 	return S_OK;
 }
 
 HRESULT CEndlessUsbToolDlg::OnInstallEndlessSelected(IHTMLElement* pElement)
 {
-    return S_OK;
+    if (IsButtonDisabled(pElement)) return S_OK;
 
- //   m_fullInstall = true;
+    m_fullInstall = true;
+    StartJSONDownload();
+    ChangePage(_T(ELEMENT_FIRST_PAGE), _T(ELEMENT_FILE_PAGE));
 
- //   ChangePage(_T(ELEMENT_FIRST_PAGE), _T(ELEMENT_FILE_PAGE));
-
-	//return S_OK;
+	return S_OK;
 }
 
 HRESULT CEndlessUsbToolDlg::OnLinkClicked(IHTMLElement* pElement)
@@ -1163,7 +1303,7 @@ error:
 	return S_OK;
 }
 
-void CEndlessUsbToolDlg::UpdateFileEntries()
+void CEndlessUsbToolDlg::UpdateFileEntries(bool shouldInit)
 {
     CComPtr<IHTMLElement> pElement;
     CComPtr<IHTMLSelectElement> selectElement;
@@ -1174,11 +1314,6 @@ void CEndlessUsbToolDlg::UpdateFileEntries()
     pFileImageEntry_t currentEntry = NULL;
     CString currentPath;
     BOOL fileAccessException = false;
-
-    // start the change notifications thread if not already started
-    if (m_fileScanThread == INVALID_HANDLE_VALUE) {
-        m_fileScanThread = CreateThread(NULL, 0, CEndlessUsbToolDlg::FileScanThread, (LPVOID)m_closingApplicationEvent, 0, NULL);
-    }
 
     // get needed HTML elements
     hr = GetSelectElement(_T(ELEMENT_FILES_SELECT), selectElement);
@@ -1281,6 +1416,11 @@ checkEntries:
         KillTimer(TID_UPDATE_FILES);
     }
 
+    bool hasLocalImages = m_imageFiles.GetCount() != 0;
+    if (!hasLocalImages) {
+        m_useLocalFile = false;
+    }
+
     // set selected image for Rufus code
     CComBSTR selectedValue;
     hr = selectElement->get_value(&selectedValue);
@@ -1292,6 +1432,20 @@ checkEntries:
             image_path = _com_util::ConvertBSTRToString(selectedValue);
         }
     }
+
+    if (shouldInit) {        
+        // start the change notifications thread
+        if (hasLocalImages && m_fileScanThread == INVALID_HANDLE_VALUE) {
+            m_fileScanThread = CreateThread(NULL, 0, CEndlessUsbToolDlg::FileScanThread, (LPVOID)m_closingApplicationEvent, 0, NULL);
+        }        
+        
+        CallJavascript(_T(JS_SHOW_ELEMENT), CComVariant(ELEMENT_LOCAL_FILES_FOUND), CComVariant(hasLocalImages));
+        CallJavascript(_T(JS_SHOW_ELEMENT), CComVariant(ELEMENT_LOCAL_FILES_NOT_FOUND), CComVariant(!hasLocalImages));
+        CallJavascript(_T(JS_SHOW_ELEMENT), CComVariant(HTML_BUTTON_ID(ELEMENT_SELFILE_NEXT_BUTTON)), CComVariant(hasLocalImages));
+    }
+
+    CallJavascript(_T(JS_ENABLE_ELEMENT), CComVariant(_T(ELEMENT_FILES_SELECT)), CComVariant(hasLocalImages));
+    CallJavascript(_T(JS_ENABLE_ELEMENT), CComVariant(_T(ELEMENT_IMAGE_TYPE_LOCAL)), CComVariant(hasLocalImages));
 }
 
 DWORD WINAPI CEndlessUsbToolDlg::FileScanThread(void* param)
@@ -1346,18 +1500,16 @@ void CEndlessUsbToolDlg::StartJSONDownload()
 
     if (result == FALSE) {
         luprintf("Device not connected to internet [0x%x], error=%s", flags, WindowsErrorString());
-        CallJavascript(_T(JS_SHOW_ELEMENT), CComVariant(ELEMENT_SELFILE_NO_CONNECTION), CComVariant(TRUE));
+        CallJavascript(_T(JS_ENABLE_DOWNLOAD), CComVariant(FALSE));
         return;
     }
 
     result = InternetCheckConnection(RELEASE_JSON_URL, FLAG_ICC_FORCE_CONNECTION, 0);
     if(result == FALSE) {
-        CallJavascript(_T(JS_SHOW_ELEMENT), CComVariant(ELEMENT_SELFILE_NO_CONNECTION), CComVariant(TRUE));
+        CallJavascript(_T(JS_ENABLE_DOWNLOAD), CComVariant(FALSE));
         luprintf("Cannot connect to server to download JSON, error=%d, %s", GetLastError(), WindowsErrorString());
         return;
     }
-
-    CallJavascript(_T(JS_SHOW_ELEMENT), CComVariant(ELEMENT_SELFILE_NO_CONNECTION), CComVariant(FALSE));
 
     m_releasesJsonFile = app_dir;
     m_releasesJsonFile += _T("\\");
@@ -1392,9 +1544,10 @@ do { \
 void CEndlessUsbToolDlg::UpdateDownloadOptions()
 {
     Json::Reader reader;
-    Json::Value rootValue, imagesElem, jsonElem, personalities, persImages, persImage, fullImage;
+    Json::Value rootValue, imagesElem, jsonElem, personalities, persImages, persImage, fullImage, latestEntry;
     int64_t result = 0;
     std::ifstream jsonStream;
+    CString latestVersion("");
 
     m_remoteImages.RemoveAll();
 
@@ -1434,7 +1587,17 @@ void CEndlessUsbToolDlg::UpdateDownloadOptions()
         persImages = (*it)[JSON_IMG_PERS_IMAGES];
         IFFALSE_CONTINUE(!persImages.isNull(), "Error: No personality_images entry found.");
 
+        CString currentVersion((*it)[JSON_IMG_VERSION].asCString());
+        if (currentVersion > latestVersion) {
+            latestVersion = currentVersion;
+            latestEntry = *it;
+        }
+    }
+
+    if(!latestEntry.isNull()) {
+        uprintf("Selected version '%ls'", latestVersion);
         uint32_t personalityMsgId = 0;
+        personalities = latestEntry[JSON_IMG_PERSONALITIES];
         for (Json::ValueIterator persIt = personalities.begin(); persIt != personalities.end(); persIt++) {
             IFFALSE_CONTINUE(persIt->isString(), "Entry is not string, continuing");
             IFFALSE_CONTINUE(m_personalityToLocaleMsg.Lookup(CString(persIt->asCString()), personalityMsgId), "Unknown personality. Continuing.");
@@ -1456,12 +1619,13 @@ void CEndlessUsbToolDlg::UpdateDownloadOptions()
             //remoteImage.extractedSize = fullImage[JSON_IMG_EXTRACTED_SIZE].asUInt64();
             remoteImage.urlFile = fullImage[JSON_IMG_URL_FILE].asCString();
             remoteImage.urlSignature = fullImage[JSON_IMG_URL_SIG].asCString();
+            remoteImage.personality = persIt->asCString();
 
             // Create display name
-            GetImgDisplayName(remoteImage.displayName, CString((*it)[JSON_IMG_VERSION].asCString()), CString(persIt->asCString()), remoteImage.compressedSize);
+            GetImgDisplayName(remoteImage.displayName, latestVersion, remoteImage.personality, remoteImage.compressedSize);
 
             // Create dowloadJobName
-            remoteImage.downloadJobName = (*it)[JSON_IMG_VERSION].asCString();
+            remoteImage.downloadJobName = latestVersion;
             remoteImage.downloadJobName += persIt->asCString();
 
             m_remoteImages.AddTail(remoteImage);
@@ -1470,28 +1634,51 @@ void CEndlessUsbToolDlg::UpdateDownloadOptions()
 
     // Radu: Maybe move this to another method to separate UI from logic
     // add options to UI
-
     HRESULT hr = ClearSelectElement(_T(ELEMENT_REMOTE_SELECT));
-    IFFALSE_GOTOERROR(SUCCEEDED(hr), "Error clearing remote images select.")
+    IFFALSE_PRINTERROR(SUCCEEDED(hr), "Error clearing remote images select.");
+    hr = ClearSelectElement(_T(ELEMENT_SELFILE_DOWN_LANG));
+    IFFALSE_PRINTERROR(SUCCEEDED(hr), "Error clearing remote images select.");
+
+    CallJavascript(_T(JS_ENABLE_BUTTON), CComVariant(HTML_BUTTON_ID(_T(ELEMENT_DOWNLOAD_LIGHT_BUTTON))), CComVariant(FALSE));
     for (POSITION pos = m_remoteImages.GetHeadPosition(); pos != NULL; ) {
         RemoteImageEntry_t imageEntry = m_remoteImages.GetNext(pos);
-        hr = AddEntryToSelect(_T(ELEMENT_REMOTE_SELECT), CComBSTR(""), CComBSTR(imageEntry.displayName), NULL);
-        IFFALSE_GOTOERROR(SUCCEEDED(hr), "Error adding remote image to list.");
+        long selectIndex = 0;
+        hr = AddEntryToSelect(_T(ELEMENT_REMOTE_SELECT), CComBSTR(""), CComBSTR(imageEntry.displayName), &selectIndex);
+        IFFALSE_PRINTERROR(SUCCEEDED(hr), "Error adding remote image to list.");
+
+        if (imageEntry.personality == PERSONALITY_BASE) {
+            CallJavascript(_T(JS_ENABLE_BUTTON), CComVariant(HTML_BUTTON_ID(_T(ELEMENT_DOWNLOAD_LIGHT_BUTTON))), CComVariant(TRUE));
+            m_baseImageRemoteIndex = selectIndex;
+        } else {            
+            CString imageLanguage = UTF8ToCString(lmprintf(m_personalityToLocaleMsg[imageEntry.personality]));
+            CString indexStr;
+            indexStr.Format(L"%d", selectIndex);
+            hr = AddEntryToSelect(_T(ELEMENT_SELFILE_DOWN_LANG), CComBSTR(indexStr), CComBSTR(imageLanguage), NULL);
+            IFFALSE_PRINTERROR(SUCCEEDED(hr), "Error adding remote image to full images list.");
+        }
     }
 
-    bool foundImages = m_remoteImages.GetCount() != 0;
-    hr = CallJavascript(_T(JS_ENABLE_DOWNLOAD), CComVariant(foundImages));
-    if (!foundImages) {
-        hr = AddEntryToSelect(_T(ELEMENT_REMOTE_SELECT), CComBSTR(""), CComBSTR("---"), NULL);
+    bool foundRemoteImages = m_remoteImages.GetCount() != 0;
+    hr = CallJavascript(_T(JS_ENABLE_DOWNLOAD), CComVariant(foundRemoteImages));
+    IFFALSE_PRINTERROR(SUCCEEDED(hr), "Error calling javascript to enable/disable download posibility.");
+
+    if (m_imageFiles.GetCount() == 0) {
+        m_selectedRemoteIndex = m_baseImageRemoteIndex;
+    }
+
+    if (!foundRemoteImages) {
+        // RADU: do we need this?
+        //hr = AddEntryToSelect(_T(ELEMENT_REMOTE_SELECT), CComBSTR(""), CComBSTR(""), NULL);
+        //hr = AddEntryToSelect(_T(ELEMENT_SELFILE_DOWN_LANG), CComBSTR(""), CComBSTR(""), NULL);
     }
 
     return;
 
 error:
-    // RADU: disable downloading here I assume? Or retry download/parse?
-    MessageBoxU(NULL, "Error unpacking JSON file", "Fatal error", MB_ICONSTOP | MB_SYSTEMMODAL);
+    // RADU: disable downloading here I assume? Or retry download/parse?    
     uprintf("JSON parsing failed. Parser error messages %s", reader.getFormattedErrorMessages().c_str());
     CallJavascript(_T(JS_ENABLE_DOWNLOAD), CComVariant(FALSE));
+    CallJavascript(_T(JS_ENABLE_BUTTON), CComVariant(HTML_BUTTON_ID(_T(ELEMENT_DOWNLOAD_LIGHT_BUTTON))), CComVariant(FALSE));
     return;
 }
 
@@ -1507,10 +1694,15 @@ HRESULT CEndlessUsbToolDlg::OnSelectFileNextClicked(IHTMLElement* pElement)
 {
     LPITEMIDLIST pidlDesktop = NULL;
     SHChangeNotifyEntry NotifyEntry;
+    
+    if (IsButtonDisabled(pElement)) {
+        return S_OK;
+    }
 
     // RADU: move this to another thread
     GetUSBDevices(0);
     OnSelectedUSBDiskChanged(NULL);
+
 
     // Register MEDIA_INSERTED/MEDIA_REMOVED notifications for card readers
     if (SUCCEEDED(SHGetSpecialFolderLocation(0, CSIDL_DESKTOP, &pidlDesktop))) {
@@ -1523,7 +1715,7 @@ HRESULT CEndlessUsbToolDlg::OnSelectFileNextClicked(IHTMLElement* pElement)
     }
 
     // Get display name with actual image size, not compressed
-    CString selectedImage, personality, version;
+    CString selectedImage, personality, version, selectedSize;
     ULONGLONG size = 0;
     if (m_useLocalFile) {
         selectedImage = image_path;
@@ -1536,7 +1728,14 @@ HRESULT CEndlessUsbToolDlg::OnSelectFileNextClicked(IHTMLElement* pElement)
         size = remote.extractedSize;
     }
 
+    selectedSize = SizeToHumanReadable(size, FALSE, use_fake_units);
     if (ParseImgFileName(selectedImage, personality, version)) {
+        SetElementText(_T(ELEMENT_INSTALLER_VERSION), CComBSTR(version));
+        SetElementText(_T(ELEMENT_INSTALLER_LANGUAGE), UTF8ToBSTR(lmprintf(m_personalityToLocaleMsg[personality])));
+        CString contentStr("--- (");
+        contentStr += SizeToHumanReadable(size, FALSE, use_fake_units);
+        contentStr += ")";
+        SetElementText(_T(ELEMENT_INSTALLER_CONTENT), CComBSTR(contentStr));
         GetImgDisplayName(selectedImage, version, personality, size);
     } else {
         uprintf("Cannot parse data from file name %ls; using default %s", selectedImage, ENDLESS_OS);
@@ -1544,6 +1743,7 @@ HRESULT CEndlessUsbToolDlg::OnSelectFileNextClicked(IHTMLElement* pElement)
     }
 
     SetElementText(_T(ELEMENT_SELUSB_NEW_DISK_NAME), CComBSTR(selectedImage));
+    SetElementText(_T(ELEMENT_SELUSB_NEW_DISK_SIZE), CComBSTR(selectedSize));
 
 	ChangePage(_T(ELEMENT_FILE_PAGE), _T(ELEMENT_USB_PAGE));
 
@@ -1632,6 +1832,33 @@ HRESULT CEndlessUsbToolDlg::OnSelectedImageTypeChanged(IHTMLElement* pElement)
     return S_OK;
 }
 
+HRESULT CEndlessUsbToolDlg::OnDownloadLightButtonClicked(IHTMLElement* pElement)
+{
+    m_selectedRemoteIndex = m_baseImageRemoteIndex;
+    OnSelectFileNextClicked(pElement);
+
+    return S_OK;
+}
+HRESULT CEndlessUsbToolDlg::OnDownloadFullButtonClicked(IHTMLElement* pElement)
+{
+    // trigger select onchange to update selected index
+    CComPtr<IHTMLElement> pSelElem;
+    GetElement(_T(ELEMENT_SELFILE_DOWN_LANG), &pSelElem);
+    CComQIPtr<IHTMLElement3> spElem3(pSelElem);
+    CComPtr<IHTMLEventObj> spEo;
+    CComQIPtr<IHTMLDocument4> spDoc4(m_spHtmlDoc); // pDoc Document
+    spDoc4->createEventObject(NULL, &spEo);
+
+    CComQIPtr<IDispatch> spDisp(spEo);
+    CComVariant var(spDisp);
+    VARIANT_BOOL bCancel = VARIANT_FALSE;
+    spElem3->fireEvent(L"onchange", &var, &bCancel);
+    
+    OnSelectFileNextClicked(pElement);
+
+    return S_OK;
+}
+
 // Select USB Page Handlers
 HRESULT CEndlessUsbToolDlg::OnSelectUSBPreviousClicked(IHTMLElement* pElement)
 {
@@ -1643,11 +1870,18 @@ HRESULT CEndlessUsbToolDlg::OnSelectUSBPreviousClicked(IHTMLElement* pElement)
 
 HRESULT CEndlessUsbToolDlg::OnSelectUSBNextClicked(IHTMLElement* pElement)
 {
+    if (IsButtonDisabled(pElement)) return S_OK;
+
 	LeavingDevicesPage();
 
+    SetElementText(_T(ELEMENT_INSTALL_STATUS), CComBSTR(""));
+    SetElementText(_T(ELEMENT_INSTALL_DESCRIPTION), CComBSTR(""));
+
     if (m_useLocalFile) {
-        StartRufusFormatThread();
+        StartFileVerificationThread();        
     } else {
+        UpdateCurrentStep(OP_DOWNLOADING_FILES);        
+
         RemoteImageEntry_t remote = m_remoteImages.GetAt(m_remoteImages.FindIndex(m_selectedRemoteIndex));
         DownloadType_t downloadType = m_fullInstall ? DownloadType_t::DownloadTypeInstallerImage : DownloadType_t::DownloadTypeLiveImage;
         // add image file to download
@@ -1671,8 +1905,6 @@ HRESULT CEndlessUsbToolDlg::OnSelectUSBNextClicked(IHTMLElement* pElement)
             appendFile = true;
             status = m_downloadManager.AddDownload(downloadType, url, localFile, true, &appendFile, remote.downloadJobName);
         }
-
-        SetWindowText(UTF8ToCString(lmprintf(MSG_304)));
     }
 
     ChangePage(_T(ELEMENT_USB_PAGE), _T(ELEMENT_INSTALL_PAGE));
@@ -1698,6 +1930,8 @@ void CEndlessUsbToolDlg::StartRufusFormatThread()
         return;
     }
 
+    UpdateCurrentStep(OP_FLASHING_DEVICE);
+
     FormatStatus = 0;
     m_scanImageThread = CreateThread(NULL, 0, CEndlessUsbToolDlg::RufusISOScanThread, NULL, 0, NULL);
     if (m_scanImageThread == NULL) {
@@ -1719,9 +1953,25 @@ HRESULT CEndlessUsbToolDlg::OnSelectedUSBDiskChanged(IHTMLElement* pElement)
     SelectedDrive.DeviceNumber = (DWORD)ComboBox_GetItemData(hDeviceList, deviceIndex);
     GetDrivePartitionData(SelectedDrive.DeviceNumber, fs_type, sizeof(fs_type), FALSE);
 
+    CallJavascript(_T(JS_ENABLE_BUTTON), CComVariant(HTML_BUTTON_ID(_T(ELEMENT_SELUSB_NEXT_BUTTON))), CComVariant(m_usbDeleteAgreement));
+    CallJavascript(_T(JS_ENABLE_ELEMENT), CComVariant(_T(ELEMENT_SELUSB_USB_DRIVES)), CComVariant(TRUE));
+
     return S_OK;
 
 error:
+    CallJavascript(_T(JS_ENABLE_BUTTON), CComVariant(HTML_BUTTON_ID(_T(ELEMENT_SELUSB_NEXT_BUTTON))), CComVariant(FALSE));
+    CallJavascript(_T(JS_ENABLE_ELEMENT), CComVariant(_T(ELEMENT_SELUSB_USB_DRIVES)), CComVariant(FALSE));
+    return S_OK;
+}
+
+HRESULT CEndlessUsbToolDlg::OnAgreementCheckboxChanged(IHTMLElement *pElement)
+{
+    int deviceIndex = ComboBox_GetCurSel(hDeviceList);
+    m_usbDeleteAgreement = !m_usbDeleteAgreement;
+
+    BOOL enable = m_usbDeleteAgreement && deviceIndex >= 0;
+    CallJavascript(_T(JS_ENABLE_BUTTON), CComVariant(HTML_BUTTON_ID(_T(ELEMENT_SELUSB_NEXT_BUTTON))), CComVariant(enable));
+    
     return S_OK;
 }
 
@@ -1745,14 +1995,16 @@ HRESULT CEndlessUsbToolDlg::OnCloseAppClicked(IHTMLElement* pElement)
 
 void CEndlessUsbToolDlg::OnClose()
 {
-    bool format_in_progress = m_formatThread != INVALID_HANDLE_VALUE;
+    bool operation_in_progress = m_currentStep == OP_FLASHING_DEVICE;
 
-    if (format_in_progress) {
+    if (operation_in_progress) {
         int result = MessageBoxExU(hMainDialog, lmprintf(MSG_105), lmprintf(MSG_049), MB_YESNO | MB_ICONWARNING | MB_IS_RTL, selected_langid);
         if (result == IDYES) {
-            FormatStatus = ERROR_SEVERITY_ERROR | FAC(FACILITY_STORAGE) | ERROR_CANCELLED;
-            PrintInfo(0, MSG_201);
+            FormatStatus = ERROR_SEVERITY_ERROR | FAC(FACILITY_STORAGE) | ERROR_CANCELLED;            
             uprintf("Cancelling");
+            CString str = UTF8ToCString(lmprintf(MSG_201));
+            SetElementText(_T(ELEMENT_INSTALL_DESCRIPTION), CComBSTR(str));
+            SetElementText(_T(ELEMENT_INSTALL_STATUS), CComBSTR(""));
         }
         return;
     }
@@ -1764,7 +2016,7 @@ void CEndlessUsbToolDlg::OnClose()
 HRESULT CEndlessUsbToolDlg::CallJavascript(LPCTSTR method, CComVariant parameter1, CComVariant parameter2)
 {
     HRESULT hr;
-    uprintf("CallJavascript called with method %ls", method);
+    //uprintf("CallJavascript called with method %ls", method);
     if (m_spWindowElem == NULL) {
         hr = m_spHtmlDoc->get_parentWindow(&m_spWindowElem);
         IFFALSE_RETURN_VALUE(SUCCEEDED(hr) && m_spWindowElem != NULL, "Error querying for parent window.", E_FAIL);
@@ -1783,7 +2035,7 @@ HRESULT CEndlessUsbToolDlg::CallJavascript(LPCTSTR method, CComVariant parameter
     IFFALSE_RETURN_VALUE(SUCCEEDED(hr), "Error getting method dispid", E_FAIL);
     if (parameter2 == CComVariant()) {
         hr = m_dispWindow.Invoke1(dispidMethod, &parameter1);
-    }else {
+    } else {
         hr = m_dispWindow.Invoke2(dispidMethod, &parameter1, &parameter2);
     }
 
@@ -1791,6 +2043,104 @@ HRESULT CEndlessUsbToolDlg::CallJavascript(LPCTSTR method, CComVariant parameter
 
     return S_OK;
 }
+void CEndlessUsbToolDlg::UpdateCurrentStep(int currentStep)
+{
+    if (m_currentStep == currentStep) {
+        uprintf("Already at step %ls(%d)", OperationToStr(currentStep), currentStep);
+        return;
+    }
+
+    int nrSteps = m_useLocalFile ? 2 : 3;
+    int nrCurrentStep;
+    int locMsgIdTitle, locMsgIdSubtitle;
+    m_currentStep = currentStep;
+    
+    switch (m_currentStep)
+    {
+    case OP_DOWNLOADING_FILES:
+        locMsgIdTitle = MSG_304;
+        locMsgIdSubtitle = MSG_301;
+        nrCurrentStep = 1;
+        break;
+    case OP_VERIFYING_SIGNATURE:
+        locMsgIdTitle = MSG_310;
+        locMsgIdSubtitle = MSG_308;
+        nrCurrentStep = m_useLocalFile ? 1 : 2;
+        break;
+    case OP_FLASHING_DEVICE:
+        locMsgIdTitle = MSG_311;
+        locMsgIdSubtitle = MSG_309;
+        nrCurrentStep = m_useLocalFile ? 2 : 3;
+        break;
+    default:
+        uprintf("Unknown operation %ls(%d)", OperationToStr(currentStep), currentStep);
+        break;
+    }
+    
+    CString str = UTF8ToCString(lmprintf(locMsgIdSubtitle));
+    SetElementText(_T(ELEMENT_INSTALL_DESCRIPTION), CComBSTR(str));
+
+    str = UTF8ToCString(lmprintf(MSG_305, nrCurrentStep));
+    SetElementText(_T(ELEMENT_INSTALL_STEP), CComBSTR(str));
+
+    str = UTF8ToCString(lmprintf(MSG_306, nrSteps));
+    SetElementText(_T(ELEMENT_INSTALL_STEPS_TOTAL), CComBSTR(str));  
+
+    str = UTF8ToCString(lmprintf(locMsgIdTitle));
+    SetElementText(_T(ELEMENT_INSTALL_STEP_TEXT), CComBSTR(str));
+
+    CallJavascript(_T(JS_SET_PROGRESS), CComVariant(0));
+    SetElementText(_T(ELEMENT_INSTALL_STATUS), CComBSTR(""));
+}
+
+void CEndlessUsbToolDlg::StartFileVerificationThread()
+{
+    if (m_verifyImageThread != INVALID_HANDLE_VALUE) {
+        uprintf("Verification already started");
+        return;
+    }
+
+    UpdateCurrentStep(OP_VERIFYING_SIGNATURE);
+
+    m_verifyImageThread = CreateThread(NULL, 0, CEndlessUsbToolDlg::FileVerificationThread, (LPVOID)m_stopVerificationEvent, 0, NULL);
+    if (m_verifyImageThread == NULL) {
+        m_verifyImageThread = INVALID_HANDLE_VALUE;
+        uprintf("Unable to start signature verification thread.");
+        FormatStatus = ERROR_SEVERITY_ERROR | FAC(FACILITY_STORAGE) | APPERR(ERROR_CANT_START_THREAD);
+    }
+}
+// used for mocked verification
+#define VERIFICATION_WAIT 100
+#define VERIFICATION_STEP 10
+
+DWORD WINAPI CEndlessUsbToolDlg::FileVerificationThread(void* param)
+{
+    int current = 0, total = 100;
+    BOOL result = FALSE;
+
+    while (current < total) {
+        DWORD dwWaitStatus = WaitForSingleObject((HANDLE)param, VERIFICATION_WAIT);
+        switch (dwWaitStatus)
+        {
+        case WAIT_OBJECT_0:
+            goto done;
+            break;
+        case WAIT_TIMEOUT:
+            current += VERIFICATION_STEP;
+            ::PostMessage(hMainDialog, WM_UPDATE_PROGRESS, (WPARAM)OP_VERIFYING_SIGNATURE, (LPARAM)current);
+            break;
+        default:
+            break;
+        }
+    }
+    result = TRUE;
+
+done:
+    ::PostMessage(hMainDialog, WM_FINISHED_FILE_VERIFICATION, (WPARAM)result, 0);
+    
+    return 0;
+}
+
 
 bool CEndlessUsbToolDlg::ParseImgFileName(const CString& filename, CString &personality, CString &version)
 {
@@ -1812,7 +2162,9 @@ bool CEndlessUsbToolDlg::ParseImgFileName(const CString& filename, CString &pers
         resToken = filename.Tokenize(t1, pos);
         elemIndex++;
     };
-    IFFALSE_GOTOERROR(!version.IsEmpty() && !lastPart.IsEmpty() && product == "eos", "");
+
+    version.Replace(_T(EOS_PRODUCT_TEXT), _T(""));
+    IFFALSE_GOTOERROR(!version.IsEmpty() && !lastPart.IsEmpty() && product == _T(EOS_PRODUCT_TEXT), "");
 
     pos = 0;
     resToken = lastPart.Tokenize(t2, pos);

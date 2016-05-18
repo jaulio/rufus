@@ -439,6 +439,13 @@
 #define MSG_289                         3289
 #define MSG_MAX                         3290
 
+#ifdef ENDLESSUSB_TOOL
+#pragma warning (push)
+#pragma warning (disable: 4005)
+#include "endless\resource.h"
+#pragma warning (pop)
+# endif // ENDLESSUSB_TOOL
+
 // Next default values for new objects
 // 
 #ifdef APSTUDIO_INVOKED

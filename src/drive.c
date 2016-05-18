@@ -492,7 +492,11 @@ BOOL GetDriveLabel(DWORD DriveIndex, char* letters, char** label)
 	wchar_t wVolumeLabel[MAX_PATH+1];
 	static char VolumeLabel[MAX_PATH+1];
 
+#ifdef ENDLESSUSB_TOOL
+    *label = lmprintf(MSG_307);
+#else // ENDLESSUSB_TOOL
 	*label = STR_NO_LABEL;
+#endif // ENDLESSUSB_TOOL
 
 	if (!GetDriveLetters(DriveIndex, letters))
 		return FALSE;

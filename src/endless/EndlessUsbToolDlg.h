@@ -18,6 +18,7 @@ typedef struct FileImageEntry {
 typedef struct RemoteImageEntry {
     ULONGLONG compressedSize;
     ULONGLONG extractedSize;
+    CString personality;
     CString urlFile;
     CString urlSignature;
     CString displayName;
@@ -57,11 +58,14 @@ protected:
     HRESULT OnSelectedImageFileChanged(IHTMLElement* pElement);
     HRESULT OnSelectedRemoteFileChanged(IHTMLElement* pElement);
     HRESULT OnSelectedImageTypeChanged(IHTMLElement* pElement);
+    HRESULT OnDownloadLightButtonClicked(IHTMLElement* pElement);
+    HRESULT OnDownloadFullButtonClicked(IHTMLElement* pElement);
 
 	// Select USB Page handlers
 	HRESULT OnSelectUSBPreviousClicked(IHTMLElement* pElement);
 	HRESULT OnSelectUSBNextClicked(IHTMLElement* pElement);
     HRESULT OnSelectedUSBDiskChanged(IHTMLElement* pElement);
+    HRESULT OnAgreementCheckboxChanged(IHTMLElement* pElement);
 
 	// Thank You page handlers
 	HRESULT OnCloseAppClicked(IHTMLElement* pElement);
@@ -103,11 +107,16 @@ private:
     BOOL m_automount;
     HANDLE m_FilesChangedHandle;
     HANDLE m_closingApplicationEvent;
+    HANDLE m_stopVerificationEvent;
     HANDLE m_fileScanThread;
     HANDLE m_formatThread;
     HANDLE m_scanImageThread;
+    HANDLE m_verifyImageThread;
     bool m_useLocalFile;
-    UINT m_selectedRemoteIndex;
+    long m_selectedRemoteIndex;
+    long m_baseImageRemoteIndex;
+    bool m_usbDeleteAgreement;
+    int m_currentStep;
     CMap<CString, LPCTSTR, pFileImageEntry_t, pFileImageEntry_t> m_imageFiles;
     CList<CString> m_imageIndexToPath;
     CList<RemoteImageEntry_t> m_remoteImages;
@@ -136,10 +145,11 @@ private:
     HRESULT ClearSelectElement(PCTSTR selectId);
 	HRESULT AddEntryToSelect(PCTSTR selectId, const CComBSTR &value, const CComBSTR &text, long *outIndex, BOOL selected = FALSE);
 	HRESULT AddEntryToSelect(CComPtr<IHTMLSelectElement> &selectElem, const CComBSTR &value, const CComBSTR &text, long *outIndex, BOOL selected = FALSE);
+    static bool IsButtonDisabled(IHTMLElement *pElement);
 
 	void LeavingDevicesPage();
 
-    void UpdateFileEntries();
+    void UpdateFileEntries(bool shouldInit = false);
     static DWORD WINAPI FileScanThread(void* param);
 
     void StartJSONDownload();
@@ -150,6 +160,11 @@ private:
     void ErrorOccured(const CString errorMessage);
 
     HRESULT CallJavascript(LPCTSTR method, CComVariant parameter1, CComVariant parameter2 = NULL);
+
+    void UpdateCurrentStep(int currentStep);
+
+    void StartFileVerificationThread();
+    static DWORD WINAPI FileVerificationThread(void* param);
 
     static bool ParseImgFileName(const CString& filename, CString &personality, CString &version);
     static void GetImgDisplayName(CString &displayName, const CString &version, const CString &personality, ULONGLONG size);

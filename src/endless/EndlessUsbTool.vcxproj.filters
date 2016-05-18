@@ -90,6 +90,9 @@
     <ClInclude Include="gpt\gpt_errors.h">
       <Filter>Header Files\gpt</Filter>
     </ClInclude>
+    <ClInclude Include="GeneralCode.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="EndlessUsbTool.cpp">
@@ -174,6 +177,12 @@
     </None>
     <None Include="res\endless.loc" />
     <None Include="..\..\res\uefi\uefi-ntfs.img" />
+    <None Include="res\EndlessFonts.css" />
+    <None Include="res\fonts\eot\Lato-Regular.eot" />
+    <None Include="res\fonts\eot\Lato-Medium.eot" />
+    <None Include="res\fonts\eot\Lato-Bold.eot" />
+    <None Include="res\fonts\eot\Lato-Black.eot" />
+    <None Include="res\fonts\eot\Lato-Light.eot" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="EndlessUsbTool.rc">
@@ -208,5 +217,12 @@
     <Image Include="res\images\wizard_page_indicator_selected.png">
       <Filter>Resource Files\Images</Filter>
     </Image>
+  </ItemGroup>
+  <ItemGroup>
+    <Font Include="res\fonts\ttf\Lato-Regular.ttf" />
+    <Font Include="res\fonts\ttf\Lato-Medium.ttf" />
+    <Font Include="res\fonts\ttf\Lato-Bold.ttf" />
+    <Font Include="res\fonts\ttf\Lato-Black.ttf" />
+    <Font Include="res\fonts\ttf\Lato-Light.ttf" />
   </ItemGroup>
 </Project>

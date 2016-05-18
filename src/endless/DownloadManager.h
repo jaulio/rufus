@@ -3,6 +3,8 @@
 #include <windows.h>
 #include <bits.h>
 
+#include "GeneralCode.h"
+
 /// IUnknown methods declaration macro
 #define DECLARE_IUNKNOWN \
     STDMETHOD_(ULONG, AddRef)(void); \
@@ -15,9 +17,6 @@ typedef enum DownloadType {
     DownloadTypeInstallerImage,
     DownloadTypeMax
 } DownloadType_t;
-
-// helper methods
-#define TOSTR(value) case value: return _T(#value)
 
 static LPCTSTR DownloadTypeToString(DownloadType_t type)
 {

@@ -107,6 +107,7 @@
       <MinimalRebuild>true</MinimalRebuild>
       <ExceptionHandling>Sync</ExceptionHandling>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
+      <DisableSpecificWarnings>4091</DisableSpecificWarnings>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -135,6 +136,7 @@
       <SDLCheck>true</SDLCheck>
       <AdditionalIncludeDirectories>..\endless;..\msvc-missing;..\ms-sys\inc;..\syslinux\libinstaller;..\syslinux\libfat;..\syslinux\win;..\libcdio;..\getopt;..\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+      <DisableSpecificWarnings>4091</DisableSpecificWarnings>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -163,6 +165,7 @@
       <SDLCheck>true</SDLCheck>
       <ExceptionHandling>false</ExceptionHandling>
       <AdditionalIncludeDirectories>..\endless;..\msvc-missing;..\ms-sys\inc;..\syslinux\libinstaller;..\syslinux\libfat;..\syslinux\win;..\libcdio;..\getopt;..\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <DisableSpecificWarnings>4091</DisableSpecificWarnings>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -194,6 +197,7 @@
       <PreprocessorDefinitions>ENDLESSUSB_TOOL;_OFF_T_DEFINED;_off_t=__int64;off_t=_off_t;_WINDOWS;NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>true</SDLCheck>
       <AdditionalIncludeDirectories>..\endless;..\msvc-missing;..\ms-sys\inc;..\syslinux\libinstaller;..\syslinux\libfat;..\syslinux\win;..\libcdio;..\getopt;..\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <DisableSpecificWarnings>4091</DisableSpecificWarnings>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -227,6 +231,7 @@
     <ClInclude Include="DownloadManager.h" />
     <ClInclude Include="EndlessUsbTool.h" />
     <ClInclude Include="EndlessUsbToolDlg.h" />
+    <ClInclude Include="GeneralCode.h" />
     <ClInclude Include="gpt\gpt.h" />
     <ClInclude Include="gpt\gpt_errors.h" />
     <ClInclude Include="json\json-forwards.h" />
@@ -440,12 +445,18 @@
   <ItemGroup>
     <None Include="..\..\res\uefi\uefi-ntfs.img" />
     <None Include="res\endless.loc" />
+    <None Include="res\EndlessFonts.css" />
     <None Include="res\EndlessUsbTool.css" />
     <None Include="res\EndlessUsbTool.htm">
       <DeploymentContent>true</DeploymentContent>
     </None>
     <None Include="res\EndlessUsbTool.js" />
     <None Include="res\EndlessUsbTool.rc2" />
+    <None Include="res\fonts\eot\Lato-Black.eot" />
+    <None Include="res\fonts\eot\Lato-Bold.eot" />
+    <None Include="res\fonts\eot\Lato-Light.eot" />
+    <None Include="res\fonts\eot\Lato-Medium.eot" />
+    <None Include="res\fonts\eot\Lato-Regular.eot" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="EndlessUsbTool.rc" />
@@ -486,6 +497,13 @@
     <ProjectReference Include="..\syslinux\win\.msvc\win.vcxproj">
       <Project>{7d2e9784-ddf7-4988-a887-cf099bc3b340}</Project>
     </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
+    <Font Include="res\fonts\ttf\Lato-Black.ttf" />
+    <Font Include="res\fonts\ttf\Lato-Bold.ttf" />
+    <Font Include="res\fonts\ttf\Lato-Light.ttf" />
+    <Font Include="res\fonts\ttf\Lato-Medium.ttf" />
+    <Font Include="res\fonts\ttf\Lato-Regular.ttf" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

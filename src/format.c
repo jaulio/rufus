@@ -1482,7 +1482,9 @@ static BOOL WriteDrive(HANDLE hPhysicalDrive, HANDLE hSourceImage)
 #else
 /// RADU: propose this change to rufus
 		if (-1 == bled_uncompress_with_handles(hSourceImage, hPhysicalDrive, img_report.compression_type)) {
-				FormatStatus = ERROR_SEVERITY_ERROR | FAC(FACILITY_STORAGE) | ERROR_NO_MEDIA_IN_DRIVE;
+            if (SCODE_CODE(FormatStatus) != ERROR_CANCELLED) {
+                FormatStatus = ERROR_SEVERITY_ERROR | FAC(FACILITY_STORAGE) | ERROR_NO_MEDIA_IN_DRIVE;
+            }
 		}
 #endif // !ENDLESSUSB_TOOL
 		bled_exit();
