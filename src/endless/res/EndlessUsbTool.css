@@ -9,7 +9,11 @@
 body {
 	font-family: Lato;
 	background: #363d41
-} 
+}
+
+b {
+	font-family: LatoBold;
+}
 
 #MainContainer {
     width: 746px;
@@ -496,6 +500,10 @@ select:disabled {
 
 #AgreementContainer {
 	margin-top: 100px;	
+}
+
+#AgreementContainer b {
+	font-family: LatoBold;
 }
 
 #AgreementContainer * {

@@ -1087,7 +1087,7 @@ void CEndlessUsbToolDlg::ApplyRufusLocalization()
 		case LC_TEXT:
 			if (pElement != NULL) {
 				if ((lcmd->txt[1] != NULL) && (lcmd->txt[1][0] != 0)) {
-					hr = pElement->put_innerText(UTF8ToBSTR(lcmd->txt[1]));
+					hr = pElement->put_innerHTML(UTF8ToBSTR(lcmd->txt[1]));
 					if (FAILED(hr)) {
 						luprintf("error when updating control '%s', hr='%x'\n", lcmd->txt[0], hr);
 					}
