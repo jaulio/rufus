@@ -162,7 +162,7 @@ t MSG_105 "Cancelling may leave the device in an UNUSABLE state.\n"
 	"If you are sure you want to cancel, click YES. Otherwise, click NO."
 t MSG_201 "Cancelling, please wait"
 
-t MSG_300 "Error dowloading file."
+t MSG_300 "Error downloading file."
 t MSG_301 "Download Progress"
 t MSG_302 "%s of %s (%s/s)"
 t MSG_303 "Something is wrong with your Endless OS file."
@@ -178,7 +178,7 @@ t MSG_311 "Writing"
 t MSG_400 "Light"
 t MSG_401 "English"
 t MSG_402 "Spanish"
-t MSG_403 "Portugese (Brazilian)"
+t MSG_403 "Portuguese (Brazilian)"
 
 ################################################################################
 ############################# TRANSLATOR END COPY ##############################
