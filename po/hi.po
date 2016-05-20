@@ -1,0 +1,343 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the PACKAGE package.
+# 
+# Translators:
+msgid ""
+msgstr ""
+"Project-Id-Version: rufus\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2016-03-08 02:28+0000\n"
+"PO-Revision-Date: 2016-05-20 07:27+0000\n"
+"Last-Translator: Roddy Shuler <roddy@endlessm.com>\n"
+"Language-Team: Hindi (http://www.transifex.com/endless-mobile-inc/rufus/language/hi/)\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Language: hi\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+msgctxt "FirstPageTitle"
+msgid "USB Creator for Endless OS"
+msgstr ""
+
+msgctxt "TryEndlessButton"
+msgid "Try Endless"
+msgstr ""
+
+msgctxt "TryEndlessText"
+msgid ""
+"Run Endless OS directly from a USB device. This option runs a bit slower "
+"than the full installation but you won’t have to make changes to your "
+"computer."
+msgstr ""
+
+msgctxt "InstallEndlessButton"
+msgid "Install Endless"
+msgstr ""
+
+msgctxt "InstallEndlessText"
+msgid ""
+"To get our full and faster experience, replace your current operating system"
+" and files with Endless OS and its 100+ offline apps."
+msgstr ""
+
+msgctxt "CompareOptionsLink"
+msgid "Compare the two options"
+msgstr ""
+
+msgctxt "SelectFilePreviousButton"
+msgid "Previous"
+msgstr ""
+
+msgctxt "SelectFileNextButton"
+msgid "Next"
+msgstr ""
+
+msgctxt "SelectFilePageTitle"
+msgid "Select Your Endless OS Version"
+msgstr ""
+
+msgctxt "SelectFileSubtitle"
+msgid "Choose the Endless OS version that’s best for you."
+msgstr ""
+
+msgctxt "ExistingImageFile"
+msgid "Use existing version:"
+msgstr ""
+
+msgctxt "DownloadNewImage"
+msgid "Download a new version:"
+msgstr ""
+
+msgctxt "OfflineText"
+msgid "You are offline."
+msgstr ""
+
+msgctxt "ExtraOfflineText"
+msgid "Change your Network Settings to connect to the Internet."
+msgstr ""
+
+msgctxt "LightVersionText"
+msgid "Light"
+msgstr ""
+
+msgctxt "LightDownloadSubtitle"
+msgid "2GB Download"
+msgstr ""
+
+msgctxt "LightDownloadDescription"
+msgid ""
+"Select this option if you’ll have access to the internet and can install "
+"your favorite apps later."
+msgstr ""
+
+msgctxt "DownloadLightButton"
+msgid "Download EOS Light"
+msgstr ""
+
+msgctxt "FullVersionText"
+msgid "Full"
+msgstr ""
+
+msgctxt "FullDownloadSubtitle"
+msgid "16GB Download"
+msgstr ""
+
+msgctxt "FullDownloadDescription"
+msgid ""
+"Pre-loaded with over 100 apps and content. Select this version for "
+"installing on computers that won’t have regular access to the internet."
+msgstr ""
+
+msgctxt "DownloadFullButton"
+msgid "Download EOS Full"
+msgstr ""
+
+msgctxt "SelectUSBPreviousButton"
+msgid "Previous"
+msgstr ""
+
+msgctxt "SelectUSBNextButton"
+msgid "Next"
+msgstr ""
+
+msgctxt "SelectUSBPageTitle"
+msgid "Select USB Disk"
+msgstr ""
+
+msgctxt "SelectUSBSubtitle"
+msgid ""
+"Is this the USB device you’d like to use to boot<br/>Endless OS on your "
+"computer? If not, choose another."
+msgstr ""
+
+msgctxt "USBDisksFound"
+msgid "USB found:"
+msgstr ""
+
+msgctxt "NewDiskNameLabel"
+msgid "New USB device contents:"
+msgstr ""
+
+msgctxt "NewDiskSizeLabel"
+msgid "Size:"
+msgstr ""
+
+msgctxt "AgreementCheckboxText"
+msgid "I agree to erase <b>all of the files</b> on this USB device."
+msgstr ""
+
+msgctxt "InstallingPageTitle"
+msgid "Preparing USB Drive"
+msgstr ""
+
+msgctxt "SecureBootLabel"
+msgid "Secure Boot"
+msgstr ""
+
+msgctxt "SecureBootText1"
+msgid ""
+"Depending your system, the Secure Boot option will be found on the \"Boot\","
+" \"Security\" or \"Authentication\" page."
+msgstr ""
+
+msgctxt "SecureBootText2"
+msgid ""
+"It must be set to \"Disabled\" or \"Off\" to allow you to boot from external"
+" media correctly."
+msgstr ""
+
+msgctxt "SecureBootHowTo"
+msgid "How should I do it?"
+msgstr ""
+
+msgctxt "ThankYouPageTitle"
+msgid "Thank you"
+msgstr ""
+
+msgctxt "CloseAppButton"
+msgid "Close"
+msgstr ""
+
+msgctxt "ThankYouMessage"
+msgid "Great! Your Endless USB device has been successfully created."
+msgstr ""
+
+msgctxt "InstallerVersion"
+msgid "Version:"
+msgstr ""
+
+msgctxt "InstallerLanguage"
+msgid "Language:"
+msgstr ""
+
+msgctxt "InstallerContent"
+msgid "Content:"
+msgstr ""
+
+msgctxt "SecureBootReminder1"
+msgid "Restart your computer and select \"boot from USB\" to install/try Endless."
+msgstr ""
+
+msgctxt "SecureBootReminder2"
+msgid ""
+"Remember to switch off Secure Boot so you can boot from your USB device "
+"correctly."
+msgstr ""
+
+msgctxt "SecureBootHowToReminder"
+msgid "How do I turn Secure Boot off?"
+msgstr ""
+
+msgctxt "ErrorPageTitle"
+msgid "Error"
+msgstr ""
+
+msgctxt "CloseAppButton1"
+msgid "Finish"
+msgstr ""
+
+msgctxt "ErrorMessage"
+msgid "Oops, something is wrong with your Endless OS file."
+msgstr ""
+
+msgctxt "ErrorMessageSuggestion"
+msgid ""
+"Please try to download it again or contact us so we can help you "
+"troubleshoot."
+msgstr ""
+
+msgctxt "EndlessSupport"
+msgid "Endless Support"
+msgstr ""
+
+msgctxt "DownloadButton"
+msgid "Download"
+msgstr ""
+
+msgctxt "MSG_020"
+msgid "bytes"
+msgstr ""
+
+msgctxt "MSG_021"
+msgid "Kb"
+msgstr ""
+
+msgctxt "MSG_022"
+msgid "Mb"
+msgstr ""
+
+msgctxt "MSG_023"
+msgid "Gb"
+msgstr ""
+
+msgctxt "MSG_024"
+msgid "Tb"
+msgstr ""
+
+msgctxt "MSG_025"
+msgid "Pb"
+msgstr ""
+
+msgctxt "MSG_046"
+msgid "%s (Disk %d) [%s]"
+msgstr ""
+
+msgctxt "MSG_049"
+msgid "Endless - Cancellation"
+msgstr ""
+
+msgctxt "MSG_105"
+msgid ""
+"Cancelling may leave the device in an UNUSABLE state.\n"
+"If you are sure you want to cancel, click YES. Otherwise, click NO."
+msgstr ""
+
+msgctxt "MSG_201"
+msgid "Cancelling, please wait"
+msgstr ""
+
+msgctxt "MSG_300"
+msgid "Error downloading file."
+msgstr ""
+
+msgctxt "MSG_301"
+msgid "Download Progress"
+msgstr ""
+
+msgctxt "MSG_302"
+msgid "%s of %s (%s/s)"
+msgstr ""
+
+msgctxt "MSG_303"
+msgid "Something is wrong with your Endless OS file."
+msgstr ""
+
+msgctxt "MSG_304"
+msgid "Downloading"
+msgstr ""
+
+msgctxt "MSG_305"
+msgid "Step %d"
+msgstr ""
+
+msgctxt "MSG_306"
+msgid "of %d:"
+msgstr ""
+
+msgctxt "MSG_307"
+msgid "No Label"
+msgstr ""
+
+msgctxt "MSG_308"
+msgid "Verification Progress"
+msgstr ""
+
+msgctxt "MSG_309"
+msgid "Writing Progress"
+msgstr ""
+
+msgctxt "MSG_310"
+msgid "Verifying"
+msgstr ""
+
+msgctxt "MSG_311"
+msgid "Writing"
+msgstr ""
+
+msgctxt "MSG_400"
+msgid "Light"
+msgstr ""
+
+msgctxt "MSG_401"
+msgid "English"
+msgstr ""
+
+msgctxt "MSG_402"
+msgid "Spanish"
+msgstr ""
+
+msgctxt "MSG_403"
+msgid "Portuguese (Brazilian)"
+msgstr ""
