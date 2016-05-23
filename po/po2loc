@@ -1,0 +1,89 @@
+#!/usr/bin/env python3
+
+import collections
+import polib
+
+# Script to parse the .po files that contain Transifex translations
+# and populate the endless.loc file actually used by rufus
+
+LOC_FILE = '../src/endless/res/endless.loc'
+MARKER = '### Start Endless Translations (do not edit this line) ###'
+SEPARATOR = '################################################################################'
+VERSION = '1.0.19'
+SOURCE_LANG = 'en-US'
+
+# Note: the first lcid listed is the base lcid that corresponds to the tag,
+# the rest are for other locales that should use this translation
+# See https://msdn.microsoft.com/en-us/goglobal/bb964664.aspx
+LANGS = collections.OrderedDict([
+    ('ar', {'tag': 'ar-SA',
+            'name': 'Arabic (العربية)',
+            'lcids': '0x0401, 0x0801, 0x0c01, 0x1001, 0x1401, 0x1801, 0x1c01, 0x2001, 0x2401, 0x2801, 0x2c01, 0x3001, 0x3401, 0x3801, 0x3c01, 0x4001',
+            'rtl': True}),
+    ('bn', {'tag': 'bn-BD',
+            'name': 'Bangla (বাংলা)',
+            'lcids': '0x0845, 0x0445'}),
+    ('es', {'tag': 'es-ES',
+            'name': 'Spanish (Español)',
+            'lcids': '0x040a, 0x080a, 0x0c0a, 0x100a, 0x140a, 0x180a, 0x1c0a, 0x200a, 0x240a, 0x280a, 0x2c0a, 0x300a, 0x340a, 0x380a, 0x3c0a, 0x400a, 0x440a, 0x480a, 0x4c0a, 0x500a, 0x540a, 0x580a'}),
+    ('fr', {'tag': 'fr-FR',
+            'name': 'French (Français)',
+            'lcids': '0x040c, 0x080c, 0x0c0c, 0x100c, 0x140c, 0x180c, 0x1c0c, 0x200c, 0x240c, 0x280c, 0x2c0c, 0x300c, 0x340c, 0x380c, 0xe40c'}),
+    ('hi', {'tag': 'hi-IN',
+            'name': 'Hindi (हिन्दी)',
+            'lcids': '0x0439'}),
+    ('id', {'tag': 'id-ID',
+            'name': 'Indonesian (Bahasa Indonesia)',
+            'lcids': '0x0421'}),
+    ('pt_BR', {'tag': 'pt-BR',
+               'name': 'Portuguese Brazilian (Português do Brasil)',
+               'lcids': '0x0416'}),
+    ('th', {'tag': 'th-TH',
+            'name': 'Thai (ไทย)',
+            'lcids': '0x041e'}),
+    ('vi', {'tag': 'vi-VN',
+            'name': 'Vietnamese (Tiếng Việt)',
+            'lcids': '0x042A'}),
+    ('zh_CN', {'tag': 'zh-CN',
+               'name': 'Chinese Simplified (简体中文)',
+               'lcids': '0x0804, 0x1004'})])
+
+# Read in the preamble until the marker that starts Endless translations
+preamble = ''
+have_marker = False
+with open(LOC_FILE, 'r') as f:
+    for line in f:
+        preamble += line
+        if line.startswith(MARKER):
+            have_marker = True
+            break
+
+# Re-write the file starting with the preamble
+# and then append with Endless translations
+with open(LOC_FILE, 'w') as f:
+    f.write(preamble)
+    if not have_marker:
+        f.write('\n')
+        f.write('\n')
+        f.write(MARKER)
+        f.write('\n')
+    for lang in LANGS:
+        f.write('\n')
+        f.write(SEPARATOR)
+        f.write('\n')
+        data = LANGS[lang]
+        f.write('l "%s" "%s" %s\n' %
+                (data['tag'], data['name'], data['lcids']))
+        if 'rtl' in data and data['rtl']:
+            f.write('a "r"\n')
+        f.write('v %s\n' % VERSION)
+        f.write('b "%s"\n' % SOURCE_LANG)
+        f.write('\n')
+        f.write('g IDD_DIALOG\n')
+        po = polib.pofile(lang + '.po')
+        for entry in po:
+            msgstr = entry.msgstr
+            if not msgstr:
+                # Use the English string if no translation yet
+                msgstr = entry.msgid
+            f.write('t %s "%s"\n' % (entry.msgctxt, msgstr))
