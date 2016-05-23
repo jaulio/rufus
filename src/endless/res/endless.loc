@@ -49,6 +49,7 @@
 # l "en-US" "English (English)" 0x0409
 # l "ar-SA" "Arabic (العربية)" 0x0401
 # l "az-AZ" "Azerbaijani (Azərbaycanca)" 0x042c
+# l "bn-BD" "Bangla (বাংলা)" 0x0845
 # l "bg-BG" "Bulgarian (Български)" 0x0402
 # l "zh-CN" "Chinese Simplified (简体中文)" 0x0804
 # l "zh-TW" "Chinese Traditional (正體中文)" 0x0404
@@ -60,6 +61,7 @@
 # l "fr-FR" "French (Français)" 0x040c
 # l "de-DE" "German (Deutsch)" 0x0407
 # l "el-GR" "Greek (Ελληνικά)" 0x0408
+# l "hi-IN" "Hindi (हिन्दी)" 0x0439
 # l "hu-HU" "Hungarian (Magyar)" 0x040e
 # l "id-ID" "Indonesian (Bahasa Indonesia)" 0x0421
 # l "it-IT" "Italian (Italiano)" 0x0410
