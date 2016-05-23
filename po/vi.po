@@ -3,12 +3,13 @@
 # This file is distributed under the same license as the PACKAGE package.
 # 
 # Translators:
+# Roddy Shuler <roddy@endlessm.com>, 2016
 msgid ""
 msgstr ""
 "Project-Id-Version: rufus\n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2016-03-08 02:28+0000\n"
-"PO-Revision-Date: 2016-05-20 07:39+0000\n"
+"PO-Revision-Date: 2016-05-23 21:53+0000\n"
 "Last-Translator: Roddy Shuler <roddy@endlessm.com>\n"
 "Language-Team: Vietnamese (http://www.transifex.com/endless-mobile-inc/rufus/language/vi/)\n"
 "MIME-Version: 1.0\n"
@@ -80,7 +81,7 @@ msgstr ""
 
 msgctxt "LightVersionText"
 msgid "Light"
-msgstr ""
+msgstr "Light"
 
 msgctxt "LightDownloadSubtitle"
 msgid "2GB Download"
@@ -98,7 +99,7 @@ msgstr ""
 
 msgctxt "FullVersionText"
 msgid "Full"
-msgstr ""
+msgstr "Full"
 
 msgctxt "FullDownloadSubtitle"
 msgid "16GB Download"
@@ -328,7 +329,7 @@ msgstr ""
 
 msgctxt "MSG_400"
 msgid "Light"
-msgstr ""
+msgstr "Light"
 
 msgctxt "MSG_401"
 msgid "English"

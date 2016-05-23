@@ -3,12 +3,13 @@
 # This file is distributed under the same license as the PACKAGE package.
 # 
 # Translators:
+# Roddy Shuler <roddy@endlessm.com>, 2016
 msgid ""
 msgstr ""
 "Project-Id-Version: rufus\n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2016-03-08 02:28+0000\n"
-"PO-Revision-Date: 2016-05-20 08:21+0000\n"
+"PO-Revision-Date: 2016-05-23 21:51+0000\n"
 "Last-Translator: Roddy Shuler <roddy@endlessm.com>\n"
 "Language-Team: French (http://www.transifex.com/endless-mobile-inc/rufus/language/fr/)\n"
 "MIME-Version: 1.0\n"
@@ -80,7 +81,7 @@ msgstr "Modifiez vos paramètres réseau pour vous connecter à Internet."
 
 msgctxt "LightVersionText"
 msgid "Light"
-msgstr "Léger"
+msgstr "Light"
 
 msgctxt "LightDownloadSubtitle"
 msgid "2GB Download"
@@ -98,7 +99,7 @@ msgstr "Télécharger EOS Light"
 
 msgctxt "FullVersionText"
 msgid "Full"
-msgstr "Complet"
+msgstr "Full"
 
 msgctxt "FullDownloadSubtitle"
 msgid "16GB Download"
@@ -112,7 +113,7 @@ msgstr "Comprend plus de 100 applications et autres contenus. Installez cette ve
 
 msgctxt "DownloadFullButton"
 msgid "Download EOS Full"
-msgstr "Télécharger EOS (complet)"
+msgstr "Télécharger EOS Full"
 
 msgctxt "SelectUSBPreviousButton"
 msgid "Previous"
@@ -328,7 +329,7 @@ msgstr "Écriture"
 
 msgctxt "MSG_400"
 msgid "Light"
-msgstr "Léger"
+msgstr "Light"
 
 msgctxt "MSG_401"
 msgid "English"

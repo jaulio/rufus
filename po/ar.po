@@ -3,12 +3,13 @@
 # This file is distributed under the same license as the PACKAGE package.
 # 
 # Translators:
+# Roddy Shuler <roddy@endlessm.com>, 2016
 msgid ""
 msgstr ""
 "Project-Id-Version: rufus\n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2016-03-08 02:28+0000\n"
-"PO-Revision-Date: 2016-05-20 09:24+0000\n"
+"PO-Revision-Date: 2016-05-23 21:49+0000\n"
 "Last-Translator: Roddy Shuler <roddy@endlessm.com>\n"
 "Language-Team: Arabic (http://www.transifex.com/endless-mobile-inc/rufus/language/ar/)\n"
 "MIME-Version: 1.0\n"
@@ -80,7 +81,7 @@ msgstr "قُم بتغيير إعدادات الشبكة الخاصة بك للا
 
 msgctxt "LightVersionText"
 msgid "Light"
-msgstr "خفيف"
+msgstr "Light"
 
 msgctxt "LightDownloadSubtitle"
 msgid "2GB Download"
@@ -94,11 +95,11 @@ msgstr "حدد هذا الخيار إذا كنت سوف تقوم بالدخول 
 
 msgctxt "DownloadLightButton"
 msgid "Download EOS Light"
-msgstr "تنزيل إصدار EOS الخفيف"
+msgstr "تنزيل إصدار EOS Light"
 
 msgctxt "FullVersionText"
 msgid "Full"
-msgstr "الكامل"
+msgstr "Full"
 
 msgctxt "FullDownloadSubtitle"
 msgid "16GB Download"
@@ -112,7 +113,7 @@ msgstr "تم تحميل أكثر من 100 تطبيق ومحتوى إليه بش�
 
 msgctxt "DownloadFullButton"
 msgid "Download EOS Full"
-msgstr "تنزيل إصدار EOS الكامل"
+msgstr "تنزيل إصدار EOS Full"
 
 msgctxt "SelectUSBPreviousButton"
 msgid "Previous"
@@ -328,7 +329,7 @@ msgstr "جاري  الكتابة"
 
 msgctxt "MSG_400"
 msgid "Light"
-msgstr "الخفيف"
+msgstr "Light"
 
 msgctxt "MSG_401"
 msgid "English"

@@ -3,12 +3,13 @@
 # This file is distributed under the same license as the PACKAGE package.
 # 
 # Translators:
+# Roddy Shuler <roddy@endlessm.com>, 2016
 msgid ""
 msgstr ""
 "Project-Id-Version: rufus\n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2016-03-08 02:28+0000\n"
-"PO-Revision-Date: 2016-05-20 08:15+0000\n"
+"PO-Revision-Date: 2016-05-23 21:52+0000\n"
 "Last-Translator: Roddy Shuler <roddy@endlessm.com>\n"
 "Language-Team: Indonesian (http://www.transifex.com/endless-mobile-inc/rufus/language/id/)\n"
 "MIME-Version: 1.0\n"
@@ -80,7 +81,7 @@ msgstr "Ubah Pengaturan Jaringan untuk menyambung ke Internet."
 
 msgctxt "LightVersionText"
 msgid "Light"
-msgstr "Ringan"
+msgstr "Light"
 
 msgctxt "LightDownloadSubtitle"
 msgid "2GB Download"
@@ -94,11 +95,11 @@ msgstr "Pilih opsi ini jika Anda punya akses internet dan dapat memasang aplikas
 
 msgctxt "DownloadLightButton"
 msgid "Download EOS Light"
-msgstr "Unduh EOS Ringan"
+msgstr "Unduh EOS Light"
 
 msgctxt "FullVersionText"
 msgid "Full"
-msgstr "Lengkap"
+msgstr "Full"
 
 msgctxt "FullDownloadSubtitle"
 msgid "16GB Download"
@@ -112,7 +113,7 @@ msgstr "Sudah dilengkapi lebih dari 100 aplikasi dan konten. Pilih versi ini unt
 
 msgctxt "DownloadFullButton"
 msgid "Download EOS Full"
-msgstr "Unduh EOS Lengkap"
+msgstr "Unduh EOS Full"
 
 msgctxt "SelectUSBPreviousButton"
 msgid "Previous"
@@ -328,7 +329,7 @@ msgstr "Menulis"
 
 msgctxt "MSG_400"
 msgid "Light"
-msgstr "Ringan"
+msgstr "Light"
 
 msgctxt "MSG_401"
 msgid "English"
