@@ -30,11 +30,17 @@ msgstr ""
 with open(LOC_FILE) as loc_file, open(POT_FILE, 'w') as pot_file:
     pot_file.write(PREAMBLE)
     found = False
+    in_debug_block = False
     for line in loc_file:
         if line.startswith('g'):
             # We found the last line before the start of strings
             break
     for line in loc_file:
+        if in_debug_block:
+            if line.startswith('#') and 'END NO NEED TO TRANSLATE' in line:
+                # We reached the end of the debug block
+                in_debug_block = False
+            continue
         if line.startswith('l'):
             # We found the start of translations for a language,
             # so we can stop parsing
@@ -56,6 +62,11 @@ with open(LOC_FILE) as loc_file, open(POT_FILE, 'w') as pot_file:
         elif line.strip().startswith('"'):
             # This is a continuation of the previous string
             pot_file.write(line.strip() + '\n')
+        elif line.startswith('#') and "NO NEED TO TRANSLATE" in line:
+            # This is the start of debug messages
+            # Exclude until the end marker
+            in_debug_block = True
+            
     if found:
         # Close the last found string
         pot_file.write('msgstr ""\n')
