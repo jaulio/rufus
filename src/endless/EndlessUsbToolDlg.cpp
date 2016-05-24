@@ -135,6 +135,7 @@ BOOL FormatDrive(DWORD DriveIndex);
 //Error page
 #define ELEMENT_ERROR_MESSAGE           "ErrorMessage"
 #define ELEMENT_ERROR_CLOSE_BUTTON      "CloseAppButton1"
+#define ELEMENT_ENDLESS_SUPPORT         "EndlessSupport"
 
 // Javascript methods
 #define JS_SET_PROGRESS                 "setProgress"
@@ -303,6 +304,7 @@ BEGIN_DHTML_EVENT_MAP(CEndlessUsbToolDlg)
 
     // Error Page handlers
     DHTML_EVENT_ONCLICK(_T(ELEMENT_ERROR_CLOSE_BUTTON), OnCloseAppClicked)
+    DHTML_EVENT_ONCLICK(_T(ELEMENT_ENDLESS_SUPPORT), OnLinkClicked)
 
 END_DHTML_EVENT_MAP()
 
@@ -1344,7 +1346,32 @@ HRESULT CEndlessUsbToolDlg::OnInstallEndlessSelected(IHTMLElement* pElement)
 
 HRESULT CEndlessUsbToolDlg::OnLinkClicked(IHTMLElement* pElement)
 {
-	AfxMessageBox(_T("Not implemented yet"));
+    CComBSTR id;
+    HRESULT hr;
+    uint32_t msg_id = 0;
+    char *url = NULL;
+
+    IFFALSE_RETURN_VALUE(pElement != NULL, "OnSelectedImageTypeChanged: Error getting element id", S_OK);
+
+    hr = pElement->get_id(&id);
+    IFFALSE_RETURN_VALUE(SUCCEEDED(hr), "OnSelectedImageTypeChanged: Error getting element id", S_OK);
+
+    if (id == _T(ELEMENT_COMPARE_OPTIONS)) {
+        msg_id = MSG_312;
+    } else if (id == _T(ELEMENT_SECUREBOOT_HOWTO) || id == _T(ELEMENT_SECUREBOOT_HOWTO2)) {
+        msg_id = MSG_313;
+    } else if (id == _T(ELEMENT_ENDLESS_SUPPORT)) {
+        msg_id = MSG_314;
+    } else {
+        msg_id = 0;
+        uprintf("Unknown link clicked %ls", id);
+        return S_OK;
+    }
+
+    if (msg_id != 0) {
+        // Radu: do we care about the errors?
+        ShellExecuteA(NULL, "open", lmprintf(msg_id), NULL, NULL, SW_SHOWNORMAL);
+    }
 
 	return S_OK;
 }
