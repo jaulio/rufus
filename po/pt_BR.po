@@ -4,13 +4,14 @@
 # 
 # Translators:
 # Mariana Barbosa <mari@endlessm.com>, 2016
+# Roddy Shuler <roddy@endlessm.com>, 2016
 msgid ""
 msgstr ""
 "Project-Id-Version: rufus\n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2016-03-08 02:28+0000\n"
-"PO-Revision-Date: 2016-05-20 23:53+0000\n"
-"Last-Translator: Mariana Barbosa <mari@endlessm.com>\n"
+"PO-Revision-Date: 2016-05-24 17:30+0000\n"
+"Last-Translator: Roddy Shuler <roddy@endlessm.com>\n"
 "Language-Team: Portuguese (Brazil) (http://www.transifex.com/endless-mobile-inc/rufus/language/pt_BR/)\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -155,13 +156,13 @@ msgstr "Preparando drive USB"
 
 msgctxt "SecureBootLabel"
 msgid "Secure Boot"
-msgstr "Secure Boot"
+msgstr "Inicialização Segura"
 
 msgctxt "SecureBootText1"
 msgid ""
 "Depending your system, the Secure Boot option will be found on the \"Boot\","
 " \"Security\" or \"Authentication\" page."
-msgstr "Dependendo do sistema, a opção \"Secure Boot\" deve ser encontrada na página de \"Inicialização\", \"Segurança\" ou \"Autenticação\". "
+msgstr "Dependendo do sistema, a opção \"Inicialização Segura\" deve ser encontrada na página de \"Inicialização\", \"Segurança\" ou \"Autenticação\". "
 
 msgctxt "SecureBootText2"
 msgid ""
@@ -172,6 +173,10 @@ msgstr "É preciso \"desativar\" ou \"desligar\" para permitir uma correta inici
 msgctxt "SecureBootHowTo"
 msgid "How should I do it?"
 msgstr "Como eu devo fazer isso?"
+
+msgctxt "InstallCancelButton"
+msgid "Cancel"
+msgstr ""
 
 msgctxt "ThankYouPageTitle"
 msgid "Thank you"
@@ -205,11 +210,11 @@ msgctxt "SecureBootReminder2"
 msgid ""
 "Remember to switch off Secure Boot so you can boot from your USB device "
 "correctly."
-msgstr "Lembre-se de desativar o \"Secure Boot\" para que você possa inicializar corretamente a partir do dispositivo USB."
+msgstr "Lembre-se de desativar a \"Inicialização Segura\" para que você possa inicializar corretamente a partir do dispositivo USB."
 
 msgctxt "SecureBootHowToReminder"
 msgid "How do I turn Secure Boot off?"
-msgstr "Como desabilitar o Secure Boot?"
+msgstr "Como desabilitar a Inicialização Segura?"
 
 msgctxt "ErrorPageTitle"
 msgid "Error"
@@ -269,15 +274,101 @@ msgctxt "MSG_049"
 msgid "Endless - Cancellation"
 msgstr "Endless - Cancelamento"
 
+msgctxt "MSG_095"
+msgid "Endless Image"
+msgstr ""
+
 msgctxt "MSG_105"
 msgid ""
 "Cancelling may leave the device in an UNUSABLE state.\n"
 "If you are sure you want to cancel, click YES. Otherwise, click NO."
 msgstr "Cancelar pode tornar o dispositivo INUTILIZÁVEL.\nSe você estiver certo de que quer cancelar, clique SIM. Caso contrário, clique NÃO."
 
+msgctxt "MSG_107"
+msgid "All files"
+msgstr ""
+
 msgctxt "MSG_201"
 msgid "Cancelling, please wait"
 msgstr "Cancelando. Favor aguarde"
+
+msgctxt "MSG_051"
+msgid "Undetermined error while formatting."
+msgstr ""
+
+msgctxt "MSG_052"
+msgid "Cannot use the selected file system for this media."
+msgstr ""
+
+msgctxt "MSG_061"
+msgid "Please insert a removable media in drive."
+msgstr ""
+
+msgctxt "MSG_081"
+msgid "Unsupported image"
+msgstr ""
+
+msgctxt "MSG_082"
+msgid ""
+"This image is either non-bootable, or it uses a boot or compression method "
+"that is not supported."
+msgstr ""
+
+msgctxt "MSG_086"
+msgid "No image selected"
+msgstr ""
+
+msgctxt "MSG_202"
+msgid "Scanning image..."
+msgstr ""
+
+msgctxt "MSG_203"
+msgid "Failed to scan image"
+msgstr ""
+
+msgctxt "MSG_210"
+msgid "READY"
+msgstr ""
+
+msgctxt "MSG_211"
+msgid "Cancelled"
+msgstr ""
+
+msgctxt "MSG_212"
+msgid "Failed"
+msgstr ""
+
+msgctxt "MSG_222"
+msgid "Formatting (%s)..."
+msgstr ""
+
+msgctxt "MSG_224"
+msgid "Clearing MBR/PBR/GPT structures..."
+msgstr ""
+
+msgctxt "MSG_225"
+msgid "Requesting disk access..."
+msgstr ""
+
+msgctxt "MSG_226"
+msgid "Analyzing existing boot records..."
+msgstr ""
+
+msgctxt "MSG_227"
+msgid "Closing existing volume..."
+msgstr ""
+
+msgctxt "MSG_238"
+msgid "Partitioning (%s)..."
+msgstr ""
+
+msgctxt "MSG_239"
+msgid "Deleting partitions..."
+msgstr ""
+
+msgctxt "MSG_261"
+msgid "Writing image: %0.1f%% completed"
+msgstr ""
 
 msgctxt "MSG_300"
 msgid "Error downloading file."
@@ -326,6 +417,18 @@ msgstr "Verificando"
 msgctxt "MSG_311"
 msgid "Writing"
 msgstr "Gravando"
+
+msgctxt "MSG_312"
+msgid "https://support.endlessm.com/hc/en-us/articles/208895726"
+msgstr "https://support.endlessm.com/hc/pt/articles/208895826"
+
+msgctxt "MSG_313"
+msgid "https://support.endlessm.com/hc/en-us/articles/210508723"
+msgstr "https://support.endlessm.com/hc/pt/articles/208895846"
+
+msgctxt "MSG_314"
+msgid "https://support.endlessm.com/hc/en-us"
+msgstr "https://support.endlessm.com/hc/pt"
 
 msgctxt "MSG_400"
 msgid "Light"

@@ -9,7 +9,7 @@ msgstr ""
 "Project-Id-Version: rufus\n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2016-03-08 02:28+0000\n"
-"PO-Revision-Date: 2016-05-23 21:50+0000\n"
+"PO-Revision-Date: 2016-05-24 15:39+0000\n"
 "Last-Translator: Roddy Shuler <roddy@endlessm.com>\n"
 "Language-Team: Chinese (China) (http://www.transifex.com/endless-mobile-inc/rufus/language/zh_CN/)\n"
 "MIME-Version: 1.0\n"
@@ -173,6 +173,10 @@ msgctxt "SecureBootHowTo"
 msgid "How should I do it?"
 msgstr ""
 
+msgctxt "InstallCancelButton"
+msgid "Cancel"
+msgstr ""
+
 msgctxt "ThankYouPageTitle"
 msgid "Thank you"
 msgstr ""
@@ -269,14 +273,100 @@ msgctxt "MSG_049"
 msgid "Endless - Cancellation"
 msgstr ""
 
+msgctxt "MSG_095"
+msgid "Endless Image"
+msgstr ""
+
 msgctxt "MSG_105"
 msgid ""
 "Cancelling may leave the device in an UNUSABLE state.\n"
 "If you are sure you want to cancel, click YES. Otherwise, click NO."
 msgstr ""
 
+msgctxt "MSG_107"
+msgid "All files"
+msgstr ""
+
 msgctxt "MSG_201"
 msgid "Cancelling, please wait"
+msgstr ""
+
+msgctxt "MSG_051"
+msgid "Undetermined error while formatting."
+msgstr ""
+
+msgctxt "MSG_052"
+msgid "Cannot use the selected file system for this media."
+msgstr ""
+
+msgctxt "MSG_061"
+msgid "Please insert a removable media in drive."
+msgstr ""
+
+msgctxt "MSG_081"
+msgid "Unsupported image"
+msgstr ""
+
+msgctxt "MSG_082"
+msgid ""
+"This image is either non-bootable, or it uses a boot or compression method "
+"that is not supported."
+msgstr ""
+
+msgctxt "MSG_086"
+msgid "No image selected"
+msgstr ""
+
+msgctxt "MSG_202"
+msgid "Scanning image..."
+msgstr ""
+
+msgctxt "MSG_203"
+msgid "Failed to scan image"
+msgstr ""
+
+msgctxt "MSG_210"
+msgid "READY"
+msgstr ""
+
+msgctxt "MSG_211"
+msgid "Cancelled"
+msgstr ""
+
+msgctxt "MSG_212"
+msgid "Failed"
+msgstr ""
+
+msgctxt "MSG_222"
+msgid "Formatting (%s)..."
+msgstr ""
+
+msgctxt "MSG_224"
+msgid "Clearing MBR/PBR/GPT structures..."
+msgstr ""
+
+msgctxt "MSG_225"
+msgid "Requesting disk access..."
+msgstr ""
+
+msgctxt "MSG_226"
+msgid "Analyzing existing boot records..."
+msgstr ""
+
+msgctxt "MSG_227"
+msgid "Closing existing volume..."
+msgstr ""
+
+msgctxt "MSG_238"
+msgid "Partitioning (%s)..."
+msgstr ""
+
+msgctxt "MSG_239"
+msgid "Deleting partitions..."
+msgstr ""
+
+msgctxt "MSG_261"
+msgid "Writing image: %0.1f%% completed"
 msgstr ""
 
 msgctxt "MSG_300"
@@ -325,6 +415,18 @@ msgstr ""
 
 msgctxt "MSG_311"
 msgid "Writing"
+msgstr ""
+
+msgctxt "MSG_312"
+msgid "https://support.endlessm.com/hc/en-us/articles/208895726"
+msgstr ""
+
+msgctxt "MSG_313"
+msgid "https://support.endlessm.com/hc/en-us/articles/210508723"
+msgstr ""
+
+msgctxt "MSG_314"
+msgid "https://support.endlessm.com/hc/en-us"
 msgstr ""
 
 msgctxt "MSG_400"
