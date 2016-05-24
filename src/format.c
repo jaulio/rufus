@@ -697,6 +697,7 @@ static BOOL FormatDrive(DWORD DriveIndex)
 #ifdef ENDLESSUSB_TOOL
     fs = FS_EXFAT;
     strcpy_s(FSType, sizeof(FSType), "exFAT");
+    UNREFERENCED_PARAMETER(i);
 #else
 	GetWindowTextU(hFileSystem, FSType, ARRAYSIZE(FSType));
 	// Might have a (Default) suffix => remove it
