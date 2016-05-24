@@ -133,6 +133,7 @@ private:
 
     CString m_LiveFile;
     CString m_LiveFileSig;
+    CString m_appDir;
 
 	CComPtr<IHTMLDocument3> m_spHtmlDoc3;
     CComPtr<IHTMLElement> m_spStatusElem;

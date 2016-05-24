@@ -160,7 +160,7 @@ static const wchar_t *globalAvailablePersonalities[] =
 };
 
 
-#define GET_LOCAL_PATH(__filename__) (CString(app_dir) + "\\" + (__filename__))
+#define GET_LOCAL_PATH(__filename__) (m_appDir + "\\" + (__filename__))
 #define CSTRING_GET_LAST(__path__, __spearator__) __path__.Right(__path__.GetLength() - __path__.ReverseFind(__spearator__) - 1) 
 
 enum custom_message {
@@ -372,7 +372,7 @@ void CEndlessUsbToolDlg::OnDocumentComplete(LPDISPATCH pDisp, LPCTSTR szUrl)
 	if (m_spHtmlDoc3 == NULL) {
 		HRESULT hr = m_spHtmlDoc->QueryInterface(IID_IHTMLDocument3, (void**)&m_spHtmlDoc3);
 		IFFALSE_GOTOERROR(SUCCEEDED(hr) && m_spHtmlDoc3 != NULL, "Error when querying IID_IHTMLDocument3 interface.");
-	}    
+	}
 
 	AddLanguagesToUI();
 	ApplyRufusLocalization(); //apply_localization(IDD_ENDLESSUSBTOOL_DIALOG, GetSafeHwnd());
@@ -404,6 +404,8 @@ void CEndlessUsbToolDlg::InitRufus()
         uprintf("Could not get current directory: %s", WindowsErrorString());
         app_dir[0] = 0;
     }
+    m_appDir = app_dir;
+
     if (GetSystemDirectoryU(system_dir, sizeof(system_dir)) == 0) {
         uprintf("Could not get system directory: %s", WindowsErrorString());
         safe_strcpy(system_dir, sizeof(system_dir), "C:\\Windows\\System32");
@@ -1437,7 +1439,7 @@ void CEndlessUsbToolDlg::UpdateFileEntries(bool shouldInit)
     m_localInstallerImage.stillPresent = FALSE;
 
     if (findFilesHandle == INVALID_HANDLE_VALUE) {
-        uprintf("UpdateFileEntries: No files found in current directory [%s]", app_dir);
+        uprintf("UpdateFileEntries: No files found in current directory [%ls]", m_appDir);
         goto checkEntries;
     }
 
@@ -1574,7 +1576,7 @@ DWORD WINAPI CEndlessUsbToolDlg::FileScanThread(void* param)
     //changeNotifyFilter |= FILE_NOTIFY_CHANGE_SIZE;
 
     handlesToWaitFor[0] = dlg->m_cancelOperationEvent;
-    handlesToWaitFor[1] = FindFirstChangeNotificationA(app_dir, FALSE, changeNotifyFilter);
+    handlesToWaitFor[1] = FindFirstChangeNotification(dlg->m_appDir, FALSE, changeNotifyFilter);
     if (handlesToWaitFor[1] == INVALID_HANDLE_VALUE) {
         error = GetLastError();
         uprintf("Error on FindFirstChangeNotificationA error=[%d]", error);
@@ -1629,22 +1631,28 @@ void CEndlessUsbToolDlg::StartJSONDownload()
         return;
     }
 
-    ListOfStrings urls, files;
+    //ListOfStrings urls, files;
     CString liveJson(JSON_PACKED(JSON_LIVE_FILE));
     liveJson = GET_LOCAL_PATH(liveJson);
     CString installerJson(JSON_PACKED(JSON_INSTALLER_FILE));
     installerJson = GET_LOCAL_PATH(installerJson);
 
     if (m_liveInstall) {
-        urls = { JSON_URL(JSON_LIVE_FILE) };
-        files = { liveJson };
+        ListOfStrings urls = { JSON_URL(JSON_LIVE_FILE) };
+        ListOfStrings files = { liveJson };
+
+        // RADU: add error handling so we at least show the user there was an error starting the download
+        status = m_downloadManager.AddDownload(DownloadType_t::DownloadTypeReleseJson, urls, files, false);
     } else {        
-        urls = { JSON_URL(JSON_LIVE_FILE), JSON_URL(JSON_INSTALLER_FILE) };
-        files = { liveJson, installerJson };
+        ListOfStrings urls = { JSON_URL(JSON_LIVE_FILE), JSON_URL(JSON_INSTALLER_FILE) };
+        ListOfStrings files = { liveJson, installerJson };
+
+        // RADU: add error handling so we at least show the user there was an error starting the download
+        status = m_downloadManager.AddDownload(DownloadType_t::DownloadTypeReleseJson, urls, files, false);
     }
 
     // RADU: add error handling so we at least show the user there was an error starting the download
-    status = m_downloadManager.AddDownload(DownloadType_t::DownloadTypeReleseJson, urls, files, false);
+    //status = m_downloadManager.AddDownload(DownloadType_t::DownloadTypeReleseJson, urls, files, false);
 }
 
 #define JSON_IMAGES             "images"
@@ -1789,8 +1797,16 @@ void CEndlessUsbToolDlg::UpdateDownloadOptions()
     IFFALSE_GOTOERROR(UnpackFile(JSON_PACKED(JSON_LIVE_FILE), JSON_LIVE_FILE), "Error uncompressing eos JSON file.");
     IFFALSE_GOTOERROR(ParseJsonFile(_T(JSON_LIVE_FILE), false), "Error parsing eos JSON file.");
     
+    // Radu change this once the eosinstaller JSON is available
+#if 0
     IFFALSE_GOTOERROR(UnpackFile(JSON_PACKED(JSON_INSTALLER_FILE), JSON_INSTALLER_FILE), "Error uncompressing eosinstaller JSON file.");
-    IFFALSE_GOTOERROR(ParseJsonFile(_T(JSON_INSTALLER_FILE), true) || ParseJsonFile(_T(JSON_INSTALLER_FILE), true, true), "Error parsing eosinstaller JSON file.");
+#endif
+    if (UnpackFile(JSON_PACKED(JSON_INSTALLER_FILE), JSON_INSTALLER_FILE)) {
+        IFFALSE_GOTOERROR(ParseJsonFile(_T(JSON_INSTALLER_FILE), true) || ParseJsonFile(_T(JSON_INSTALLER_FILE), true, true), "Error parsing eosinstaller JSON file.");
+    } else {
+        uprintf("Error uncompressing eosinstaller JSON file.");
+        IFFALSE_GOTOERROR(ParseJsonFile(_T(JSON_INSTALLER_FILE), true, true), "Error parsing eosinstaller JSON file.");
+    }
 
     // Radu: Maybe move this to another method to separate UI from logic
     // add options to UI
@@ -2072,11 +2088,26 @@ HRESULT CEndlessUsbToolDlg::OnSelectUSBNextClicked(IHTMLElement* pElement)
         m_localFileSig = GET_LOCAL_PATH(CSTRING_GET_LAST(remote.urlSignature, '/'));
 
         // List of files to download
-        ListOfStrings urls, files;
+        //ListOfStrings urls, files;
         CString urlInstaller, urlInstallerAsc, installerFile, installerAscFile;
         if (m_liveInstall) {
-            urls = { url, urlAsc };
-            files = { m_localFile, m_localFileSig };
+            ListOfStrings urls = { url, urlAsc };
+            ListOfStrings files = { m_localFile, m_localFileSig };
+
+            // Try resuming the download if it exists
+            bool status = m_downloadManager.AddDownload(downloadType, urls, files, true, remote.downloadJobName);
+            if (!status) {
+                // start the download again
+                status = m_downloadManager.AddDownload(downloadType, urls, files, false, remote.downloadJobName);
+                if (!status) {
+                    ChangePage(_T(ELEMENT_USB_PAGE), _T(ELEMENT_INSTALL_PAGE));
+                    // RADU: add custom error values for each of the errors so we can identify them and show a custom message for each
+                    uprintf("Error adding files for download");
+                    FormatStatus = ERROR_SEVERITY_ERROR | FAC(FACILITY_STORAGE) | ERROR_CANCELLED;
+                    PostMessage(WM_FINISHED_ALL_OPERATIONS, (WPARAM)FALSE, 0);
+                    return S_OK;
+                }
+            }
         } else {
             // installer image file + signature
             urlInstaller = CString(RELEASE_JSON_URLPATH) + m_installerImage.urlFile;
@@ -2085,22 +2116,22 @@ HRESULT CEndlessUsbToolDlg::OnSelectUSBNextClicked(IHTMLElement* pElement)
             urlInstallerAsc = CString(RELEASE_JSON_URLPATH) + m_installerImage.urlSignature;
             installerAscFile = GET_LOCAL_PATH(CSTRING_GET_LAST(m_installerImage.urlSignature, '/'));
             
-            urls = { url, urlAsc, urlInstaller, urlInstallerAsc};
-            files = { m_localFile, m_localFileSig, installerFile, installerAscFile };
-        }
-  
-        // Try resuming the download if it exists
-        bool status = m_downloadManager.AddDownload(downloadType, urls, files, true, remote.downloadJobName);
-        if (!status) {
-            // start the download again
-            status = m_downloadManager.AddDownload(downloadType, urls, files, false, remote.downloadJobName);
+            ListOfStrings urls = { url, urlAsc, urlInstaller, urlInstallerAsc};
+            ListOfStrings files = { m_localFile, m_localFileSig, installerFile, installerAscFile };
+
+            // Try resuming the download if it exists
+            bool status = m_downloadManager.AddDownload(downloadType, urls, files, true, remote.downloadJobName);
             if (!status) {
-                ChangePage(_T(ELEMENT_USB_PAGE), _T(ELEMENT_INSTALL_PAGE));
-                // RADU: add custom error values for each of the errors so we can identify them and show a custom message for each
-                uprintf("Error adding files for download");
-                FormatStatus = ERROR_SEVERITY_ERROR | FAC(FACILITY_STORAGE) | ERROR_CANCELLED;
-                PostMessage(WM_FINISHED_ALL_OPERATIONS, (WPARAM)FALSE, 0);
-                return S_OK;
+                // start the download again
+                status = m_downloadManager.AddDownload(downloadType, urls, files, false, remote.downloadJobName);
+                if (!status) {
+                    ChangePage(_T(ELEMENT_USB_PAGE), _T(ELEMENT_INSTALL_PAGE));
+                    // RADU: add custom error values for each of the errors so we can identify them and show a custom message for each
+                    uprintf("Error adding files for download");
+                    FormatStatus = ERROR_SEVERITY_ERROR | FAC(FACILITY_STORAGE) | ERROR_CANCELLED;
+                    PostMessage(WM_FINISHED_ALL_OPERATIONS, (WPARAM)FALSE, 0);
+                    return S_OK;
+                }
             }
         }
 
