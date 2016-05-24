@@ -79,11 +79,14 @@ with open(LOC_FILE, 'w') as f:
         f.write('v %s\n' % VERSION)
         f.write('b "%s"\n' % SOURCE_LANG)
         f.write('\n')
-        f.write('g IDD_DIALOG\n')
+        f.write('g IDD_ENDLESSUSBTOOL_DIALOG\n')
         po = polib.pofile(lang + '.po')
         for entry in po:
             msgstr = entry.msgstr
             if not msgstr:
                 # Use the English string if no translation yet
                 msgstr = entry.msgid
+            # Escape quotes and line feeds
+            msgstr = msgstr.replace('"', '\\"')
+            msgstr = msgstr.replace('\n', '\\n')
             f.write('t %s "%s"\n' % (entry.msgctxt, msgstr))
