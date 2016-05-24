@@ -23,6 +23,7 @@ typedef struct RemoteImageEntry {
     CString urlSignature;
     CString displayName;
     CString downloadJobName;
+    CString version;
 } RemoteImageEntry_t, *pRemoteImageEntry_t;
 
 // CEndlessUsbToolDlg dialog
@@ -67,8 +68,11 @@ protected:
     HRESULT OnSelectedUSBDiskChanged(IHTMLElement* pElement);
     HRESULT OnAgreementCheckboxChanged(IHTMLElement* pElement);
 
-	// Thank You page handlers
-	HRESULT OnCloseAppClicked(IHTMLElement* pElement);
+    // Install Page handlers
+    HRESULT OnInstallCancelClicked(IHTMLElement* pElement);
+
+	// Error/Thank You page handlers
+	HRESULT OnCloseAppClicked(IHTMLElement* pElement);    
 
 	// Implementation
 protected:
@@ -97,7 +101,7 @@ protected:
 	void OnDocumentComplete(LPDISPATCH pDisp, LPCTSTR szUrl);
 
 private:
-	bool m_fullInstall;
+	bool m_liveInstall;
 	loc_cmd* m_selectedLocale;
 	char m_localizationFile[MAX_PATH];
 	ULONG m_shellNotificationsRegister;
@@ -106,21 +110,29 @@ private:
     BOOL m_lgpExistingKey;	// For LGP set/restore
     BOOL m_automount;
     HANDLE m_FilesChangedHandle;
-    HANDLE m_closingApplicationEvent;
-    HANDLE m_stopVerificationEvent;
+    HANDLE m_cancelOperationEvent;
+    HANDLE m_closeAppEvent;
     HANDLE m_fileScanThread;
-    HANDLE m_formatThread;
-    HANDLE m_scanImageThread;
-    HANDLE m_verifyImageThread;
+    HANDLE m_operationThread;
     bool m_useLocalFile;
     long m_selectedRemoteIndex;
     long m_baseImageRemoteIndex;
     bool m_usbDeleteAgreement;
+    bool m_closeRequested;
     int m_currentStep;
     CMap<CString, LPCTSTR, pFileImageEntry_t, pFileImageEntry_t> m_imageFiles;
     CList<CString> m_imageIndexToPath;
     CList<RemoteImageEntry_t> m_remoteImages;
+    RemoteImageEntry_t m_installerImage;
+    FileImageEntry_t m_localInstallerImage;
     static CMap<CString, LPCTSTR, uint32_t, uint32_t> m_personalityToLocaleMsg;
+
+    CString m_localFile;
+    CString m_localFileSig;
+    ULONGLONG m_selectedFileSize;
+
+    CString m_LiveFile;
+    CString m_LiveFileSig;
 
 	CComPtr<IHTMLDocument3> m_spHtmlDoc3;
     CComPtr<IHTMLElement> m_spStatusElem;
@@ -128,11 +140,11 @@ private:
     CComDispatchDriver m_dispWindow;
     CComPtr<IDispatchEx> m_dispexWindow;
 
-    CString m_releasesJsonFile;
     DownloadManager m_downloadManager;
 
+    void StartOperationThread(int operation, LPTHREAD_START_ROUTINE threadRoutine, LPVOID param = NULL);
+
 	void InitRufus();
-    void StartRufusFormatThread();
     static DWORD WINAPI RufusISOScanThread(LPVOID param);
 
 	void LoadLocalizationData();
@@ -154,20 +166,36 @@ private:
 
     void StartJSONDownload();
     void UpdateDownloadOptions();
+    bool UnpackFile(LPCSTR archive, LPCSTR destination);
+    bool ParseJsonFile(LPCTSTR filename, bool isInstallerJson, bool parseMockJson = false);
 
 	void Uninit();
 
     void ErrorOccured(const CString errorMessage);
 
     HRESULT CallJavascript(LPCTSTR method, CComVariant parameter1, CComVariant parameter2 = NULL);
-
     void UpdateCurrentStep(int currentStep);
+    bool CancelInstall();
+    DownloadType_t GetSelectedDownloadType();
 
-    void StartFileVerificationThread();
     static DWORD WINAPI FileVerificationThread(void* param);
+    static bool FileHashingCallback(__int64 currentSize, __int64 totalSize, LPVOID context);
+    
+    static DWORD WINAPI FileCopyThread(void* param);
+    static DWORD CALLBACK CEndlessUsbToolDlg::CopyProgressRoutine(
+        LARGE_INTEGER TotalFileSize,
+        LARGE_INTEGER TotalBytesTransferred,
+        LARGE_INTEGER StreamSize,
+        LARGE_INTEGER StreamBytesTransferred,
+        DWORD         dwStreamNumber,
+        DWORD         dwCallbackReason,
+        HANDLE        hSourceFile,
+        HANDLE        hDestinationFile,
+        LPVOID        lpData
+    );
 
-    static bool ParseImgFileName(const CString& filename, CString &personality, CString &version);
-    static void GetImgDisplayName(CString &displayName, const CString &version, const CString &personality, ULONGLONG size);
+    static bool ParseImgFileName(const CString& filename, CString &personality, CString &version, bool &installerImage);
+    void GetImgDisplayName(CString &displayName, const CString &version, const CString &personality, ULONGLONG size = 0);
 
-    static ULONGLONG GetExtractedSize(const CString& filename);
+    static ULONGLONG GetExtractedSize(const CString& filename);    
 };

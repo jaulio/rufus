@@ -16,7 +16,7 @@ function setProgress(percent) {
         currentPercent = percent;
         var bar = document.getElementById("ProgressBar");
         progressWidth = containerWidth * percent;
-        clog("Setting " + progressWidth);
+//        clog("Setting " + progressWidth);
         bar.style.width = Math.ceil(progressWidth) + "px";
     }
 }

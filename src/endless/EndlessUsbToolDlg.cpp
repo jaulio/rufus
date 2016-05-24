@@ -1,4 +1,3 @@
-
 // EndlessUsbToolDlg.cpp : implementation file
 //
 
@@ -58,12 +57,18 @@ uint32_t dur_mins, dur_secs;
 StrArray DriveID, DriveLabel;
 BOOL enable_HDDs = FALSE, use_fake_units, enable_vmdk;
 int dialog_showing = 0;
+
+PF_TYPE_DECL(WINAPI, BOOL, SHChangeNotifyDeregister, (ULONG));
+PF_TYPE_DECL(WINAPI, ULONG, SHChangeNotifyRegister, (HWND, int, LONG, UINT, int, const SHChangeNotifyEntry *));
+
+BOOL FormatDrive(DWORD DriveIndex);
 };
 
 #include "localization.h"
 // End Rufus include files
 
 #include "gpt/gpt.h"
+#include "PGPSignature.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -119,6 +124,7 @@ int dialog_showing = 0;
 #define ELEMENT_INSTALL_STEP            "CurrentStepText"
 #define ELEMENT_INSTALL_STEPS_TOTAL     "TotalStepsText"
 #define ELEMENT_INSTALL_STEP_TEXT       "CurrentStepDescription"
+#define ELEMENT_INSTALL_CANCEL          "InstallCancelButton"
 
 //Thank You page elements
 #define ELEMENT_SECUREBOOT_HOWTO2       "SecureBootHowToReminder"
@@ -153,7 +159,7 @@ static const wchar_t *globalAvailablePersonalities[] =
 };
 
 
-#define GET_LOCAL_PATH(__filename__) (CString(app_dir) + "\\" + __filename__)
+#define GET_LOCAL_PATH(__filename__) (CString(app_dir) + "\\" + (__filename__))
 #define CSTRING_GET_LAST(__path__, __spearator__) __path__.Right(__path__.GetLength() - __path__.ReverseFind(__spearator__) - 1) 
 
 enum custom_message {
@@ -161,32 +167,38 @@ enum custom_message {
     WM_FINISHED_IMG_SCANNING,
     WM_UPDATE_PROGRESS,
     WM_FILE_DOWNLOAD_STATUS,
-    WM_FINISHED_FILE_VERIFICATION
+    WM_FINISHED_FILE_VERIFICATION,
+    WM_FINISHED_FILE_COPY,
+    WM_FINISHED_ALL_OPERATIONS,
 };
 
 enum endless_action_type {    
     OP_DOWNLOADING_FILES = OP_MAX,
     OP_VERIFYING_SIGNATURE,
     OP_FLASHING_DEVICE,
+    OP_FILE_COPY,
     OP_NO_OPERATION_IN_PROGRESS,
     OP_ENDLESS_MAX
 };
 
 #define TID_UPDATE_FILES                TID_REFRESH_TIMER + 1
 
-#define CHAR_JSON_FILE  "releases-eos.json"
-#define CHAR_JSON_GZIP  ".gz"
-
-#define RELEASE_JSON_URLPATH _T("https://d1anzknqnc1kmb.cloudfront.net/")
-//#define RELEASE_JSON_URLPATH _T("http://172.18.81.3:8000/")
-
-#define RELEASE_JSON_FILE_UNPCK _T(CHAR_JSON_FILE)
-#define RELEASE_JSON_FILE RELEASE_JSON_FILE_UNPCK _T(CHAR_JSON_GZIP)
-#define RELEASE_JSON_URL RELEASE_JSON_URLPATH RELEASE_JSON_FILE
+#define RELEASE_JSON_URLPATH    _T("https://d1anzknqnc1kmb.cloudfront.net/")
+#define JSON_LIVE_FILE          "releases-eos.json"
+#define JSON_INSTALLER_FILE     "releases-eosinstaller.json"
+#define JSON_GZIP               ".gz"
+#define JSON_PACKED(__file__)   __file__ JSON_GZIP
+#define JSON_URL(__file__)      RELEASE_JSON_URLPATH _T(JSON_PACKED(__file__))
+#define SIGNATURE_FILE_EXT      L".asc"
 
 #define ENDLESS_OS "Endless OS"
-#define EOS_PRODUCT_TEXT "eos"
+#define EOS_PRODUCT_TEXT            "eos"
+#define EOS_INSTALLER_PRODUCT_TEXT  "eosinstaller"
 const wchar_t* mainWindowTitle = L"Endless USB Creator";
+
+// Radu: How much do we need to reserve for the exfat pertition header?
+// reserve 10 mb for now; this will also include the signature file
+#define INSTALLER_DELTA_SIZE (10*1024*1024)
 
 // utility method for quick char* UTF8 conversion to BSTR
 CComBSTR UTF8ToBSTR(const char *txt) {
@@ -224,7 +236,8 @@ static LPCTSTR OperationToStr(int op)
     TOSTR(OP_FINALIZE);
     TOSTR(OP_DOWNLOADING_FILES);  
     TOSTR(OP_VERIFYING_SIGNATURE);
-    TOSTR(OP_FLASHING_DEVICE);    
+    TOSTR(OP_FLASHING_DEVICE);
+    TOSTR(OP_FILE_COPY);
     TOSTR(OP_NO_OPERATION_IN_PROGRESS);
     TOSTR(OP_ENDLESS_MAX);
     default: return _T("UNKNOWN_OPERATION");
@@ -281,15 +294,15 @@ BEGIN_DHTML_EVENT_MAP(CEndlessUsbToolDlg)
     DHTML_EVENT_ONCHANGE(_T(ELEMENT_SELUSB_AGREEMENT), OnAgreementCheckboxChanged)
 
 	// Installing Page handlers
-	DHTML_EVENT_ONCLICK(_T(ELEMENT_SECUREBOOT_HOWTO), OnLinkClicked)
-    DHTML_EVENT_ONCLICK(_T(ELEMENT_CLOSE_BUTTON), OnCloseAppClicked)
+	DHTML_EVENT_ONCLICK(_T(ELEMENT_SECUREBOOT_HOWTO), OnLinkClicked)    
+    DHTML_EVENT_ONCLICK(_T(ELEMENT_INSTALL_CANCEL), OnInstallCancelClicked)
 
 	// Thank You Page handlers
 	DHTML_EVENT_ONCLICK(_T(ELEMENT_SECUREBOOT_HOWTO2), OnLinkClicked)
-    DHTML_EVENT_ONCLICK(_T(ELEMENT_ERROR_CLOSE_BUTTON), OnCloseAppClicked)
+    DHTML_EVENT_ONCLICK(_T(ELEMENT_CLOSE_BUTTON), OnCloseAppClicked)    
 
     // Error Page handlers
-
+    DHTML_EVENT_ONCLICK(_T(ELEMENT_ERROR_CLOSE_BUTTON), OnCloseAppClicked)
 
 END_DHTML_EVENT_MAP()
 
@@ -302,7 +315,7 @@ CMap<CString, LPCTSTR, uint32_t, uint32_t> CEndlessUsbToolDlg::m_personalityToLo
 CEndlessUsbToolDlg::CEndlessUsbToolDlg(CWnd* pParent /*=NULL*/)
     : CDHtmlDialog(IDD_ENDLESSUSBTOOL_DIALOG, IDR_HTML_ENDLESSUSBTOOL_DIALOG, pParent),
     m_selectedLocale(NULL),
-    m_fullInstall(false),
+    m_liveInstall(false),
     m_localizationFile(""),
     m_shellNotificationsRegister(0),
     m_lastDevicesRefresh(0),
@@ -311,8 +324,7 @@ CEndlessUsbToolDlg::CEndlessUsbToolDlg(CWnd* pParent /*=NULL*/)
     m_lgpExistingKey(FALSE),
     m_FilesChangedHandle(INVALID_HANDLE_VALUE),
     m_fileScanThread(INVALID_HANDLE_VALUE),
-    m_formatThread(INVALID_HANDLE_VALUE),
-    m_scanImageThread(INVALID_HANDLE_VALUE),
+    m_operationThread(INVALID_HANDLE_VALUE),
     m_spStatusElem(NULL),
     m_spWindowElem(NULL),
     m_dispexWindow(NULL),
@@ -321,13 +333,11 @@ CEndlessUsbToolDlg::CEndlessUsbToolDlg(CWnd* pParent /*=NULL*/)
     m_selectedRemoteIndex(-1),
     m_baseImageRemoteIndex(-1),
     m_usbDeleteAgreement(false),
-    m_verifyImageThread(INVALID_HANDLE_VALUE),
-    m_currentStep(OP_NO_OPERATION_IN_PROGRESS)
+    m_currentStep(OP_NO_OPERATION_IN_PROGRESS),
+    m_cancelOperationEvent(CreateEvent(NULL, TRUE, FALSE, NULL)),
+    m_closeRequested(false)
 {
-    m_hIcon = AfxGetApp()->LoadIcon(IDR_MAINFRAME);
-    m_closingApplicationEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
-    m_stopVerificationEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
-    m_releasesJsonFile = "";
+    m_hIcon = AfxGetApp()->LoadIcon(IDR_MAINFRAME);    
 
     size_t personalitiesCount = sizeof(globalAvailablePersonalities) / sizeof(globalAvailablePersonalities[0]);
     for (uint32_t index = 0; index < personalitiesCount; index++) {
@@ -438,7 +448,10 @@ void CEndlessUsbToolDlg::InitRufus()
             }
         }
     }
-    srand((unsigned int)_GetTickCount64());
+
+    PF_INIT(GetTickCount64, kernel32);    
+
+    srand((unsigned int)_GetTickCount64());    
 }
 
 // The scanning process can be blocking for message processing => use a thread
@@ -533,31 +546,28 @@ BOOL CEndlessUsbToolDlg::OnInitDialog()
 	return TRUE;  // return TRUE  unless you set the focus to a control
 }
 
+#define THREADS_WAIT_TIMEOUT 10000 // 10 seconds
 void CEndlessUsbToolDlg::Uninit()
 {
-    if (m_closingApplicationEvent != INVALID_HANDLE_VALUE) {
-        // wait for File scanning thread
-        SetEvent(m_closingApplicationEvent);
-        if (m_fileScanThread != INVALID_HANDLE_VALUE) {
-            uprintf("Waiting for scan files thread.");
-            WaitForSingleObject(m_fileScanThread, INFINITE);
-            m_fileScanThread = INVALID_HANDLE_VALUE;
-        }        
-        CloseHandle(m_closingApplicationEvent);
-        m_closingApplicationEvent = INVALID_HANDLE_VALUE;
+    int handlesCount = 0;
+    HANDLE handlesToWaitFor[2];
+    
+    if (m_fileScanThread != INVALID_HANDLE_VALUE) handlesToWaitFor[handlesCount++] = m_fileScanThread;
+    if (m_operationThread != INVALID_HANDLE_VALUE) handlesToWaitFor[handlesCount++] = m_operationThread;
+
+    if (handlesCount > 0) {
+        SetEvent(m_cancelOperationEvent);
+        DWORD waitStatus = WaitForMultipleObjects(handlesCount, handlesToWaitFor, TRUE, THREADS_WAIT_TIMEOUT);
+
+        if (waitStatus == WAIT_TIMEOUT) {
+            uprintf("Error: waited for %d millis for threads to finish.");
+        }
     }
 
-    if (m_stopVerificationEvent != INVALID_HANDLE_VALUE) {
-        // wait for image verification thread
-        SetEvent(m_stopVerificationEvent);
-        if (m_verifyImageThread != INVALID_HANDLE_VALUE) {
-            uprintf("Waiting for verify image thread.");
-            WaitForSingleObject(m_verifyImageThread, INFINITE);
-            m_verifyImageThread = INVALID_HANDLE_VALUE;
-        }
-        CloseHandle(m_stopVerificationEvent);
-        m_stopVerificationEvent = INVALID_HANDLE_VALUE;
-    }    
+    if (m_cancelOperationEvent != INVALID_HANDLE_VALUE) {
+        CloseHandle(m_cancelOperationEvent);
+        m_cancelOperationEvent = INVALID_HANDLE_VALUE;
+    }
 
     m_downloadManager.Uninit();
 
@@ -588,6 +598,8 @@ void CEndlessUsbToolDlg::Uninit()
     exit_localization();
 
     safe_free(image_path);
+
+    CLOSE_OPENED_LIBRARIES;
 }
 
 // If you add a minimize button to your dialog, you will need the code below
@@ -764,7 +776,6 @@ LRESULT CEndlessUsbToolDlg::WindowProc(UINT message, WPARAM wParam, LPARAM lPara
         switch (message) {
         case WM_SETTEXT:
         {
-            uprintf("WM_SETTEXT %ls", (wchar_t*)lParam);
             lParam = (LPARAM)mainWindowTitle;            
             break;
         }
@@ -773,7 +784,7 @@ LRESULT CEndlessUsbToolDlg::WindowProc(UINT message, WPARAM wParam, LPARAM lPara
         case WM_ENDSESSION:
             // TODO: Do we want to use ShutdownBlockReasonCreate() in Vista and later to stop
             // forced shutdown? See https://msdn.microsoft.com/en-us/library/ms700677.aspx
-            if (m_formatThread != INVALID_HANDLE_VALUE) {
+            if (m_operationThread != INVALID_HANDLE_VALUE) {
                 // WM_QUERYENDSESSION uses this value to prevent shutdown
                 return (INT_PTR)TRUE;
             }
@@ -794,7 +805,10 @@ LRESULT CEndlessUsbToolDlg::WindowProc(UINT message, WPARAM wParam, LPARAM lPara
             // DO *NOT* USE WM_DEVICECHANGE AS THE MESSAGE FROM THE TIMER PROC, as it may be filtered!
             // For instance filtering will occur when (un)plugging in a FreeBSD UFD on Windows 8.
             // Instead, use a custom user message, such as UM_MEDIA_CHANGE, to set DBT_CUSTOMEVENT.
-            if (m_formatThread == INVALID_HANDLE_VALUE) {
+            
+            // RADU: check to see if this happens durring download/verification phases and the selected disk dissapeared
+            // we can still ask the user to select another disk after download/verification has finished
+            if (m_operationThread == INVALID_HANDLE_VALUE) { 
                 switch (wParam) {
                 case DBT_DEVICEARRIVAL:
                 case DBT_DEVICEREMOVECOMPLETE:
@@ -824,7 +838,7 @@ LRESULT CEndlessUsbToolDlg::WindowProc(UINT message, WPARAM wParam, LPARAM lPara
         case WM_FINISHED_IMG_SCANNING:
         {
             uprintf("Image scanning done.");
-            m_scanImageThread = INVALID_HANDLE_VALUE;
+            m_operationThread = INVALID_HANDLE_VALUE;
             if (!img_report.is_bootable_img ||
                 (img_report.compression_type != BLED_COMPRESSION_GZIP && img_report.compression_type != BLED_COMPRESSION_XZ)) {
                 uprintf("FAILURE: selected image is not bootable and compresion is different frome what is expected: xz/gz");
@@ -838,12 +852,7 @@ LRESULT CEndlessUsbToolDlg::WindowProc(UINT message, WPARAM wParam, LPARAM lPara
                 int nDeviceIndex = ComboBox_GetCurSel(hDeviceList);
                 if (nDeviceIndex != CB_ERR) {
                     DWORD DeviceNum = (DWORD)ComboBox_GetItemData(hDeviceList, nDeviceIndex);
-                    m_formatThread = CreateThread(NULL, 0, FormatThread, (LPVOID)(uintptr_t)DeviceNum, 0, NULL);
-                    if (m_formatThread == NULL) {
-                        uprintf("Unable to start formatting thread");
-                        FormatStatus = ERROR_SEVERITY_ERROR | FAC(FACILITY_STORAGE) | APPERR(ERROR_CANT_START_THREAD);
-                        PostMessage(UM_FORMAT_COMPLETED, (WPARAM)FALSE, 0);
-                    }
+                    StartOperationThread(OP_FLASHING_DEVICE, FormatThread, (LPVOID)(uintptr_t)DeviceNum);                    
                 }
             }
 
@@ -856,15 +865,42 @@ LRESULT CEndlessUsbToolDlg::WindowProc(UINT message, WPARAM wParam, LPARAM lPara
             int op = (int)wParam;
             int percent = (int)lParam;
             uprintf("Operation %ls(%d) with progress %d", OperationToStr(op), op, percent);
+            
+            // Ignore exFAT format progress.
+            if (m_currentStep == OP_FILE_COPY && op == OP_FORMAT) break;
+
+            // Radu: pass all the files to be verified to verfication thread and do the percent calculation there
+            // Not very happy about this but eh, needs refactoring
+            if (op == OP_VERIFYING_SIGNATURE) {
+                if (!m_liveInstall) {
+                    ULONGLONG totalSize = m_selectedFileSize + m_localInstallerImage.size;
+                    ULONGLONG currentSize = 0;
+                    bool isInstallerImage = (m_localFile == m_localInstallerImage.filePath);
+                    if (isInstallerImage) {
+                        currentSize = m_selectedFileSize + (m_localInstallerImage.size * percent / 100);
+                    } else {
+                        currentSize = m_selectedFileSize * percent / 100;
+                    }
+                    percent = (int)(currentSize * 100 / totalSize);
+                }
+            }
+            
+            // Radu: maybe divide the progress bar also based on the size of the image to be copied to disk after format is complete
+            if (op == OP_FORMAT && !m_liveInstall) {
+                percent = percent / 2;
+            } else if (op == OP_FILE_COPY) {
+                percent = 50 + percent / 2;
+            }
 
             hr = CallJavascript(_T(JS_SET_PROGRESS), CComVariant(percent));
             IFFALSE_BREAK(SUCCEEDED(hr), "Error when calling set progress.");
-
-            if (op == OP_VERIFYING_SIGNATURE || op == OP_FORMAT) {
+            
+            if (op == OP_VERIFYING_SIGNATURE || op == OP_FORMAT || op == OP_FILE_COPY) {
                 CString downloadString;
                 downloadString.Format(L"%d%%", percent);
                 SetElementText(_T(ELEMENT_INSTALL_STATUS), CComBSTR(downloadString));
             }
+
             break;
         }
         case UM_PROGRESS_EXIT:
@@ -873,23 +909,12 @@ LRESULT CEndlessUsbToolDlg::WindowProc(UINT message, WPARAM wParam, LPARAM lPara
             break;
         case UM_FORMAT_COMPLETED:
         {
-            m_formatThread = INVALID_HANDLE_VALUE;
-            m_currentStep = OP_NO_OPERATION_IN_PROGRESS;
-
-            if (!IS_ERROR(FormatStatus)) {
-                PrintInfo(0, MSG_210);
-                m_formatThread = INVALID_HANDLE_VALUE;
-                ChangePage(_T(ELEMENT_INSTALL_PAGE), _T(ELEMENT_SUCCESS_PAGE));
-            } else if (SCODE_CODE(FormatStatus) == ERROR_CANCELLED) {
-                PrintInfo(0, MSG_211);
-                Uninit();
-                AfxPostQuitMessage(0);            
+            m_operationThread = INVALID_HANDLE_VALUE;
+            if (!IS_ERROR(FormatStatus) && !m_liveInstall) {
+                StartOperationThread(OP_FILE_COPY, CEndlessUsbToolDlg::FileCopyThread);
             } else {
-                PrintInfo(0, MSG_212);
-                CString error = UTF8ToCString(StrError(FormatStatus, FALSE));                
-                ErrorOccured(error);
+                PostMessage(WM_FINISHED_ALL_OPERATIONS, 0, 0);
             }
-            FormatStatus = 0;
             break;
         }
         case WM_FILES_CHANGED:
@@ -913,7 +938,7 @@ LRESULT CEndlessUsbToolDlg::WindowProc(UINT message, WPARAM wParam, LPARAM lPara
                 if (isReleaseJsonDownload) {
                     UpdateDownloadOptions();
                 } else {
-                    StartFileVerificationThread();
+                    StartOperationThread(OP_VERIFYING_SIGNATURE, CEndlessUsbToolDlg::FileVerificationThread);
                 }
             } else {
                 uprintf("Download [%ls] progress %s of %s (%d of %d files)", downloadStatus->jobName,
@@ -926,24 +951,26 @@ LRESULT CEndlessUsbToolDlg::WindowProc(UINT message, WPARAM wParam, LPARAM lPara
                     static ULONGLONG startedBytes = 0;
 
                     RemoteImageEntry_t remote = m_remoteImages.GetAt(m_remoteImages.FindIndex(m_selectedRemoteIndex));
-                    ULONGLONG percent = downloadStatus->progress.BytesTransferred * 100 / remote.compressedSize;
+                    // we don't take the signature files into account but we are taking about ~2KB compared to >2GB
+                    ULONGLONG totalSize = remote.compressedSize + (m_liveInstall ? 0 : m_installerImage.compressedSize); 
+                    ULONGLONG percent = downloadStatus->progress.BytesTransferred * 100 / totalSize;
                     PostMessage(WM_UPDATE_PROGRESS, (WPARAM)OP_DOWNLOADING_FILES, (LPARAM)percent);
 
                     // calculate speed
                     CStringA speed("---");
-                    ULONGLONG currentTickCount = GetTickCount64();
+                    ULONGLONG currentTickCount = _GetTickCount64();
                     if (startedTickCount != 0) {
                         ULONGLONG diffBytes = downloadStatus->progress.BytesTransferred - startedBytes;
                         ULONGLONG diffMillis = currentTickCount - startedTickCount;
                         double diffSeconds = diffMillis / 1000.0;
-                        speed = SizeToHumanReadable(diffBytes / diffSeconds, FALSE, use_fake_units);
+                        speed = SizeToHumanReadable((ULONGLONG) (diffBytes / diffSeconds), FALSE, use_fake_units);
                     } else {
                         startedTickCount = currentTickCount;
                         startedBytes = downloadStatus->progress.BytesTransferred;
                     }
 
                     CStringA strDownloaded = SizeToHumanReadable(downloadStatus->progress.BytesTransferred, FALSE, use_fake_units);
-                    CStringA strTotal = SizeToHumanReadable(remote.compressedSize, FALSE, use_fake_units);
+                    CStringA strTotal = SizeToHumanReadable(totalSize, FALSE, use_fake_units);
                     // push to UI
                     CString downloadString = UTF8ToCString(lmprintf(MSG_302, strDownloaded, strTotal, speed));
                     SetElementText(_T(ELEMENT_INSTALL_STATUS), CComBSTR(downloadString));
@@ -958,7 +985,25 @@ LRESULT CEndlessUsbToolDlg::WindowProc(UINT message, WPARAM wParam, LPARAM lPara
             BOOL result = (BOOL)wParam;
             if (result) {
                 uprintf("Verification passed.");
-                StartRufusFormatThread();
+                m_operationThread = INVALID_HANDLE_VALUE;
+                
+                bool verifiedInstallerImage = (m_localFile == m_localInstallerImage.filePath);
+                if (!m_liveInstall && !verifiedInstallerImage) {
+                    safe_free(image_path);
+                    CComBSTR bstrString(m_localInstallerImage.filePath);
+                    image_path = _com_util::ConvertBSTRToString(bstrString);
+
+                    // Radu: please make time to refactor this.
+                    // store this to copy them
+                    m_LiveFile = m_localFile;
+                    m_LiveFileSig = m_localFileSig;
+
+                    m_localFile = image_path;
+                    m_localFileSig = m_localFile + SIGNATURE_FILE_EXT;
+                    StartOperationThread(OP_VERIFYING_SIGNATURE, CEndlessUsbToolDlg::FileVerificationThread);
+                } else {
+                    StartOperationThread(OP_FLASHING_DEVICE, CEndlessUsbToolDlg::RufusISOScanThread);
+                }
             }
             else {
                 uprintf("Verification failed.");
@@ -966,6 +1011,38 @@ LRESULT CEndlessUsbToolDlg::WindowProc(UINT message, WPARAM wParam, LPARAM lPara
                 FormatStatus = ERROR_SEVERITY_ERROR | FAC(FACILITY_STORAGE) | APPERR(ERROR_GEN_FAILURE);
                 PostMessage(UM_FORMAT_COMPLETED, (WPARAM)FALSE, 0);
             }
+            break;
+        }
+        case WM_FINISHED_FILE_COPY:
+        {
+            PostMessage(WM_FINISHED_ALL_OPERATIONS, 0, 0);
+            break;
+        }
+
+        case WM_FINISHED_ALL_OPERATIONS:
+        {
+            m_operationThread = INVALID_HANDLE_VALUE;
+            m_currentStep = OP_NO_OPERATION_IN_PROGRESS;
+
+            if (!IS_ERROR(FormatStatus)) {
+                PrintInfo(0, MSG_210);
+                m_operationThread = INVALID_HANDLE_VALUE;
+                ChangePage(_T(ELEMENT_INSTALL_PAGE), _T(ELEMENT_SUCCESS_PAGE));
+            } else if (SCODE_CODE(FormatStatus) == ERROR_CANCELLED) {
+                PrintInfo(0, MSG_211);
+                if (m_closeRequested) {
+                    AfxPostQuitMessage(0);
+                } else {
+                    // RADU: change the text on the error page 
+                    ErrorOccured(L"");
+                }
+            }
+            else {
+                PrintInfo(0, MSG_212);
+                CString error = UTF8ToCString(StrError(FormatStatus, FALSE));
+                ErrorOccured(error);
+            }
+            FormatStatus = 0;
             break;
         }
         default:
@@ -1246,7 +1323,7 @@ bool CEndlessUsbToolDlg::IsButtonDisabled(IHTMLElement *pElement)
 // First Page Handlers
 HRESULT CEndlessUsbToolDlg::OnTryEndlessSelected(IHTMLElement* pElement)
 {
-	m_fullInstall = false;
+    m_liveInstall = true;
 
     ChangePage(_T(ELEMENT_FIRST_PAGE), _T(ELEMENT_FILE_PAGE));
     StartJSONDownload();
@@ -1258,7 +1335,7 @@ HRESULT CEndlessUsbToolDlg::OnInstallEndlessSelected(IHTMLElement* pElement)
 {
     if (IsButtonDisabled(pElement)) return S_OK;
 
-    m_fullInstall = true;
+    m_liveInstall = false;
     StartJSONDownload();
     ChangePage(_T(ELEMENT_FIRST_PAGE), _T(ELEMENT_FILE_PAGE));
 
@@ -1314,6 +1391,7 @@ void CEndlessUsbToolDlg::UpdateFileEntries(bool shouldInit)
     pFileImageEntry_t currentEntry = NULL;
     CString currentPath;
     BOOL fileAccessException = false;
+    CString currentInstallerVersion;
 
     // get needed HTML elements
     hr = GetSelectElement(_T(ELEMENT_FILES_SELECT), selectElement);
@@ -1329,6 +1407,7 @@ void CEndlessUsbToolDlg::UpdateFileEntries(bool shouldInit)
         m_imageFiles.GetNextAssoc(position, currentPath, currentEntry);
         currentEntry->stillPresent = FALSE;
     }
+    m_localInstallerImage.stillPresent = FALSE;
 
     if (findFilesHandle == INVALID_HANDLE_VALUE) {
         uprintf("UpdateFileEntries: No files found in current directory [%s]", app_dir);
@@ -1342,28 +1421,39 @@ void CEndlessUsbToolDlg::UpdateFileEntries(bool shouldInit)
         if (extension != L"gz" && extension != L"xz") continue;
 
         if (!PathFileExists(findFileData.cFileName)) continue; // file is present
-        if (!PathFileExists(CString(findFileData.cFileName) + L".asc")) continue; // signature file is present
+        if (!PathFileExists(CString(findFileData.cFileName) + SIGNATURE_FILE_EXT)) continue; // signature file is present
 
         try {
             CString displayName, personality, version;
-            if (!ParseImgFileName(currentFile, personality, version)) continue;
+            bool isInstallerImage = false;
+            if (!ParseImgFileName(currentFile, personality, version, isInstallerImage)) continue;
             if (0 == GetExtractedSize(currentFile)) continue;
             CFile file(findFileData.cFileName, CFile::modeRead);
             GetImgDisplayName(displayName, version, personality, file.GetLength());
 
-            // add entry to list or update it
-            pFileImageEntry_t currentEntry = NULL;
-            if (!m_imageFiles.Lookup(file.GetFilePath(), currentEntry)) {
-                currentEntry = new FileImageEntry_t;
-                currentEntry->autoAdded = TRUE;
-                currentEntry->filePath = file.GetFilePath();
-                AddEntryToSelect(selectElement, CComBSTR(currentEntry->filePath), CComBSTR(displayName), &currentEntry->htmlIndex, 0);
-                IFFALSE_RETURN(SUCCEEDED(hr), "Error adding item in image file list.");
+            if (isInstallerImage) {
+                if (version > currentInstallerVersion) {
+                    currentInstallerVersion = version;
+                    m_localInstallerImage.stillPresent = TRUE;
+                    m_localInstallerImage.filePath = file.GetFilePath();
+                    m_localInstallerImage.size = file.GetLength();
+                }
+            } else {
+                // add entry to list or update it
+                pFileImageEntry_t currentEntry = NULL;
+                if (!m_imageFiles.Lookup(file.GetFilePath(), currentEntry)) {
+                    currentEntry = new FileImageEntry_t;
+                    currentEntry->autoAdded = TRUE;
+                    currentEntry->filePath = file.GetFilePath();
+                    currentEntry->size = file.GetLength();
+                    AddEntryToSelect(selectElement, CComBSTR(currentEntry->filePath), CComBSTR(displayName), &currentEntry->htmlIndex, 0);
+                    IFFALSE_RETURN(SUCCEEDED(hr), "Error adding item in image file list.");
 
-                m_imageFiles.SetAt(currentEntry->filePath, currentEntry);
-                m_imageIndexToPath.AddTail(currentEntry->filePath);
+                    m_imageFiles.SetAt(currentEntry->filePath, currentEntry);
+                    m_imageIndexToPath.AddTail(currentEntry->filePath);
+                }
+                currentEntry->stillPresent = TRUE;
             }
-            currentEntry->stillPresent = TRUE;
 
             // RADU: do we need to care about the size?
 
@@ -1436,7 +1526,7 @@ checkEntries:
     if (shouldInit) {        
         // start the change notifications thread
         if (hasLocalImages && m_fileScanThread == INVALID_HANDLE_VALUE) {
-            m_fileScanThread = CreateThread(NULL, 0, CEndlessUsbToolDlg::FileScanThread, (LPVOID)m_closingApplicationEvent, 0, NULL);
+            m_fileScanThread = CreateThread(NULL, 0, CEndlessUsbToolDlg::FileScanThread, (LPVOID)this, 0, NULL);
         }        
         
         CallJavascript(_T(JS_SHOW_ELEMENT), CComVariant(ELEMENT_LOCAL_FILES_FOUND), CComVariant(hasLocalImages));
@@ -1450,12 +1540,13 @@ checkEntries:
 
 DWORD WINAPI CEndlessUsbToolDlg::FileScanThread(void* param)
 {
+    CEndlessUsbToolDlg *dlg = (CEndlessUsbToolDlg*)param;
     DWORD error = 0;
     HANDLE handlesToWaitFor[2];
     DWORD changeNotifyFilter = FILE_NOTIFY_CHANGE_FILE_NAME;
     //changeNotifyFilter |= FILE_NOTIFY_CHANGE_SIZE;
 
-    handlesToWaitFor[0] = (HANDLE)param;
+    handlesToWaitFor[0] = dlg->m_cancelOperationEvent;
     handlesToWaitFor[1] = FindFirstChangeNotificationA(app_dir, FALSE, changeNotifyFilter);
     if (handlesToWaitFor[1] == INVALID_HANDLE_VALUE) {
         error = GetLastError();
@@ -1504,18 +1595,29 @@ void CEndlessUsbToolDlg::StartJSONDownload()
         return;
     }
 
-    result = InternetCheckConnection(RELEASE_JSON_URL, FLAG_ICC_FORCE_CONNECTION, 0);
+    result = InternetCheckConnection(JSON_URL(JSON_LIVE_FILE), FLAG_ICC_FORCE_CONNECTION, 0);
     if(result == FALSE) {
         CallJavascript(_T(JS_ENABLE_DOWNLOAD), CComVariant(FALSE));
         luprintf("Cannot connect to server to download JSON, error=%d, %s", GetLastError(), WindowsErrorString());
         return;
     }
 
-    m_releasesJsonFile = app_dir;
-    m_releasesJsonFile += _T("\\");
-    m_releasesJsonFile += RELEASE_JSON_FILE;
+    ListOfStrings urls, files;
+    CString liveJson(JSON_PACKED(JSON_LIVE_FILE));
+    liveJson = GET_LOCAL_PATH(liveJson);
+    CString installerJson(JSON_PACKED(JSON_INSTALLER_FILE));
+    installerJson = GET_LOCAL_PATH(installerJson);
 
-    status = m_downloadManager.AddDownload(DownloadType_t::DownloadTypeReleseJson, RELEASE_JSON_URL, m_releasesJsonFile, true);
+    if (m_liveInstall) {
+        urls = { JSON_URL(JSON_LIVE_FILE) };
+        files = { liveJson };
+    } else {        
+        urls = { JSON_URL(JSON_LIVE_FILE), JSON_URL(JSON_INSTALLER_FILE) };
+        files = { liveJson, installerJson };
+    }
+
+    // RADU: add error handling so we at least show the user there was an error starting the download
+    status = m_downloadManager.AddDownload(DownloadType_t::DownloadTypeReleseJson, urls, files, false);
 }
 
 #define JSON_IMAGES             "images"
@@ -1541,32 +1643,38 @@ do { \
     uprintf("\t\t %s=%s", tag, parentValue[tag].toStyledString().c_str()); \
 } while(false);
 
-void CEndlessUsbToolDlg::UpdateDownloadOptions()
+bool CEndlessUsbToolDlg::UnpackFile(LPCSTR archive, LPCSTR destination)
 {
-    Json::Reader reader;
-    Json::Value rootValue, imagesElem, jsonElem, personalities, persImages, persImage, fullImage, latestEntry;
     int64_t result = 0;
-    std::ifstream jsonStream;
-    CString latestVersion("");
-
-    m_remoteImages.RemoveAll();
 
     // RADU: provide a progress function and move this from UI thread
     // For initial release this is ok as the operation should be very fast for the JSON
     // Unpack the file
     result = bled_init(_uprintf, NULL, NULL);
-    result = bled_uncompress(CHAR_JSON_FILE CHAR_JSON_GZIP, CHAR_JSON_FILE, BLED_COMPRESSION_GZIP);
+    result = bled_uncompress(archive, destination, BLED_COMPRESSION_GZIP);
     bled_exit();
-    IFFALSE_GOTOERROR(result != -1, "bled_uncompress_to_buffer failed");
+    return result != -1;
+}
 
-    // Parse JSON
-    jsonStream.open(RELEASE_JSON_FILE_UNPCK);
-    IFFALSE_GOTOERROR(!jsonStream.fail(), "Opening JSON file failed.");
-    IFFALSE_GOTOERROR(reader.parse(jsonStream, rootValue, false), "Parsing of JSON failed.");
+bool CEndlessUsbToolDlg::ParseJsonFile(LPCTSTR filename, bool isInstallerJson, bool parseMockJson)
+{
+    Json::Reader reader;
+    Json::Value rootValue, imagesElem, jsonElem, personalities, persImages, persImage, fullImage, latestEntry;
+    CString latestVersion("");
+
+    if (parseMockJson) {
+        IFFALSE_GOTOERROR(reader.parse(eosinstaller_json_mock, rootValue, false), "Parsing of mocked JSON failed.");
+    } else {
+        std::ifstream jsonStream;        
+
+        jsonStream.open(filename);
+        IFFALSE_GOTOERROR(!jsonStream.fail(), "Opening JSON file failed.");
+        IFFALSE_GOTOERROR(reader.parse(jsonStream, rootValue, false), "Parsing of JSON failed.");
+    }
 
     // Print version
     jsonElem = rootValue[JSON_VERSION];
-    if(!jsonElem.isString()) uprintf("JSON Version: %s", jsonElem.asString().c_str());
+    if (!jsonElem.isString()) uprintf("JSON Version: %s", jsonElem.asString().c_str());
 
     // Go through the image entries
     imagesElem = rootValue[JSON_IMAGES];
@@ -1594,12 +1702,15 @@ void CEndlessUsbToolDlg::UpdateDownloadOptions()
         }
     }
 
-    if(!latestEntry.isNull()) {
+    IFFALSE_GOTOERROR(!latestEntry.isNull(), "No images found in the JSON.");
+
+    if (!latestEntry.isNull()) {
         uprintf("Selected version '%ls'", latestVersion);
         uint32_t personalityMsgId = 0;
         personalities = latestEntry[JSON_IMG_PERSONALITIES];
         for (Json::ValueIterator persIt = personalities.begin(); persIt != personalities.end(); persIt++) {
             IFFALSE_CONTINUE(persIt->isString(), "Entry is not string, continuing");
+            IFFALSE_CONTINUE(!isInstallerJson || CString(persIt->asCString()) == PERSONALITY_BASE, "Installer JSON parsing: not base personality");
             IFFALSE_CONTINUE(m_personalityToLocaleMsg.Lookup(CString(persIt->asCString()), personalityMsgId), "Unknown personality. Continuing.");
 
             persImage = persImages[persIt->asString()];
@@ -1613,24 +1724,46 @@ void CEndlessUsbToolDlg::UpdateDownloadOptions()
             CHECK_ENTRY(fullImage, JSON_IMG_URL_FILE);
             CHECK_ENTRY(fullImage, JSON_IMG_URL_SIG);
 
-            RemoteImageEntry_t remoteImage;
+            RemoteImageEntry_t remoteImageEntry;
+            RemoteImageEntry_t &remoteImage = isInstallerJson ? m_installerImage : remoteImageEntry;
+
             remoteImage.compressedSize = fullImage[JSON_IMG_COMPRESSED_SIZE].asUInt64();
-            remoteImage.extractedSize = 0;
-            //remoteImage.extractedSize = fullImage[JSON_IMG_EXTRACTED_SIZE].asUInt64();
+            remoteImage.extractedSize = fullImage[JSON_IMG_EXTRACTED_SIZE].asUInt64();
+            // before releases extractedSize is not populated; add the compressed size so we don't show 0
+            if(remoteImage.extractedSize == 0) remoteImage.extractedSize = remoteImage.compressedSize;            
             remoteImage.urlFile = fullImage[JSON_IMG_URL_FILE].asCString();
             remoteImage.urlSignature = fullImage[JSON_IMG_URL_SIG].asCString();
             remoteImage.personality = persIt->asCString();
+            remoteImage.version = latestVersion;
 
-            // Create display name
-            GetImgDisplayName(remoteImage.displayName, latestVersion, remoteImage.personality, remoteImage.compressedSize);
+            if(!isInstallerJson) {
+                // Create display name
+                GetImgDisplayName(remoteImage.displayName, remoteImage.version, remoteImage.personality, remoteImage.compressedSize);
 
-            // Create dowloadJobName
-            remoteImage.downloadJobName = latestVersion;
-            remoteImage.downloadJobName += persIt->asCString();
+                // Create dowloadJobName
+                remoteImage.downloadJobName = latestVersion;
+                remoteImage.downloadJobName += persIt->asCString();
 
-            m_remoteImages.AddTail(remoteImage);
+                m_remoteImages.AddTail(remoteImage);
+            }
         }
     }
+
+    return true;
+error:
+    uprintf("JSON parsing failed. Parser error messages %s", reader.getFormattedErrorMessages().c_str());
+    return false;
+}
+
+void CEndlessUsbToolDlg::UpdateDownloadOptions()
+{
+    m_remoteImages.RemoveAll();
+
+    IFFALSE_GOTOERROR(UnpackFile(JSON_PACKED(JSON_LIVE_FILE), JSON_LIVE_FILE), "Error uncompressing eos JSON file.");
+    IFFALSE_GOTOERROR(ParseJsonFile(_T(JSON_LIVE_FILE), false), "Error parsing eos JSON file.");
+    
+    IFFALSE_GOTOERROR(UnpackFile(JSON_PACKED(JSON_INSTALLER_FILE), JSON_INSTALLER_FILE), "Error uncompressing eosinstaller JSON file.");
+    IFFALSE_GOTOERROR(ParseJsonFile(_T(JSON_INSTALLER_FILE), true) || ParseJsonFile(_T(JSON_INSTALLER_FILE), true, true), "Error parsing eosinstaller JSON file.");
 
     // Radu: Maybe move this to another method to separate UI from logic
     // add options to UI
@@ -1676,7 +1809,6 @@ void CEndlessUsbToolDlg::UpdateDownloadOptions()
 
 error:
     // RADU: disable downloading here I assume? Or retry download/parse?    
-    uprintf("JSON parsing failed. Parser error messages %s", reader.getFormattedErrorMessages().c_str());
     CallJavascript(_T(JS_ENABLE_DOWNLOAD), CComVariant(FALSE));
     CallJavascript(_T(JS_ENABLE_BUTTON), CComVariant(HTML_BUTTON_ID(_T(ELEMENT_DOWNLOAD_LIGHT_BUTTON))), CComVariant(FALSE));
     return;
@@ -1703,40 +1835,56 @@ HRESULT CEndlessUsbToolDlg::OnSelectFileNextClicked(IHTMLElement* pElement)
     GetUSBDevices(0);
     OnSelectedUSBDiskChanged(NULL);
 
+    PF_INIT(SHChangeNotifyRegister, shell32);
 
     // Register MEDIA_INSERTED/MEDIA_REMOVED notifications for card readers
-    if (SUCCEEDED(SHGetSpecialFolderLocation(0, CSIDL_DESKTOP, &pidlDesktop))) {
+    if (pfSHChangeNotifyRegister && SUCCEEDED(SHGetSpecialFolderLocation(0, CSIDL_DESKTOP, &pidlDesktop))) {
         NotifyEntry.pidl = pidlDesktop;
         NotifyEntry.fRecursive = TRUE;
         // NB: The following only works if the media is already formatted.
         // If you insert a blank card, notifications will not be sent... :(
-        m_shellNotificationsRegister = SHChangeNotifyRegister(m_hWnd, 0x0001 | 0x0002 | 0x8000,
+        m_shellNotificationsRegister = pfSHChangeNotifyRegister(m_hWnd, 0x0001 | 0x0002 | 0x8000,
             SHCNE_MEDIAINSERTED | SHCNE_MEDIAREMOVED, UM_MEDIA_CHANGE, 1, &NotifyEntry);
     }
 
     // Get display name with actual image size, not compressed
     CString selectedImage, personality, version, selectedSize;
     ULONGLONG size = 0;
+    bool isInstallerImage = false;
     if (m_useLocalFile) {
         selectedImage = image_path;
+        pFileImageEntry_t localEntry = NULL;
+        if (!m_imageFiles.Lookup(selectedImage, localEntry)) {
+            uprintf("ERROR: Selected local file not found.");
+        }        
         selectedImage = CSTRING_GET_LAST(selectedImage, '\\');
-        size = GetExtractedSize(selectedImage);
+        size = m_liveInstall ? GetExtractedSize(selectedImage) : localEntry->size;
+
+        m_selectedFileSize = localEntry->size;
     } else {
         RemoteImageEntry_t remote = m_remoteImages.GetAt(m_remoteImages.FindIndex(m_selectedRemoteIndex));
-        DownloadType_t downloadType = m_fullInstall ? DownloadType_t::DownloadTypeInstallerImage : DownloadType_t::DownloadTypeLiveImage;
+        DownloadType_t downloadType = GetSelectedDownloadType();
         selectedImage = CSTRING_GET_LAST(remote.urlFile, '/');
-        size = remote.extractedSize;
+        size = m_liveInstall ? remote.extractedSize : remote.compressedSize;
+        
+        m_selectedFileSize = remote.compressedSize;
     }
 
+    // add the installer size if this is not a live image
+    if (!m_liveInstall) {
+        size += INSTALLER_DELTA_SIZE + m_installerImage.extractedSize;
+    }    
+
     selectedSize = SizeToHumanReadable(size, FALSE, use_fake_units);
-    if (ParseImgFileName(selectedImage, personality, version)) {
+    if (ParseImgFileName(selectedImage, personality, version, isInstallerImage)) {
+        if(isInstallerImage) uprintf("ERROR: An installer image has been selected.");
         SetElementText(_T(ELEMENT_INSTALLER_VERSION), CComBSTR(version));
         SetElementText(_T(ELEMENT_INSTALLER_LANGUAGE), UTF8ToBSTR(lmprintf(m_personalityToLocaleMsg[personality])));
         CString contentStr("--- (");
         contentStr += SizeToHumanReadable(size, FALSE, use_fake_units);
         contentStr += ")";
         SetElementText(_T(ELEMENT_INSTALLER_CONTENT), CComBSTR(contentStr));
-        GetImgDisplayName(selectedImage, version, personality, size);
+        GetImgDisplayName(selectedImage, version, personality, 0);
     } else {
         uprintf("Cannot parse data from file name %ls; using default %s", selectedImage, ENDLESS_OS);
         selectedImage = _T(ENDLESS_OS);
@@ -1877,67 +2025,95 @@ HRESULT CEndlessUsbToolDlg::OnSelectUSBNextClicked(IHTMLElement* pElement)
     SetElementText(_T(ELEMENT_INSTALL_STATUS), CComBSTR(""));
     SetElementText(_T(ELEMENT_INSTALL_DESCRIPTION), CComBSTR(""));
 
+    // Radu: we need to download an installer if only a live image is found and full install was selected
     if (m_useLocalFile) {
-        StartFileVerificationThread();        
+        m_localFile = image_path;
+        m_localFileSig = m_localFile + SIGNATURE_FILE_EXT;
+
+        StartOperationThread(OP_VERIFYING_SIGNATURE, CEndlessUsbToolDlg::FileVerificationThread);
     } else {
-        UpdateCurrentStep(OP_DOWNLOADING_FILES);        
-
+        UpdateCurrentStep(OP_DOWNLOADING_FILES);
+        
         RemoteImageEntry_t remote = m_remoteImages.GetAt(m_remoteImages.FindIndex(m_selectedRemoteIndex));
-        DownloadType_t downloadType = m_fullInstall ? DownloadType_t::DownloadTypeInstallerImage : DownloadType_t::DownloadTypeLiveImage;
-        // add image file to download
-        CString localFile = GET_LOCAL_PATH(CSTRING_GET_LAST(remote.urlFile, '/'));
+        DownloadType_t downloadType = GetSelectedDownloadType();
+
+        // live image file
         CString url = CString(RELEASE_JSON_URLPATH) + remote.urlFile;
+        m_localFile = GET_LOCAL_PATH(CSTRING_GET_LAST(remote.urlFile, '/'));
+        // live image signature file
+        CString urlAsc = CString(RELEASE_JSON_URLPATH) + remote.urlSignature;
+        m_localFileSig = GET_LOCAL_PATH(CSTRING_GET_LAST(remote.urlSignature, '/'));
 
-        // RADU: add error handling so we at least show the user there was an error
-        bool appendFile = false;
-        bool status = m_downloadManager.AddDownload(downloadType, url, localFile, false, &appendFile, remote.downloadJobName);
+        // List of files to download
+        ListOfStrings urls, files;
+        CString urlInstaller, urlInstallerAsc, installerFile, installerAscFile;
+        if (m_liveInstall) {
+            urls = { url, urlAsc };
+            files = { m_localFile, m_localFileSig };
+        } else {
+            // installer image file + signature
+            urlInstaller = CString(RELEASE_JSON_URLPATH) + m_installerImage.urlFile;
+            installerFile = GET_LOCAL_PATH(CSTRING_GET_LAST(m_installerImage.urlFile, '/'));
 
-        // add image file path for Rufus
-        safe_free(image_path);
-        CComBSTR bstrString(localFile);
-        image_path = _com_util::ConvertBSTRToString(bstrString);
-
-        if (appendFile == false) {
-            // add .asc file to download
-            localFile = GET_LOCAL_PATH(CSTRING_GET_LAST(remote.urlSignature, '/'));
-            url = CString(RELEASE_JSON_URLPATH) + remote.urlSignature;
-            // RADU: add error handling so we at least show the user there was an error
-            appendFile = true;
-            status = m_downloadManager.AddDownload(downloadType, url, localFile, true, &appendFile, remote.downloadJobName);
+            urlInstallerAsc = CString(RELEASE_JSON_URLPATH) + m_installerImage.urlSignature;
+            installerAscFile = GET_LOCAL_PATH(CSTRING_GET_LAST(m_installerImage.urlSignature, '/'));
+            
+            urls = { url, urlAsc, urlInstaller, urlInstallerAsc};
+            files = { m_localFile, m_localFileSig, installerFile, installerAscFile };
         }
+  
+        // Try resuming the download if it exists
+        bool status = m_downloadManager.AddDownload(downloadType, urls, files, true, remote.downloadJobName);
+        if (!status) {
+            // start the download again
+            status = m_downloadManager.AddDownload(downloadType, urls, files, false, remote.downloadJobName);
+            if (!status) {
+                ChangePage(_T(ELEMENT_USB_PAGE), _T(ELEMENT_INSTALL_PAGE));
+                // RADU: add custom error values for each of the errors so we can identify them and show a custom message for each
+                uprintf("Error adding files for download");
+                FormatStatus = ERROR_SEVERITY_ERROR | FAC(FACILITY_STORAGE) | ERROR_CANCELLED;
+                PostMessage(WM_FINISHED_ALL_OPERATIONS, (WPARAM)FALSE, 0);
+                return S_OK;
+            }
+        }
+
+        // add remote installer data to local installer data
+        m_localInstallerImage.stillPresent = TRUE;
+        m_localInstallerImage.filePath = GET_LOCAL_PATH(CSTRING_GET_LAST(m_installerImage.urlFile, '/'));
+        m_localInstallerImage.size = m_installerImage.compressedSize;
     }
 
     ChangePage(_T(ELEMENT_USB_PAGE), _T(ELEMENT_INSTALL_PAGE));
 
-    // RADU: This is also in uninit, move to one place
-    // wait for File scanning thread
-    SetEvent(m_closingApplicationEvent);
+    // RADU: wait for File scanning thread
     if (m_fileScanThread != INVALID_HANDLE_VALUE) {
+        SetEvent(m_cancelOperationEvent);        
         uprintf("Waiting for scan files thread.");
-        WaitForSingleObject(m_fileScanThread, INFINITE);
+        WaitForSingleObject(m_fileScanThread, 5000);
         m_fileScanThread = INVALID_HANDLE_VALUE;
+        ResetEvent(m_cancelOperationEvent);
     }
-    CloseHandle(m_closingApplicationEvent);
-    m_closingApplicationEvent = INVALID_HANDLE_VALUE;
 
 	return S_OK;
 }
 
-void CEndlessUsbToolDlg::StartRufusFormatThread()
+void CEndlessUsbToolDlg::StartOperationThread(int operation, LPTHREAD_START_ROUTINE threadRoutine, LPVOID param)
 {
-    if (m_scanImageThread != INVALID_HANDLE_VALUE || m_formatThread != INVALID_HANDLE_VALUE) {
-        uprintf("Scanning/Formatting already started");
+    if (m_operationThread != INVALID_HANDLE_VALUE) {
+        uprintf("StartThread: Another operation is in progress. Current operation %ls(%d), requested operation %ls(%d)", 
+            OperationToStr(m_currentStep), m_currentStep, OperationToStr(operation), operation);
         return;
     }
 
-    UpdateCurrentStep(OP_FLASHING_DEVICE);
+    UpdateCurrentStep(operation);
 
     FormatStatus = 0;
-    m_scanImageThread = CreateThread(NULL, 0, CEndlessUsbToolDlg::RufusISOScanThread, NULL, 0, NULL);
-    if (m_scanImageThread == NULL) {
-        m_scanImageThread = INVALID_HANDLE_VALUE;
-        uprintf("Unable to start ISO scanning thread");
+    m_operationThread = CreateThread(NULL, 0, threadRoutine, param != NULL ? param : (LPVOID)this, 0, NULL);
+    if (m_operationThread == NULL) {
+        m_operationThread = INVALID_HANDLE_VALUE;
+        uprintf("Error: Unable to start thread.");
         FormatStatus = ERROR_SEVERITY_ERROR | FAC(FACILITY_STORAGE) | APPERR(ERROR_CANT_START_THREAD);
+        PostMessage(WM_FINISHED_ALL_OPERATIONS, (WPARAM)FALSE, 0);
     }
 }
 
@@ -1952,8 +2128,35 @@ HRESULT CEndlessUsbToolDlg::OnSelectedUSBDiskChanged(IHTMLElement* pElement)
     memset(&SelectedDrive, 0, sizeof(SelectedDrive));
     SelectedDrive.DeviceNumber = (DWORD)ComboBox_GetItemData(hDeviceList, deviceIndex);
     GetDrivePartitionData(SelectedDrive.DeviceNumber, fs_type, sizeof(fs_type), FALSE);
+    
+    // Radu: same code found in OnSelectFileNextClicked, move to new method
+    // check if final image will fit in the disk    
+    ULONGLONG size = 0;
+    if (m_useLocalFile) {
+        pFileImageEntry_t localEntry = NULL;
+        CString selectedImage(image_path);
+        selectedImage = CSTRING_GET_LAST(selectedImage, '\\');
+        
+        size = GetExtractedSize(selectedImage);        
+        if (!m_liveInstall && m_imageFiles.Lookup(selectedImage, localEntry)) {
+            size = localEntry->size;
+        }
+    }
+    else {
+        RemoteImageEntry_t remote = m_remoteImages.GetAt(m_remoteImages.FindIndex(m_selectedRemoteIndex));  
+        DownloadType_t downloadType = GetSelectedDownloadType();
+        size = m_liveInstall ? remote.extractedSize : remote.compressedSize;
+    }
 
-    CallJavascript(_T(JS_ENABLE_BUTTON), CComVariant(HTML_BUTTON_ID(_T(ELEMENT_SELUSB_NEXT_BUTTON))), CComVariant(m_usbDeleteAgreement));
+    // add the installer size if this is not a live image
+    if (!m_liveInstall) {
+        size += INSTALLER_DELTA_SIZE + m_installerImage.extractedSize;
+    }
+
+    // RADU: should it be >= or should we take some more stuff into account like the partition size 
+    BOOL isDiskBigEnough = (ULONGLONG)SelectedDrive.DiskSize > size;
+
+    CallJavascript(_T(JS_ENABLE_BUTTON), CComVariant(HTML_BUTTON_ID(_T(ELEMENT_SELUSB_NEXT_BUTTON))), CComVariant(m_usbDeleteAgreement && isDiskBigEnough));
     CallJavascript(_T(JS_ENABLE_ELEMENT), CComVariant(_T(ELEMENT_SELUSB_USB_DRIVES)), CComVariant(TRUE));
 
     return S_OK;
@@ -1966,11 +2169,8 @@ error:
 
 HRESULT CEndlessUsbToolDlg::OnAgreementCheckboxChanged(IHTMLElement *pElement)
 {
-    int deviceIndex = ComboBox_GetCurSel(hDeviceList);
     m_usbDeleteAgreement = !m_usbDeleteAgreement;
-
-    BOOL enable = m_usbDeleteAgreement && deviceIndex >= 0;
-    CallJavascript(_T(JS_ENABLE_BUTTON), CComVariant(HTML_BUTTON_ID(_T(ELEMENT_SELUSB_NEXT_BUTTON))), CComVariant(enable));
+    OnSelectedUSBDiskChanged(NULL);
     
     return S_OK;
 }
@@ -1978,38 +2178,73 @@ HRESULT CEndlessUsbToolDlg::OnAgreementCheckboxChanged(IHTMLElement *pElement)
 
 void CEndlessUsbToolDlg::LeavingDevicesPage()
 {
-    if (m_shellNotificationsRegister != 0) {
-        SHChangeNotifyDeregister(m_shellNotificationsRegister);
+    PF_INIT(SHChangeNotifyDeregister, Shell32);
+
+    if (pfSHChangeNotifyDeregister != NULL && m_shellNotificationsRegister != 0) {
+        pfSHChangeNotifyDeregister(m_shellNotificationsRegister);
         m_shellNotificationsRegister = 0;
     }
 }
 
-// Thank You Page Handlers
+// Install Page Handlers
+HRESULT CEndlessUsbToolDlg::OnInstallCancelClicked(IHTMLElement* pElement)
+{
+    if (!CancelInstall()) {
+        CallJavascript(_T(JS_ENABLE_BUTTON), CComVariant(HTML_BUTTON_ID(_T(ELEMENT_INSTALL_CANCEL))), CComVariant(FALSE));
+        return S_OK;
+    }
+
+    if(m_operationThread != INVALID_HANDLE_VALUE) {
+        SetEvent(m_cancelOperationEvent);
+    } else {
+        m_downloadManager.Uninit();
+        FormatStatus = ERROR_SEVERITY_ERROR | FAC(FACILITY_STORAGE) | ERROR_CANCELLED;
+        PostMessage(WM_FINISHED_ALL_OPERATIONS, (WPARAM)FALSE, 0);
+    }
+
+    return S_OK;
+}
+
+// Error/Thank You Page Handlers
 HRESULT CEndlessUsbToolDlg::OnCloseAppClicked(IHTMLElement* pElement)
 {
-	Uninit();
-	AfxPostQuitMessage(0);
+    Uninit();
+    AfxPostQuitMessage(0);
 
 	return S_OK;
 }
 
-void CEndlessUsbToolDlg::OnClose()
+bool CEndlessUsbToolDlg::CancelInstall()
 {
     bool operation_in_progress = m_currentStep == OP_FLASHING_DEVICE;
 
     if (operation_in_progress) {
         int result = MessageBoxExU(hMainDialog, lmprintf(MSG_105), lmprintf(MSG_049), MB_YESNO | MB_ICONWARNING | MB_IS_RTL, selected_langid);
         if (result == IDYES) {
-            FormatStatus = ERROR_SEVERITY_ERROR | FAC(FACILITY_STORAGE) | ERROR_CANCELLED;            
-            uprintf("Cancelling");
+            FormatStatus = ERROR_SEVERITY_ERROR | FAC(FACILITY_STORAGE) | ERROR_CANCELLED;
+            uprintf("Cancelling current operation.");
             CString str = UTF8ToCString(lmprintf(MSG_201));
             SetElementText(_T(ELEMENT_INSTALL_DESCRIPTION), CComBSTR(str));
             SetElementText(_T(ELEMENT_INSTALL_STATUS), CComBSTR(""));
         }
+    }
+
+    return !operation_in_progress;
+}
+
+DownloadType_t CEndlessUsbToolDlg::GetSelectedDownloadType()
+{
+    return m_liveInstall ? DownloadType_t::DownloadTypeLiveImage : DownloadType_t::DownloadTypeInstallerImage;
+}
+
+void CEndlessUsbToolDlg::OnClose()
+{
+    if (!CancelInstall()) {
+        m_closeRequested = true;
         return;
     }
-    Uninit();
 
+    Uninit();
     CDHtmlDialog::OnClose();
 }
 
@@ -2068,6 +2303,7 @@ void CEndlessUsbToolDlg::UpdateCurrentStep(int currentStep)
         nrCurrentStep = m_useLocalFile ? 1 : 2;
         break;
     case OP_FLASHING_DEVICE:
+    case OP_FILE_COPY:
         locMsgIdTitle = MSG_311;
         locMsgIdSubtitle = MSG_309;
         nrCurrentStep = m_useLocalFile ? 2 : 3;
@@ -2093,56 +2329,223 @@ void CEndlessUsbToolDlg::UpdateCurrentStep(int currentStep)
     SetElementText(_T(ELEMENT_INSTALL_STATUS), CComBSTR(""));
 }
 
-void CEndlessUsbToolDlg::StartFileVerificationThread()
+bool CEndlessUsbToolDlg::FileHashingCallback(__int64 currentSize, __int64 totalSize, LPVOID context)
 {
-    if (m_verifyImageThread != INVALID_HANDLE_VALUE) {
-        uprintf("Verification already started");
-        return;
+    // RADU: do param verification
+    CEndlessUsbToolDlg *dlg = (CEndlessUsbToolDlg *)context;    
+    DWORD dwWaitStatus = WaitForSingleObject((HANDLE)dlg->m_cancelOperationEvent, 0);
+    if(dwWaitStatus == WAIT_OBJECT_0) {
+        uprintf("FileHashingCallback: Cancel requested.");
+        return false;
     }
+    
+    float current = (float)(currentSize * 100 / totalSize);
+    UpdateProgress(OP_VERIFYING_SIGNATURE, current);
 
-    UpdateCurrentStep(OP_VERIFYING_SIGNATURE);
-
-    m_verifyImageThread = CreateThread(NULL, 0, CEndlessUsbToolDlg::FileVerificationThread, (LPVOID)m_stopVerificationEvent, 0, NULL);
-    if (m_verifyImageThread == NULL) {
-        m_verifyImageThread = INVALID_HANDLE_VALUE;
-        uprintf("Unable to start signature verification thread.");
-        FormatStatus = ERROR_SEVERITY_ERROR | FAC(FACILITY_STORAGE) | APPERR(ERROR_CANT_START_THREAD);
-    }
+    return true;
 }
-// used for mocked verification
-#define VERIFICATION_WAIT 100
-#define VERIFICATION_STEP 10
 
 DWORD WINAPI CEndlessUsbToolDlg::FileVerificationThread(void* param)
 {
-    int current = 0, total = 100;
-    BOOL result = FALSE;
+    CEndlessUsbToolDlg *dlg = (CEndlessUsbToolDlg*) param;
+    CString filename = dlg->m_localFile;
+    CString signatureFilename = dlg->m_localFileSig;
+    BOOL verificationResult = FALSE;    
 
-    while (current < total) {
-        DWORD dwWaitStatus = WaitForSingleObject((HANDLE)param, VERIFICATION_WAIT);
-        switch (dwWaitStatus)
-        {
-        case WAIT_OBJECT_0:
-            goto done;
-            break;
-        case WAIT_TIMEOUT:
-            current += VERIFICATION_STEP;
-            ::PostMessage(hMainDialog, WM_UPDATE_PROGRESS, (WPARAM)OP_VERIFYING_SIGNATURE, (LPARAM)current);
-            break;
-        default:
-            break;
-        }
+    signature_packet_t p_sig = { 0 };
+    public_key_t p_pkey = { 0 };
+    HCRYPTPROV hCryptProv = NULL;
+    HCRYPTHASH hHash = NULL;
+
+    IFFALSE_GOTOERROR(0 == LoadSignature(signatureFilename, &p_sig), "Error on LoadSignature");
+    IFFALSE_GOTOERROR(0 == parse_public_key(endless_public_key, sizeof(endless_public_key), &p_pkey, nullptr), "Error on parse_public_key");
+    IFFALSE_GOTOERROR(CryptAcquireContext(&hCryptProv, nullptr, nullptr, map_algo(p_pkey.key.algo), CRYPT_VERIFYCONTEXT), "Error on CryptAcquireContext");
+
+    memcpy(p_pkey.longid, endless_public_key_longid, sizeof(endless_public_key_longid));
+    IFFALSE_GOTOERROR(0 == memcmp(p_sig.issuer_longid, p_pkey.longid, 8), "Error: signature key id differs from Endless key id");
+
+    IFFALSE_GOTOERROR(CryptCreateHash(hCryptProv, map_digestalgo(p_sig.digest_algo), 0, 0, &hHash), "Error on CryptCreateHash");
+
+    IFFALSE_GOTOERROR(0 == hash_from_file(hHash, filename, &p_sig, FileHashingCallback, dlg), "Error on hash_from_file");
+    IFFALSE_GOTOERROR(0 == check_hash(hHash, &p_sig), "Error on check_hash");
+    IFFALSE_GOTOERROR(0 == verify_signature(hCryptProv, hHash, p_pkey, p_sig), "Error on verify_signature");
+
+    verificationResult = TRUE;
+
+error:
+    ::PostMessage(hMainDialog, WM_FINISHED_FILE_VERIFICATION, (WPARAM)verificationResult, 0);
+
+    // cleanup wincrypto
+    CryptDestroyHash(hHash);
+    CryptReleaseContext(hCryptProv, 0);
+
+    // cleanup key
+    free(p_pkey.psz_username);
+    // cleanup signature
+    if (p_sig.version == 4)
+    {
+        free(p_sig.specific.v4.hashed_data);
+        free(p_sig.specific.v4.unhashed_data);
     }
-    result = TRUE;
 
-done:
-    ::PostMessage(hMainDialog, WM_FINISHED_FILE_VERIFICATION, (WPARAM)result, 0);
-    
     return 0;
 }
 
+#if !defined(PARTITION_BASIC_DATA_GUID)
+const GUID PARTITION_BASIC_DATA_GUID =
+{ 0xebd0a0a2L, 0xb9e5, 0x4433,{ 0x87, 0xc0, 0x68, 0xb6, 0xb7, 0x26, 0x99, 0xc7 } };
+#endif
 
-bool CEndlessUsbToolDlg::ParseImgFileName(const CString& filename, CString &personality, CString &version)
+#define EXPECTED_NUMBER_OF_PARTITIONS 3
+
+DWORD WINAPI CEndlessUsbToolDlg::FileCopyThread(void* param)
+{
+    CEndlessUsbToolDlg *dlg = (CEndlessUsbToolDlg*)param;
+    
+    HANDLE hPhysical = INVALID_HANDLE_VALUE;
+    DWORD size;
+    DWORD DriveIndex = SelectedDrive.DeviceNumber;
+    BOOL result;
+
+    BYTE geometry[256] = { 0 }, layout[4096] = { 0 };
+    PDISK_GEOMETRY_EX DiskGeometry = (PDISK_GEOMETRY_EX)(void*)geometry;
+    PDRIVE_LAYOUT_INFORMATION_EX DriveLayout = (PDRIVE_LAYOUT_INFORMATION_EX)(void*)layout;
+    CString driveDestination, fileDestination;
+    char *guid_volume = NULL;
+    int formatRetries = 5;
+
+    memset(&SelectedDrive, 0, sizeof(SelectedDrive));
+
+    // Query for disk and partition data
+    hPhysical = GetPhysicalHandle(DriveIndex, TRUE, TRUE);
+    IFFALSE_GOTOERROR(hPhysical != INVALID_HANDLE_VALUE, "Error on acquiring disk handle.");
+    
+    result = DeviceIoControl(hPhysical, IOCTL_DISK_GET_DRIVE_GEOMETRY_EX, NULL, 0, geometry, sizeof(geometry), &size, NULL);
+    IFFALSE_GOTOERROR(result == TRUE && size > 0, "Error on querying disk geometry.");    
+
+    result = DeviceIoControl(hPhysical, IOCTL_DISK_GET_DRIVE_LAYOUT_EX, NULL, 0, layout, sizeof(layout), &size, NULL);
+    IFFALSE_GOTOERROR(result == TRUE && size > 0, "Error on querying disk layout.");
+    
+    IFFALSE_GOTOERROR(DriveLayout->PartitionStyle == PARTITION_STYLE_GPT, "Unexpected partition type.");
+    IFFALSE_GOTOERROR(DriveLayout->PartitionCount == EXPECTED_NUMBER_OF_PARTITIONS, "Error: Unexpected number of partitions.");
+
+    //uprintf("Partition type: GPT, NB Partitions: %d\n", DriveLayout->PartitionCount);
+    //uprintf("Disk GUID: %s\n", GuidToString(&DriveLayout->Gpt.DiskId));
+    //uprintf("Max parts: %d, Start Offset: %I64i, Usable = %I64i bytes\n",
+    //    DriveLayout->Gpt.MaxPartitionCount, DriveLayout->Gpt.StartingUsableOffset.QuadPart, DriveLayout->Gpt.UsableLength.QuadPart);
+
+    // Move all partitions by one so we can add the exfat to the beginning of the partition table
+    for (int index = EXPECTED_NUMBER_OF_PARTITIONS; index > 0 ; index--) {
+        memcpy(&(DriveLayout->PartitionEntry[index]), &(DriveLayout->PartitionEntry[index - 1]), sizeof(PARTITION_INFORMATION_EX));
+        DriveLayout->PartitionEntry[index].PartitionNumber = index + 1;
+    }
+
+    // Create the partition to occupy available disk space
+    PARTITION_INFORMATION_EX *lastPartition = &(DriveLayout->PartitionEntry[DriveLayout->PartitionCount]);
+    PARTITION_INFORMATION_EX *newPartition = &(DriveLayout->PartitionEntry[0]);
+    newPartition->PartitionStyle = PARTITION_STYLE_GPT;
+    newPartition->PartitionNumber = 1;;
+    newPartition->StartingOffset.QuadPart = lastPartition->StartingOffset.QuadPart + lastPartition->PartitionLength.QuadPart;    
+    newPartition->PartitionLength.QuadPart = DiskGeometry->DiskSize.QuadPart - newPartition->StartingOffset.QuadPart; //newPartition->PartitionLength.QuadPart = DriveLayout->Gpt.UsableLength.QuadPart - newPartition->StartingOffset.QuadPart;
+
+    newPartition->Gpt.PartitionType = PARTITION_BASIC_DATA_GUID;
+    IGNORE_RETVAL(CoCreateGuid(&newPartition->Gpt.PartitionId));
+    wcscpy(newPartition->Gpt.Name, L"eosimages");
+
+    DriveLayout->PartitionCount += 1;
+
+    size = sizeof(DRIVE_LAYOUT_INFORMATION_EX) + DriveLayout->PartitionCount * sizeof(PARTITION_INFORMATION_EX);
+    IFFALSE_GOTOERROR(DeviceIoControl(hPhysical, IOCTL_DISK_SET_DRIVE_LAYOUT_EX, layout, size, NULL, 0, &size, NULL), "Could not set drive layout.");
+    result = RefreshDriveLayout(hPhysical);
+    safe_closehandle(hPhysical);
+
+    // Check if user canceled
+    IFFALSE_GOTOERROR(WaitForSingleObject(dlg->m_cancelOperationEvent, 0) == WAIT_TIMEOUT, "User cancel.");
+
+    // Wait for the logical drive we just created to appear
+    uprintf("Waiting for logical drive to reappear...\n");
+    Sleep(200); // Radu: check if this is needed, that's what rufus does; I hate sync using sleep
+    if (!WaitForLogical(DriveIndex)) uprintf("Logical drive was not found!");	// We try to continue even if this fails, just in case
+
+    while (formatRetries-- > 0 && !(result = FormatDrive(DriveIndex))) {
+        Sleep(200); // Radu: check if this is needed, that's what rufus does; I hate sync using sleep
+        // Check if user canceled
+        IFFALSE_GOTOERROR(WaitForSingleObject(dlg->m_cancelOperationEvent, 0) == WAIT_TIMEOUT, "User cancel.");
+    }
+    IFFALSE_GOTOERROR(result, "Format error.");
+
+    Sleep(200); // Radu: check if this is needed, that's what rufus does; I hate sync using sleep
+    WaitForLogical(DriveIndex);
+
+    guid_volume = GetLogicalName(DriveIndex, TRUE, TRUE);
+    IFFALSE_GOTOERROR(guid_volume != NULL, "Could not get GUID volume name\n");
+    uprintf("Found volume GUID %s\n", guid_volume);
+
+    // Mount partition
+    char drive_name[] = "?:\\";
+    drive_name[0] = GetUnusedDriveLetter();
+    IFFALSE_GOTOERROR(drive_name[0] != 0, "Could not find an unused drive letter");
+    IFFALSE_GOTOERROR(MountVolume(drive_name, guid_volume), "Could not mount volume.");
+
+    // Copy Files
+    driveDestination = drive_name;
+    fileDestination = driveDestination + CSTRING_GET_LAST(dlg->m_LiveFile, L'\\');
+    result = CopyFileEx(dlg->m_LiveFile, fileDestination, CEndlessUsbToolDlg::CopyProgressRoutine, dlg, NULL, 0);
+    IFFALSE_GOTOERROR(result, "Copying live image failed/canceled.");
+
+    fileDestination = driveDestination + CSTRING_GET_LAST(dlg->m_LiveFileSig, L'\\');
+    result = CopyFileEx(dlg->m_LiveFileSig, fileDestination, NULL, NULL, NULL, 0);
+    IFFALSE_GOTOERROR(result, "Copying live image signature failed.");
+
+    // Unmount
+    if (!DeleteVolumeMountPointA(drive_name)) {
+        uprintf("Failed to unmount volume: %s", WindowsErrorString());
+    }
+    // Also delete the destination mountpoint if needed (Don't care about errors)
+    DeleteVolumeMountPointA(drive_name);    
+
+    FormatStatus = 0;
+    dlg->PostMessage(WM_FINISHED_FILE_COPY, 0, 0);
+    return 0;
+error:
+    safe_closehandle(hPhysical);
+    safe_free(guid_volume);
+
+    uprintf("FileCopyThread exited with error.");
+    FormatStatus = ERROR_SEVERITY_ERROR | FAC(FACILITY_STORAGE) | ERROR_OPEN_FAILED;
+    dlg->PostMessage(WM_FINISHED_FILE_COPY, 0, 0);
+    return 0;
+}
+
+DWORD CALLBACK CEndlessUsbToolDlg::CopyProgressRoutine(
+    LARGE_INTEGER TotalFileSize,
+    LARGE_INTEGER TotalBytesTransferred,
+    LARGE_INTEGER StreamSize,
+    LARGE_INTEGER StreamBytesTransferred,
+    DWORD         dwStreamNumber,
+    DWORD         dwCallbackReason,
+    HANDLE        hSourceFile,
+    HANDLE        hDestinationFile,
+    LPVOID        lpData
+)
+{
+    CEndlessUsbToolDlg *dlg = (CEndlessUsbToolDlg*)lpData;
+
+    DWORD dwWaitStatus = WaitForSingleObject((HANDLE)dlg->m_cancelOperationEvent, 0);
+    if (dwWaitStatus == WAIT_OBJECT_0) {
+        uprintf("CopyProgressRoutine: Cancel requested.");
+        return PROGRESS_CANCEL;
+    }
+
+    float current = (float)(TotalBytesTransferred.QuadPart * 100 / TotalFileSize.QuadPart);
+    UpdateProgress(OP_FILE_COPY, current);
+
+    return PROGRESS_CONTINUE;
+}
+
+
+
+bool CEndlessUsbToolDlg::ParseImgFileName(const CString& filename, CString &personality, CString &version, bool &installerImage)
 {
     // parse filename to get personality and version
     CString lastPart;
@@ -2164,7 +2567,9 @@ bool CEndlessUsbToolDlg::ParseImgFileName(const CString& filename, CString &pers
     };
 
     version.Replace(_T(EOS_PRODUCT_TEXT), _T(""));
-    IFFALSE_GOTOERROR(!version.IsEmpty() && !lastPart.IsEmpty() && product == _T(EOS_PRODUCT_TEXT), "");
+    IFFALSE_GOTOERROR(!version.IsEmpty() && !lastPart.IsEmpty(), "");
+    installerImage = product == _T(EOS_INSTALLER_PRODUCT_TEXT);
+    IFFALSE_GOTOERROR(product == _T(EOS_PRODUCT_TEXT) || installerImage, "");    
 
     pos = 0;
     resToken = lastPart.Tokenize(t2, pos);
@@ -2187,15 +2592,17 @@ error:
 
 void CEndlessUsbToolDlg::GetImgDisplayName(CString &displayName, const CString &version, const CString &personality, ULONGLONG size)
 {
-    // RADU: we also do this for Remote files; move to new method
+    ULONGLONG actualsize = m_liveInstall ? size : (size + m_installerImage.compressedSize);
     // Create display name
     displayName = _T(ENDLESS_OS);
     displayName += " ";
     displayName += version;
     displayName += " ";
     displayName += UTF8ToCString(lmprintf(m_personalityToLocaleMsg[personality]));
-    displayName += " - ";
-    displayName += SizeToHumanReadable(size, FALSE, use_fake_units);
+    if (size != 0) {
+        displayName += " - ";
+        displayName += SizeToHumanReadable(actualsize, FALSE, use_fake_units);
+    }
 }
 
 ULONGLONG CEndlessUsbToolDlg::GetExtractedSize(const CString& filename)

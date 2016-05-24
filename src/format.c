@@ -676,7 +676,11 @@ out:
 /*
  * Call on fmifs.dll's FormatEx() to format the drive
  */
+#ifdef ENDLESSUSB_TOOL
+BOOL FormatDrive(DWORD DriveIndex)
+#else
 static BOOL FormatDrive(DWORD DriveIndex)
+#endif // ENDLESSUSB_TOOL
 {
 	BOOL r = FALSE;
 	PF_DECL(FormatEx);
@@ -690,6 +694,10 @@ static BOOL FormatDrive(DWORD DriveIndex)
 	size_t i;
 	int fs;
 
+#ifdef ENDLESSUSB_TOOL
+    fs = FS_EXFAT;
+    strcpy_s(FSType, sizeof(FSType), "exFAT");
+#else
 	GetWindowTextU(hFileSystem, FSType, ARRAYSIZE(FSType));
 	// Might have a (Default) suffix => remove it
 	for (i=strlen(FSType); i>2; i--) {
@@ -704,6 +712,7 @@ static BOOL FormatDrive(DWORD DriveIndex)
 	} else {
 		PrintInfoDebug(0, MSG_222, FSType);
 	}
+#endif // ENDLESSUSB_TOOL
 	VolumeName = GetLogicalName(DriveIndex, TRUE, TRUE);
 	wVolumeName = utf8_to_wchar(VolumeName);
 	if (wVolumeName == NULL) {
@@ -723,6 +732,11 @@ static BOOL FormatDrive(DWORD DriveIndex)
 	PF_INIT(EnableVolumeCompression, Fmifs);
 	setlocale(LC_ALL, locale);
 
+#ifdef ENDLESSUSB_TOOL
+    wcscpy_s(wFSType, 64, L"exFAT");
+    wcscpy_s(wLabel, 64, L"eosimages");
+    ulClusterSize = 0x8000;
+#else
 	GetWindowTextW(hFileSystem, wFSType, ARRAYSIZE(wFSType));
 	// We may have a " (Default)" trail
 	for (i=0; i<wcslen(wFSType); i++) {
@@ -732,6 +746,8 @@ static BOOL FormatDrive(DWORD DriveIndex)
 		}
 	}
 	GetWindowTextW(hLabel, wLabel, ARRAYSIZE(wLabel));
+
+
 	// Make sure the label is valid
 	ToValidLabel(wLabel, (wFSType[0] == 'F') && (wFSType[1] == 'A') && (wFSType[2] == 'T'));
 	ulClusterSize = (ULONG)ComboBox_GetItemData(hClusterSize, ComboBox_GetCurSel(hClusterSize));
@@ -745,7 +761,7 @@ static BOOL FormatDrive(DWORD DriveIndex)
 	format_percent = 0.0f;
 	task_number = 0;
 	fs_index = (int)ComboBox_GetItemData(hFileSystem, ComboBox_GetCurSel(hFileSystem));
-
+#endif // ENDLESSUSB_TOOL
 	uprintf("%s format was selected\n", IsChecked(IDC_QUICKFORMAT)?"Quick":"Slow");
 	pfFormatEx(wVolumeName, SelectedDrive.Geometry.MediaType, wFSType, wLabel,
 		IsChecked(IDC_QUICKFORMAT), ulClusterSize, FormatExCallback);
@@ -1478,7 +1494,7 @@ static BOOL WriteDrive(HANDLE hPhysicalDrive, HANDLE hSourceImage)
 		uprintf("Writing Compressed Image...");
 		bled_init(_uprintf, update_progress, &FormatStatus);
 #ifndef ENDLESSUSB_TOOL
-		bled_uncompress_with_handles(hSourceImage, hPhysicalDrive, img_report.compression_type)
+        bled_uncompress_with_handles(hSourceImage, hPhysicalDrive, img_report.compression_type);
 #else
 /// RADU: propose this change to rufus
 		if (-1 == bled_uncompress_with_handles(hSourceImage, hPhysicalDrive, img_report.compression_type)) {

@@ -2,6 +2,7 @@
 
 #include <windows.h>
 #include <bits.h>
+#include <initializer_list>
 
 #include "GeneralCode.h"
 
@@ -36,6 +37,8 @@ typedef struct DownloadStatus {
     CString jobName;
 } DownloadStatus_t;
 
+typedef std::initializer_list<LPCTSTR> ListOfStrings;
+
 static const DownloadStatus_t DownloadStatusNull = { {0, 0, 0, 0}, false, false, L"" };
 
 class DownloadManager : public IBackgroundCopyCallback {
@@ -47,7 +50,7 @@ public:
     bool Init(HWND window, DWORD statusMessageId);
     bool Uninit();
 
-    bool AddDownload(DownloadType_t type, LPCTSTR url, LPCTSTR file, bool startDownload = false, bool *appendFile = NULL, LPCTSTR jobSuffix = NULL);
+    bool AddDownload(DownloadType_t type, ListOfStrings urls, ListOfStrings files, bool resumeExisting, LPCTSTR jobSuffix = NULL);
 
     static CString GetJobName(DownloadType_t type);
 

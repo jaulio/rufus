@@ -1,5 +1,7 @@
 #include "stdafx.h"
 #include "DownloadManager.h"
+#include <algorithm>
+
 extern "C" {
     #include "rufus.h"
 }
@@ -60,7 +62,7 @@ error:
     return false;
 }
 
-bool DownloadManager::AddDownload(DownloadType_t type, LPCTSTR url, LPCTSTR file, bool startDownload, bool *appendFile, LPCTSTR jobSuffix)
+bool DownloadManager::AddDownload(DownloadType_t type, ListOfStrings urls, ListOfStrings files, bool resumeExisting, LPCTSTR jobSuffix)
 {
     LPWSTR local = NULL, remote = NULL;
     CComPtr<IBackgroundCopyJob> currentJob;
@@ -69,60 +71,83 @@ bool DownloadManager::AddDownload(DownloadType_t type, LPCTSTR url, LPCTSTR file
     ULONG count = 0;
     CString jobName;
     bool jobExisted = false;
-
+    WCHAR* pLocalFileName = NULL, *pRemoteName = NULL;
+    
     IFFALSE_GOTOERROR(m_bcManager != NULL, "Manager is NULL. Was Init called?");
-
-    uprintf("DownloadManager::AddDownload (%ls, %ls)", url, file);
+    IFFALSE_GOTOERROR(urls.size() == files.size(), "Count of files and urls differ.");
 
     jobName = DownloadManager::GetJobName(type);
     if (jobSuffix != NULL) jobName += jobSuffix;
+    uprintf("DownloadManager::AddDownload job %ls", jobName);
 
     if(type != DownloadType_t::DownloadTypeReleseJson && jobSuffix == NULL) {
         uprintf("Error: AddDownload NO SUFFIX ADDED");
     }
+        
+    IFFALSE_GOTO(SUCCEEDED(GetExistingJob(jobName, currentJob)), "No previous download job found", usecurrentjob);
+    IFFALSE_GOTO(resumeExisting, "Canceling exiting download on request.", canceljob);
+    
+    if (currentJob != NULL) {
+        CComPtr<IEnumBackgroundCopyFiles> pFileList;
+        CComPtr<IBackgroundCopyFile> pFile;
+        ULONG cFileCount = 0, index = 0;
 
-    hr = GetExistingJob(jobName, currentJob);
-    if (SUCCEEDED(hr) && type == DownloadType_t::DownloadTypeReleseJson) {
-        hr = currentJob->Cancel();
-        currentJob = NULL;
+        IFFALSE_GOTO(SUCCEEDED(currentJob->EnumFiles(&pFileList)) && pFileList != NULL, "Error getting filelist.", canceljob);
+        IFFALSE_GOTO(SUCCEEDED(pFileList->GetCount(&cFileCount)) && cFileCount == urls.size(), "Number of files doesn't match.", canceljob);
+
+        //Enumerate the files in the job.
+        for (index = 0; index < cFileCount; index++) {
+            IFFALSE_GOTO(S_OK == pFileList->Next(1, &pFile, NULL), "Error querying for file object.", canceljob);
+            IFFALSE_GOTO(SUCCEEDED(pFile->GetLocalName(&pLocalFileName)), "Error querying for local file name.", canceljob);
+            IFFALSE_GOTO(SUCCEEDED(pFile->GetRemoteName(&pRemoteName)), "Error querying for remote file name.", canceljob);
+            
+            ListOfStrings::iterator foundUrlItem = std::find_if(urls.begin(), urls.end(), [&pRemoteName](LPCTSTR url) { return 0 == wcscmp(url, pRemoteName); });
+            IFFALSE_GOTO(foundUrlItem != urls.end(), "URL no found in list.", canceljob);
+            ListOfStrings::iterator file = files.begin() + (foundUrlItem - urls.begin());
+            IFFALSE_GOTO(0 == wcscmp(*file, pLocalFileName), "Local file doesn't match at url index.", canceljob);
+            
+            CoTaskMemFree(pLocalFileName); pLocalFileName = NULL;
+            CoTaskMemFree(pRemoteName); pRemoteName = NULL;
+            pFile = NULL;
+        }
+
     }
+    goto usecurrentjob;
 
-    if (FAILED(hr) || currentJob == NULL) {
+canceljob:
+    // extra cleaning in case the for loop exited because of error
+    // No need to check for NULL as CoTaskMemFree handles it
+    CoTaskMemFree(pLocalFileName);
+    CoTaskMemFree(pRemoteName);
+    // cancel the job
+    hr = currentJob->Cancel();
+    currentJob = NULL;
+
+usecurrentjob:
+    if (currentJob == NULL) {
         hr = m_bcManager->CreateJob(jobName, BG_JOB_TYPE_DOWNLOAD, &jobId, &currentJob);
         IFFALSE_GOTOERROR(SUCCEEDED(hr), "Error creating instance of IBackgroundCopyJob.");
 
-        hr = currentJob->AddFile(url, file);
-        IFFALSE_GOTOERROR(SUCCEEDED(hr), "Error adding file to download job");
-        
-    } else if(appendFile != NULL && *appendFile) {
-        hr = currentJob->AddFile(url, file);
-        IFFALSE_GOTOERROR(SUCCEEDED(hr) || hr == CO_E_OBJNOTCONNECTED, "Error adding file to download job");
-    } else {
-        jobExisted = true;
+        for (auto url = urls.begin(), file = files.begin(); url != urls.end(); url++, file++) {
+            uprintf("Adding download [%ls]->[%ls]", *url, *file);
+            hr = currentJob->AddFile(*url, *file);
+            IFFALSE_GOTOERROR(SUCCEEDED(hr), "Error adding file to download job");
+        }
     }
 
-    // RADU: Check if file is already added and/or if it's the same file, maybe json changed? 
-    if (appendFile == NULL || !(*appendFile)) {
-        hr = currentJob->SetNotifyInterface(this);
-        IFFALSE_GOTOERROR(SUCCEEDED(hr), "Error calling SetNotifyInterface.");
+    hr = currentJob->SetNotifyInterface(this);
+    IFFALSE_GOTOERROR(SUCCEEDED(hr), "Error calling SetNotifyInterface.");
+    
+    hr = currentJob->SetNotifyFlags(BG_NOTIFY_JOB_TRANSFERRED | BG_NOTIFY_JOB_ERROR | BG_NOTIFY_JOB_MODIFICATION | BG_NOTIFY_FILE_TRANSFERRED);
+    IFFALSE_GOTOERROR(SUCCEEDED(hr), "Error calling SetNotifyFlags.");
 
-        hr = currentJob->SetNotifyFlags(BG_NOTIFY_JOB_TRANSFERRED | BG_NOTIFY_JOB_ERROR | BG_NOTIFY_JOB_MODIFICATION | BG_NOTIFY_FILE_TRANSFERRED);
-        IFFALSE_GOTOERROR(SUCCEEDED(hr), "Error calling SetNotifyFlags.");
-    }
-
-    if (appendFile != NULL) {
-        *appendFile = jobExisted;
-    }
-
-    if (startDownload || jobExisted) {
-        hr = currentJob->Resume();
-        IFFALSE_GOTOERROR(SUCCEEDED(hr), "Error resuming download.");
-    }
+    hr = currentJob->Resume();
+    IFFALSE_GOTOERROR(SUCCEEDED(hr), "Error resuming download.");
 
     return true;
 
 error:
-    uprintf("DownloadManager::AddDownload (%ls, %ls) failed with hr = 0x%x, last error = %s", url, file, hr, WindowsErrorString());
+    uprintf("DownloadManager::AddDownload failed with hr = 0x%x, last error = %s", hr, WindowsErrorString());
     return false;
 }
 

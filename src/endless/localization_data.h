@@ -65,6 +65,7 @@ const loc_control_id control_id[] = {
 	LOC_CTRL_HTML(SecureBootText1),
 	LOC_CTRL_HTML(SecureBootText2),
 	LOC_CTRL_HTML(SecureBootHowTo),
+	LOC_CTRL_HTML(InstallCancelButton),
 	LOC_CTRL_HTML(ThankYouPageTitle),
 	LOC_CTRL_HTML(CloseAppButton),	
 	LOC_CTRL_HTML(ThankYouMessage),
