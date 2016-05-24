@@ -187,7 +187,7 @@ t MSG_239 "Deleting partitions..."
 t MSG_261 "Writing image: %0.1f%% completed"
 # END NO NEED TO TRANSLATE
 
-t MSG_300 "Error dowloading file."
+t MSG_300 "Error downloading file."
 t MSG_301 "Download Progress"
 t MSG_302 "%s of %s (%s/s)"
 t MSG_303 "Something is wrong with your Endless OS file."
