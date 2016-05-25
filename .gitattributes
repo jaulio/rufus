@@ -17,4 +17,4 @@ install-sh      eol=lf
 .gitattributes  export-ignore
 .gitignore      export-ignore
 *.creole        export-ignore
-
+*.rc		diff

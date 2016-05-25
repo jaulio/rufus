@@ -338,7 +338,8 @@ CEndlessUsbToolDlg::CEndlessUsbToolDlg(CWnd* pParent /*=NULL*/)
     m_usbDeleteAgreement(false),
     m_currentStep(OP_NO_OPERATION_IN_PROGRESS),
     m_cancelOperationEvent(CreateEvent(NULL, TRUE, FALSE, NULL)),
-    m_closeRequested(false)
+    m_closeRequested(false),
+    m_ieVersion(0)
 {
     m_hIcon = AfxGetApp()->LoadIcon(IDR_MAINFRAME);    
 
@@ -514,7 +515,6 @@ BOOL CEndlessUsbToolDlg::OnInitDialog()
     //Disable JavaScript errors
     m_pBrowserApp->put_Silent(VARIANT_TRUE);
 
-	// Make round corners
 	//// Remove caption and border
 	SetWindowLong(m_hWnd, GWL_STYLE, GetWindowLong(m_hWnd, GWL_STYLE)
 		& (~(WS_CAPTION | WS_BORDER)));
@@ -522,21 +522,26 @@ BOOL CEndlessUsbToolDlg::OnInitDialog()
     // Move window
     SetWindowPos(NULL, 0, 0, 748, 514, SWP_NOMOVE | SWP_NOZORDER);
 
-	//  Get the rectangle
-	CRect rect;
-	GetWindowRect(&rect);
-	int w = rect.Width();
-	int h = rect.Height();
+    GetIEVersion();
 
-	int radius = 11;
-	CRgn rgnRound, rgnRect, rgnComp;
-	rgnRound.CreateRoundRectRgn(0, 0, w + 1, h + radius, radius, radius);        
-    rgnRect.CreateRectRgn(0, 0, w, h);
-    rgnComp.CreateRectRgn(0, 0, w, h);
-    int combineResult = rgnComp.CombineRgn(&rgnRect, &rgnRound, RGN_AND);
+    // Make round corners
+    if(m_ieVersion >= 9) { // Internet explorer < 9 doesn't support rounded corners
+        //  Get the rectangle
+        CRect rect;
+        GetWindowRect(&rect);
+        int w = rect.Width();
+        int h = rect.Height();
 
-	//  Set the window region
-	SetWindowRgn(static_cast<HRGN>(rgnComp.GetSafeHandle()), TRUE);
+        int radius = 11;
+        CRgn rgnRound, rgnRect, rgnComp;
+        rgnRound.CreateRoundRectRgn(0, 0, w + 1, h + radius, radius, radius);
+        rgnRect.CreateRectRgn(0, 0, w, h);
+        rgnComp.CreateRectRgn(0, 0, w, h);
+        int combineResult = rgnComp.CombineRgn(&rgnRect, &rgnRound, RGN_AND);
+        //  Set the window region
+        SetWindowRgn(static_cast<HRGN>(rgnComp.GetSafeHandle()), TRUE);
+    }
+
 
 	// Init localization before doing anything else
 	LoadLocalizationData();
@@ -2677,4 +2682,24 @@ ULONGLONG CEndlessUsbToolDlg::GetExtractedSize(const CString& filename)
 
     CStringA asciiFileName(filename);
     return get_archive_disk_image_size(asciiFileName, compression_type);
+}
+
+void CEndlessUsbToolDlg::GetIEVersion()
+{
+    CRegKey registryKey;
+    LSTATUS result;
+    wchar_t versionValue[256];
+    ULONG size = sizeof(versionValue) / sizeof(versionValue[0]);
+
+    result = registryKey.Open(HKEY_LOCAL_MACHINE, L"SOFTWARE\\Microsoft\\Internet Explorer", KEY_QUERY_VALUE);
+    IFFALSE_RETURN(result == ERROR_SUCCESS, "Error opening IE registry key.");
+
+    result = registryKey.QueryStringValue(L"Version", versionValue, &size);
+    IFFALSE_RETURN(result == ERROR_SUCCESS, "Error Querying for version value.");
+
+    uprintf("%ls", versionValue);
+
+    CString version = versionValue;
+    version = version.Left(version.Find(L'.'));
+    m_ieVersion = _wtoi(version);
 }
