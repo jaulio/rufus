@@ -126,6 +126,7 @@ const loc_control_id control_id[] = {
 	LOC_CTRL(MSG_312),
 	LOC_CTRL(MSG_313),
 	LOC_CTRL(MSG_314),
+	LOC_CTRL(MSG_315),
 	LOC_CTRL(MSG_400),
 	LOC_CTRL(MSG_401),
 	LOC_CTRL(MSG_402),

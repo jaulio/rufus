@@ -110,6 +110,9 @@ BOOL FormatDrive(DWORD DriveIndex);
 #define ELEMENT_DOWNLOAD_LIGHT_BUTTON   "DownloadLightButton"
 #define ELEMENT_DOWNLOAD_FULL_BUTTON    "DownloadFullButton"
 
+#define ELEMENT_DOWNLOAD_LIGHT_SIZE     "LightDownloadSubtitle"
+#define ELEMENT_DOWNLOAD_FULL_SIZE      "FullDownloadSubtitle"
+
 //Select USB page elements
 #define ELEMENT_SELUSB_PREV_BUTTON      "SelectUSBPreviousButton"
 #define ELEMENT_SELUSB_NEXT_BUTTON      "SelectUSBNextButton"
@@ -1098,8 +1101,7 @@ HRESULT CEndlessUsbToolDlg::OnHtmlMouseDown(IHTMLElement* pElement)
 // Private methods
 void CEndlessUsbToolDlg::LoadLocalizationData()
 {
-	const char* rufus_loc = "rufus.loc";
-	//int lcid = 0x0418;
+	const char* rufus_loc = "endless.loc";
     int lcid = GetUserDefaultUILanguage();
 	BYTE *loc_data;
 	DWORD loc_size, size;
@@ -1824,6 +1826,7 @@ void CEndlessUsbToolDlg::UpdateDownloadOptions()
     hr = ClearSelectElement(_T(ELEMENT_SELFILE_DOWN_LANG));
     IFFALSE_PRINTERROR(SUCCEEDED(hr), "Error clearing remote images select.");
 
+    bool updatedFullSize = false;
     CallJavascript(_T(JS_ENABLE_BUTTON), CComVariant(HTML_BUTTON_ID(_T(ELEMENT_DOWNLOAD_LIGHT_BUTTON))), CComVariant(FALSE));
     for (POSITION pos = m_remoteImages.GetHeadPosition(); pos != NULL; ) {
         RemoteImageEntry_t imageEntry = m_remoteImages.GetNext(pos);
@@ -1831,15 +1834,27 @@ void CEndlessUsbToolDlg::UpdateDownloadOptions()
         hr = AddEntryToSelect(_T(ELEMENT_REMOTE_SELECT), CComBSTR(""), CComBSTR(imageEntry.displayName), &selectIndex);
         IFFALSE_PRINTERROR(SUCCEEDED(hr), "Error adding remote image to list.");
 
+        ULONGLONG size = imageEntry.compressedSize + (m_liveInstall ? 0 : m_installerImage.compressedSize);
+        CComBSTR sizeText = UTF8ToBSTR(lmprintf(MSG_315, SizeToHumanReadable(size, FALSE, use_fake_units)));
+        const wchar_t *htmlElemId = NULL;
+
         if (imageEntry.personality == PERSONALITY_BASE) {
             CallJavascript(_T(JS_ENABLE_BUTTON), CComVariant(HTML_BUTTON_ID(_T(ELEMENT_DOWNLOAD_LIGHT_BUTTON))), CComVariant(TRUE));
             m_baseImageRemoteIndex = selectIndex;
-        } else {            
+            htmlElemId = _T(ELEMENT_DOWNLOAD_LIGHT_SIZE);
+        } else {
             CString imageLanguage = UTF8ToCString(lmprintf(m_personalityToLocaleMsg[imageEntry.personality]));
             CString indexStr;
             indexStr.Format(L"%d", selectIndex);
             hr = AddEntryToSelect(_T(ELEMENT_SELFILE_DOWN_LANG), CComBSTR(indexStr), CComBSTR(imageLanguage), NULL);
             IFFALSE_PRINTERROR(SUCCEEDED(hr), "Error adding remote image to full images list.");
+            if (!updatedFullSize) {
+                updatedFullSize = true;
+                htmlElemId = _T(ELEMENT_DOWNLOAD_FULL_SIZE);
+            }
+        }
+        if (htmlElemId != 0) {
+            SetElementText(htmlElemId, sizeText);
         }
     }
 
@@ -2003,6 +2018,12 @@ HRESULT CEndlessUsbToolDlg::OnSelectedRemoteFileChanged(IHTMLElement* pElement)
     IFFALSE_RETURN_VALUE(p != NULL, "Index value not valid.", S_OK);
     RemoteImageEntry_t r = m_remoteImages.GetAt(p);
     uprintf("OnSelectedImageFileChanged to REMOTE [%ls]", r.displayName);
+
+    if (r.personality != PERSONALITY_BASE) {
+        ULONGLONG size = r.compressedSize + (m_liveInstall ? 0 : m_installerImage.compressedSize);
+        CComBSTR sizeText = UTF8ToBSTR(lmprintf(MSG_315, SizeToHumanReadable(size, FALSE, use_fake_units)));
+        SetElementText(_T(ELEMENT_DOWNLOAD_FULL_SIZE), sizeText);
+    }
 
     m_useLocalFile = false;
 
