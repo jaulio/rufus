@@ -73,8 +73,12 @@ b {
 
 /* Blue button */
 .ButtonBlue {
-	width: 142px;
+	width: 160px;
 	border-color: #1c5187;	
+}
+
+.ButtonBlue:not([maxIE8]) {
+	width: 150px;
 }
 
 .ButtonBlue div {
@@ -318,8 +322,8 @@ select:disabled {
 }
 
 .PanelText {
-	width: 75%;
-	font-size: 14px;
+	width: 80%;
+	font-size: 13px;
 	margin-top: 25px;
 	text-align: center;
 	height: 50px;
@@ -327,7 +331,6 @@ select:disabled {
 
 #LeftPanel .PanelText {
 	height: 75px;
-	overflow: hidden;
 }
 
 #FirstPage .PageContent .FullWidthContent {
