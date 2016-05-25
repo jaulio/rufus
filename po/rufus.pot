@@ -78,10 +78,6 @@ msgctxt "LightVersionText"
 msgid "Light"
 msgstr ""
 
-msgctxt "LightDownloadSubtitle"
-msgid "2GB Download"
-msgstr ""
-
 msgctxt "LightDownloadDescription"
 msgid "Select this option if you’ll have access to the internet and can install your favorite apps later."
 msgstr ""
@@ -92,10 +88,6 @@ msgstr ""
 
 msgctxt "FullVersionText"
 msgid "Full"
-msgstr ""
-
-msgctxt "FullDownloadSubtitle"
-msgid "16GB Download"
 msgstr ""
 
 msgctxt "FullDownloadDescription"
@@ -147,7 +139,7 @@ msgid "Secure Boot"
 msgstr ""
 
 msgctxt "SecureBootText1"
-msgid "Depending your system, the Secure Boot option will be found on the \"Boot\", \"Security\" or \"Authentication\" page."
+msgid "Depending on your system, the Secure Boot option will be found on the \"Boot\", \"Security\" or \"Authentication\" page."
 msgstr ""
 
 msgctxt "SecureBootText2"
@@ -328,6 +320,10 @@ msgstr ""
 
 msgctxt "MSG_314"
 msgid "https://support.endlessm.com/hc/en-us"
+msgstr ""
+
+msgctxt "MSG_315"
+msgid "%s Download"
 msgstr ""
 
 msgctxt "MSG_400"
