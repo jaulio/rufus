@@ -161,7 +161,8 @@ static const wchar_t *globalAvailablePersonalities[] =
 
 
 #define GET_LOCAL_PATH(__filename__) (m_appDir + "\\" + (__filename__))
-#define CSTRING_GET_LAST(__path__, __spearator__) __path__.Right(__path__.GetLength() - __path__.ReverseFind(__spearator__) - 1) 
+#define CSTRING_GET_LAST(__path__, __separator__) __path__.Right(__path__.GetLength() - __path__.ReverseFind(__separator__) - 1)
+#define CSTRING_GET_PATH(__path__, __separator__) __path__.Left(__path__.ReverseFind(__separator__))
 
 enum custom_message {
     WM_FILES_CHANGED = UM_NO_UPDATE + 1,
@@ -400,11 +401,14 @@ void CEndlessUsbToolDlg::InitRufus()
     hMainInstance = AfxGetResourceHandle();
 
     // Retrieve the current application directory as well as the system & sysnative dirs
-    if (GetCurrentDirectoryU(sizeof(app_dir), app_dir) == 0) {
+    if(GetModuleFileNameA(NULL, app_dir, sizeof(app_dir)) == 0) {
         uprintf("Could not get current directory: %s", WindowsErrorString());
         app_dir[0] = 0;
     }
-    m_appDir = app_dir;
+    CStringA appDirStr = app_dir;
+    appDirStr = CSTRING_GET_PATH(appDirStr, '\\');
+    strcpy_s(app_dir, appDirStr);
+    m_appDir = appDirStr;
 
     if (GetSystemDirectoryU(system_dir, sizeof(system_dir)) == 0) {
         uprintf("Could not get system directory: %s", WindowsErrorString());

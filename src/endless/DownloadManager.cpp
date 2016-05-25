@@ -138,7 +138,11 @@ usecurrentjob:
     hr = currentJob->SetNotifyInterface(this);
     IFFALSE_GOTOERROR(SUCCEEDED(hr), "Error calling SetNotifyInterface.");
     
-    hr = currentJob->SetNotifyFlags(BG_NOTIFY_JOB_TRANSFERRED | BG_NOTIFY_JOB_ERROR | BG_NOTIFY_JOB_MODIFICATION | BG_NOTIFY_FILE_TRANSFERRED);
+    ULONG flags = BG_NOTIFY_JOB_TRANSFERRED | BG_NOTIFY_JOB_ERROR | BG_NOTIFY_JOB_MODIFICATION;
+    if (nWindowsVersion > WINDOWS_XP) { // BG_NOTIFY_FILE_TRANSFERRED makes the call fail on XP
+        flags = flags | BG_NOTIFY_FILE_TRANSFERRED;
+    }
+    hr = currentJob->SetNotifyFlags(flags);
     IFFALSE_GOTOERROR(SUCCEEDED(hr), "Error calling SetNotifyFlags.");
 
     hr = currentJob->Resume();
