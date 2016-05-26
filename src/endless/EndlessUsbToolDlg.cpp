@@ -2711,6 +2711,10 @@ void CEndlessUsbToolDlg::GetImgDisplayName(CString &displayName, const CString &
     displayName += version;
     displayName += " ";
     displayName += UTF8ToCString(lmprintf(m_personalityToLocaleMsg[personality]));
+    if (personality != PERSONALITY_BASE) {
+        displayName += " ";
+        displayName += UTF8ToCString(lmprintf(MSG_316));
+    }
     if (size != 0) {
         displayName += " - ";
         displayName += SizeToHumanReadable(actualsize, FALSE, use_fake_units);
