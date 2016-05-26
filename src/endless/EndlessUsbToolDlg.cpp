@@ -1434,12 +1434,13 @@ void CEndlessUsbToolDlg::UpdateFileEntries(bool shouldInit)
     CComPtr<IHTMLSelectElement> selectElement;
     HRESULT hr;
     WIN32_FIND_DATA findFileData;
-    HANDLE findFilesHandle = FindFirstFile(_T("*.*"), &findFileData);
     POSITION position;
     pFileImageEntry_t currentEntry = NULL;
     CString currentPath;
     BOOL fileAccessException = false;
     CString currentInstallerVersion;
+    CString searchPath = GET_LOCAL_PATH(_T("*.*"));
+    HANDLE findFilesHandle = FindFirstFile(searchPath, &findFileData);
 
     // get needed HTML elements
     hr = GetSelectElement(_T(ELEMENT_FILES_SELECT), selectElement);
@@ -1465,18 +1466,19 @@ void CEndlessUsbToolDlg::UpdateFileEntries(bool shouldInit)
     do {
         if ((findFileData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0) continue;
         CString currentFile = findFileData.cFileName;
+        CString fullPathFile = GET_LOCAL_PATH(findFileData.cFileName);
         CString extension = CSTRING_GET_LAST(currentFile, '.');
         if (extension != L"gz" && extension != L"xz") continue;
 
-        if (!PathFileExists(findFileData.cFileName)) continue; // file is present
-        if (!PathFileExists(CString(findFileData.cFileName) + SIGNATURE_FILE_EXT)) continue; // signature file is present
+        if (!PathFileExists(fullPathFile)) continue; // file is present
+        if (!PathFileExists(fullPathFile + SIGNATURE_FILE_EXT)) continue; // signature file is present
 
         try {
             CString displayName, personality, version;
             bool isInstallerImage = false;
             if (!ParseImgFileName(currentFile, personality, version, isInstallerImage)) continue;
-            if (0 == GetExtractedSize(currentFile)) continue;
-            CFile file(findFileData.cFileName, CFile::modeRead);
+            if (0 == GetExtractedSize(fullPathFile)) continue;
+            CFile file(fullPathFile, CFile::modeRead);
             GetImgDisplayName(displayName, version, personality, file.GetLength());
 
             if (isInstallerImage) {
@@ -1812,17 +1814,23 @@ error:
 void CEndlessUsbToolDlg::UpdateDownloadOptions()
 {
     CString languagePersonalty = PERSONALITY_ENGLISH;
+    CString filePathGz, filePath;
 
     m_remoteImages.RemoveAll();
 
-    IFFALSE_GOTOERROR(UnpackFile(JSON_PACKED(JSON_LIVE_FILE), JSON_LIVE_FILE), "Error uncompressing eos JSON file.");
-    IFFALSE_GOTOERROR(ParseJsonFile(_T(JSON_LIVE_FILE), false), "Error parsing eos JSON file.");
+    filePathGz = GET_LOCAL_PATH(CString(JSON_PACKED(JSON_LIVE_FILE)));
+    filePath = GET_LOCAL_PATH(CString(JSON_LIVE_FILE));
+    IFFALSE_GOTOERROR(UnpackFile(CStringA(filePathGz), CStringA(filePath)), "Error uncompressing eos JSON file.");
+    IFFALSE_GOTOERROR(ParseJsonFile(filePath, false), "Error parsing eos JSON file.");
     
     // Radu change this once the eosinstaller JSON is available
 #if 0
     IFFALSE_GOTOERROR(UnpackFile(JSON_PACKED(JSON_INSTALLER_FILE), JSON_INSTALLER_FILE), "Error uncompressing eosinstaller JSON file.");
 #endif
-    if (UnpackFile(JSON_PACKED(JSON_INSTALLER_FILE), JSON_INSTALLER_FILE)) {
+    filePathGz = GET_LOCAL_PATH(CString(JSON_PACKED(JSON_INSTALLER_FILE)));
+    filePath = GET_LOCAL_PATH(CString(JSON_INSTALLER_FILE));
+
+    if (UnpackFile(CStringA(filePathGz), CStringA(filePath))) {
         IFFALSE_GOTOERROR(ParseJsonFile(_T(JSON_INSTALLER_FILE), true) || ParseJsonFile(_T(JSON_INSTALLER_FILE), true, true), "Error parsing eosinstaller JSON file.");
     } else {
         uprintf("Error uncompressing eosinstaller JSON file.");
@@ -2253,11 +2261,12 @@ HRESULT CEndlessUsbToolDlg::OnSelectedUSBDiskChanged(IHTMLElement* pElement)
         if (!m_liveInstall && m_imageFiles.Lookup(selectedImage, localEntry)) {
             size = localEntry->size;
         }
-    }
-    else {
-        RemoteImageEntry_t remote = m_remoteImages.GetAt(m_remoteImages.FindIndex(m_selectedRemoteIndex));  
-        DownloadType_t downloadType = GetSelectedDownloadType();
-        size = m_liveInstall ? remote.extractedSize : remote.compressedSize;
+    } else {
+        POSITION p = m_remoteImages.FindIndex(m_selectedRemoteIndex);
+        if (p != NULL) {
+            RemoteImageEntry_t remote = m_remoteImages.GetAt(p);
+            size = m_liveInstall ? remote.extractedSize : remote.compressedSize;
+        }
     }
 
     // add the installer size if this is not a live image
