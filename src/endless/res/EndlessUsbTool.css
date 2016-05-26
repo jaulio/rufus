@@ -105,8 +105,7 @@ b {
 .ButtonBlue div:active {
 	color: white;
 	background: #2b79cb; /*older than IE6 */    
-	filter: progid:DXImageTransform.Microsoft.gradient( startColorstr='#2b79cb', endColorstr='#3583d5',GradientType=0 )
-			progid:DXImageTransform.Microsoft.Shadow(color='#000000'); /* IE6-9 */
+	filter: progid:DXImageTransform.Microsoft.gradient( startColorstr='#2b79cb', endColorstr='#3583d5',GradientType=0 ); /* IE6-9 */
 	background-image: linear-gradient(to bottom, #2b79cb, #2e7fd3 40%, #3583d5); /* IE10+ */
 	
 	text-shadow: 0 -1px rgba(0, 0, 0, 0.62353); /* IE10+ */
