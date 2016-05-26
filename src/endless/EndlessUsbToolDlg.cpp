@@ -135,6 +135,7 @@ BOOL FormatDrive(DWORD DriveIndex);
 #define ELEMENT_INSTALLER_VERSION       "InstallerVersionValue"
 #define ELEMENT_INSTALLER_LANGUAGE      "InstallerVersionLanguage"
 #define ELEMENT_INSTALLER_CONTENT       "InstallerContentValue"
+#define ELEMENT_THANKYOU_MESSAGE        "ThankYouMessage"
 //Error page
 #define ELEMENT_ERROR_MESSAGE           "ErrorMessage"
 #define ELEMENT_ERROR_CLOSE_BUTTON      "CloseAppButton1"
@@ -1960,12 +1961,18 @@ HRESULT CEndlessUsbToolDlg::OnSelectFileNextClicked(IHTMLElement* pElement)
     selectedSize = SizeToHumanReadable(size, FALSE, use_fake_units);
     if (ParseImgFileName(selectedImage, personality, version, isInstallerImage)) {
         if(isInstallerImage) uprintf("ERROR: An installer image has been selected.");
+
+        CString usbType = UTF8ToCString(lmprintf(m_liveInstall ? MSG_317 : MSG_318)); // Live or installer
+        CString imageType = UTF8ToCString(lmprintf(personality == PERSONALITY_BASE ? MSG_400 : MSG_316)); // Light or Full
+        CString imageLanguage = personality == PERSONALITY_BASE ?  L"" : UTF8ToCString(lmprintf(m_personalityToLocaleMsg[personality])); // Language for Full or empty string for Light
+        CString finalMessageStr = UTF8ToCString(lmprintf(MSG_320, version, imageType, imageLanguage, usbType));
+        SetElementText(_T(ELEMENT_THANKYOU_MESSAGE), CComBSTR(finalMessageStr));
+
         SetElementText(_T(ELEMENT_INSTALLER_VERSION), CComBSTR(version));
-        SetElementText(_T(ELEMENT_INSTALLER_LANGUAGE), UTF8ToBSTR(lmprintf(m_personalityToLocaleMsg[personality])));
-        CString contentStr("--- (");
-        contentStr += SizeToHumanReadable(size, FALSE, use_fake_units);
-        contentStr += ")";
+        SetElementText(_T(ELEMENT_INSTALLER_LANGUAGE), CComBSTR(imageLanguage));
+        CString contentStr  = UTF8ToCString(lmprintf(MSG_319, imageType, SizeToHumanReadable(size, FALSE, use_fake_units)));
         SetElementText(_T(ELEMENT_INSTALLER_CONTENT), CComBSTR(contentStr));
+
         GetImgDisplayName(selectedImage, version, personality, 0);
     } else {
         uprintf("Cannot parse data from file name %ls; using default %s", selectedImage, ENDLESS_OS);
@@ -2479,8 +2486,8 @@ error:
     ::PostMessage(hMainDialog, WM_FINISHED_FILE_VERIFICATION, (WPARAM)verificationResult, 0);
 
     // cleanup wincrypto
-    CryptDestroyHash(hHash);
-    CryptReleaseContext(hCryptProv, 0);
+    if(hHash != NULL) CryptDestroyHash(hHash);
+    if(hCryptProv != NULL) CryptReleaseContext(hCryptProv, 0);
 
     // cleanup key
     free(p_pkey.psz_username);
