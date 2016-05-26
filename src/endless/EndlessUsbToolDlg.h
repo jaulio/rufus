@@ -126,6 +126,7 @@ private:
     RemoteImageEntry_t m_installerImage;
     FileImageEntry_t m_localInstallerImage;
     static CMap<CString, LPCTSTR, uint32_t, uint32_t> m_personalityToLocaleMsg;
+    static CMap<CStringA, LPCSTR, CString, LPCTSTR> m_localeToPersonality;
 
     CString m_localFile;
     CString m_localFileSig;

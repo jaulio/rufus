@@ -317,6 +317,7 @@ BEGIN_DISPATCH_MAP(CEndlessUsbToolDlg, CDHtmlDialog)
 END_DISPATCH_MAP()
 
 CMap<CString, LPCTSTR, uint32_t, uint32_t> CEndlessUsbToolDlg::m_personalityToLocaleMsg;
+CMap<CStringA, LPCSTR, CString, LPCTSTR> CEndlessUsbToolDlg::m_localeToPersonality;
 
 CEndlessUsbToolDlg::CEndlessUsbToolDlg(CWnd* pParent /*=NULL*/)
     : CDHtmlDialog(IDD_ENDLESSUSBTOOL_DIALOG, IDR_HTML_ENDLESSUSBTOOL_DIALOG, pParent),
@@ -350,6 +351,10 @@ CEndlessUsbToolDlg::CEndlessUsbToolDlg(CWnd* pParent /*=NULL*/)
     for (uint32_t index = 0; index < personalitiesCount; index++) {
         m_personalityToLocaleMsg.SetAt(globalAvailablePersonalities[index], MSG_400 + index);
     }
+
+    m_localeToPersonality["en-US"] = PERSONALITY_ENGLISH;
+    m_localeToPersonality["es-ES"] = PERSONALITY_SPANISH;
+    m_localeToPersonality["pt-BR"] = PERSONALITY_PORTUGHESE;
 }
 
 void CEndlessUsbToolDlg::DoDataExchange(CDataExchange* pDX)
@@ -1803,6 +1808,8 @@ error:
 
 void CEndlessUsbToolDlg::UpdateDownloadOptions()
 {
+    CString languagePersonalty = PERSONALITY_ENGLISH;
+
     m_remoteImages.RemoveAll();
 
     IFFALSE_GOTOERROR(UnpackFile(JSON_PACKED(JSON_LIVE_FILE), JSON_LIVE_FILE), "Error uncompressing eos JSON file.");
@@ -1820,20 +1827,28 @@ void CEndlessUsbToolDlg::UpdateDownloadOptions()
     }
 
     // Radu: Maybe move this to another method to separate UI from logic
-    // add options to UI
+    // remove all options to UI
     HRESULT hr = ClearSelectElement(_T(ELEMENT_REMOTE_SELECT));
     IFFALSE_PRINTERROR(SUCCEEDED(hr), "Error clearing remote images select.");
     hr = ClearSelectElement(_T(ELEMENT_SELFILE_DOWN_LANG));
     IFFALSE_PRINTERROR(SUCCEEDED(hr), "Error clearing remote images select.");
 
+    // get selected language
+    if (!m_localeToPersonality.Lookup(m_selectedLocale->txt[0], languagePersonalty)) {
+        uprintf("ERROR: Selected language personality not found. Defaulting to English");
+    }
+
+    // add options to UI
     bool updatedFullSize = false;
     CallJavascript(_T(JS_ENABLE_BUTTON), CComVariant(HTML_BUTTON_ID(_T(ELEMENT_DOWNLOAD_LIGHT_BUTTON))), CComVariant(FALSE));
     for (POSITION pos = m_remoteImages.GetHeadPosition(); pos != NULL; ) {
         RemoteImageEntry_t imageEntry = m_remoteImages.GetNext(pos);
         long selectIndex = 0;
-        hr = AddEntryToSelect(_T(ELEMENT_REMOTE_SELECT), CComBSTR(""), CComBSTR(imageEntry.displayName), &selectIndex);
+        bool matchesLanguage = languagePersonalty == imageEntry.personality;
+        hr = AddEntryToSelect(_T(ELEMENT_REMOTE_SELECT), CComBSTR(""), CComBSTR(imageEntry.displayName), &selectIndex, matchesLanguage);
         IFFALSE_PRINTERROR(SUCCEEDED(hr), "Error adding remote image to list.");
 
+        // option size
         ULONGLONG size = imageEntry.compressedSize + (m_liveInstall ? 0 : m_installerImage.compressedSize);
         CComBSTR sizeText = UTF8ToBSTR(lmprintf(MSG_315, SizeToHumanReadable(size, FALSE, use_fake_units)));
         const wchar_t *htmlElemId = NULL;
@@ -1846,7 +1861,7 @@ void CEndlessUsbToolDlg::UpdateDownloadOptions()
             CString imageLanguage = UTF8ToCString(lmprintf(m_personalityToLocaleMsg[imageEntry.personality]));
             CString indexStr;
             indexStr.Format(L"%d", selectIndex);
-            hr = AddEntryToSelect(_T(ELEMENT_SELFILE_DOWN_LANG), CComBSTR(indexStr), CComBSTR(imageLanguage), NULL);
+            hr = AddEntryToSelect(_T(ELEMENT_SELFILE_DOWN_LANG), CComBSTR(indexStr), CComBSTR(imageLanguage), NULL, matchesLanguage);
             IFFALSE_PRINTERROR(SUCCEEDED(hr), "Error adding remote image to full images list.");
             if (!updatedFullSize) {
                 updatedFullSize = true;
@@ -1923,7 +1938,7 @@ HRESULT CEndlessUsbToolDlg::OnSelectFileNextClicked(IHTMLElement* pElement)
         pFileImageEntry_t localEntry = NULL;
         if (!m_imageFiles.Lookup(selectedImage, localEntry)) {
             uprintf("ERROR: Selected local file not found.");
-        }        
+        }
         selectedImage = CSTRING_GET_LAST(selectedImage, '\\');
         size = m_liveInstall ? GetExtractedSize(selectedImage) : localEntry->size;
 
