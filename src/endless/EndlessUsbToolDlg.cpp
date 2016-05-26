@@ -914,9 +914,11 @@ LRESULT CEndlessUsbToolDlg::WindowProc(UINT message, WPARAM wParam, LPARAM lPara
                 percent = 50 + percent / 2;
             }
 
-            hr = CallJavascript(_T(JS_SET_PROGRESS), CComVariant(percent));
-            IFFALSE_BREAK(SUCCEEDED(hr), "Error when calling set progress.");
-            
+            if (percent >= 0 && percent <= 100) {
+                hr = CallJavascript(_T(JS_SET_PROGRESS), CComVariant(percent));
+                IFFALSE_BREAK(SUCCEEDED(hr), "Error when calling set progress.");
+            }
+
             if (op == OP_VERIFYING_SIGNATURE || op == OP_FORMAT || op == OP_FILE_COPY) {
                 CString downloadString;
                 downloadString.Format(L"%d%%", percent);
