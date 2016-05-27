@@ -170,7 +170,7 @@ private:
     void StartJSONDownload();
     void UpdateDownloadOptions();
     bool UnpackFile(LPCSTR archive, LPCSTR destination);
-    bool ParseJsonFile(LPCTSTR filename, bool isInstallerJson, bool parseMockJson = false);
+    bool ParseJsonFile(LPCTSTR filename, bool isInstallerJson);
 
 	void Uninit();
 
