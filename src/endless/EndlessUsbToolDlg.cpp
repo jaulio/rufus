@@ -2255,8 +2255,7 @@ HRESULT CEndlessUsbToolDlg::OnSelectedUSBDiskChanged(IHTMLElement* pElement)
     if (m_useLocalFile) {
         pFileImageEntry_t localEntry = NULL;
         CString selectedImage(image_path);
-        selectedImage = CSTRING_GET_LAST(selectedImage, '\\');
-        
+
         size = GetExtractedSize(selectedImage);        
         if (!m_liveInstall && m_imageFiles.Lookup(selectedImage, localEntry)) {
             size = localEntry->size;
