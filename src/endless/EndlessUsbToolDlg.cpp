@@ -1824,18 +1824,20 @@ void CEndlessUsbToolDlg::UpdateDownloadOptions()
     IFFALSE_GOTOERROR(UnpackFile(CStringA(filePathGz), CStringA(filePath)), "Error uncompressing eos JSON file.");
     IFFALSE_GOTOERROR(ParseJsonFile(filePath, false), "Error parsing eos JSON file.");
 
-    filePathGz = GET_LOCAL_PATH(CString(JSON_PACKED(JSON_INSTALLER_FILE)));
-    filePath = GET_LOCAL_PATH(CString(JSON_INSTALLER_FILE));
-    IFFALSE_GOTOERROR(UnpackFile(CStringA(filePathGz), CStringA(filePath)), "Error uncompressing eosinstaller JSON file.");
-    IFFALSE_GOTOERROR(ParseJsonFile(filePath, true), "Error parsing eosinstaller JSON file.");
+    if (!m_liveInstall) {
+        filePathGz = GET_LOCAL_PATH(CString(JSON_PACKED(JSON_INSTALLER_FILE)));
+        filePath = GET_LOCAL_PATH(CString(JSON_INSTALLER_FILE));
+        IFFALSE_GOTOERROR(UnpackFile(CStringA(filePathGz), CStringA(filePath)), "Error uncompressing eosinstaller JSON file.");
+        IFFALSE_GOTOERROR(ParseJsonFile(filePath, true), "Error parsing eosinstaller JSON file.");
 
-    // Radu: remove this at some point
-    // Hardcoded path to working eosinstaller image
-    if (m_installerImage.version == L"2.6.2") {
-        m_installerImage.compressedSize = 0x2D921F94; // eosinstaller-eos2.6-i386-i386.160526-202533.base.img.gz size in bytes
-        m_installerImage.extractedSize = 0xB2DCC000; // eosinstaller-eos2.6-i386-i386.160526-202533.base.img.gz extracted size in bytes
-        m_installerImage.urlFile = L"eosinstaller-i386-i386/eos2.6/base/160526-202533/eosinstaller-eos2.6-i386-i386.160526-202533.base.img.gz";
-        m_installerImage.urlSignature = L"eosinstaller-i386-i386/eos2.6/base/160526-202533/eosinstaller-eos2.6-i386-i386.160526-202533.base.img.gz.asc";
+        // Radu: remove this at some point
+        // Hardcoded path to working eosinstaller image
+        if (m_installerImage.version == L"2.6.2") {
+            m_installerImage.compressedSize = 0x2D921F94; // eosinstaller-eos2.6-i386-i386.160526-202533.base.img.gz size in bytes
+            m_installerImage.extractedSize = 0xB2DCC000; // eosinstaller-eos2.6-i386-i386.160526-202533.base.img.gz extracted size in bytes
+            m_installerImage.urlFile = L"eosinstaller-i386-i386/eos2.6/base/160526-202533/eosinstaller-eos2.6-i386-i386.160526-202533.base.img.gz";
+            m_installerImage.urlSignature = L"eosinstaller-i386-i386/eos2.6/base/160526-202533/eosinstaller-eos2.6-i386-i386.160526-202533.base.img.gz.asc";
+        }
     }
 
     // Radu: Maybe move this to another method to separate UI from logic
