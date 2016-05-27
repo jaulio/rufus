@@ -8,6 +8,9 @@ extern "C" {
 
 #define DOWNLOAD_JOB_PREFIX _T("Endless")
 
+#define MINIMUM_RETRY_DELAY_SEC     20
+#define NO_PROGRESS_TIMEOUT_SEC     600
+
 volatile ULONG DownloadManager::m_refCount = 0;
 
 DownloadManager::DownloadManager()
@@ -127,6 +130,11 @@ usecurrentjob:
     if (currentJob == NULL) {
         hr = m_bcManager->CreateJob(jobName, BG_JOB_TYPE_DOWNLOAD, &jobId, &currentJob);
         IFFALSE_GOTOERROR(SUCCEEDED(hr), "Error creating instance of IBackgroundCopyJob.");
+
+        hr = currentJob->SetMinimumRetryDelay(MINIMUM_RETRY_DELAY_SEC);
+        IFFALSE_PRINTERROR(SUCCEEDED(hr), "Error on SetMinimumRetryDelay");
+        hr = currentJob->SetNoProgressTimeout(NO_PROGRESS_TIMEOUT_SEC);
+        IFFALSE_PRINTERROR(SUCCEEDED(hr), "Error on SetNoProgressTimeout");
 
         for (auto url = urls.begin(), file = files.begin(); url != urls.end(); url++, file++) {
             uprintf("Adding download [%ls]->[%ls]", *url, *file);
