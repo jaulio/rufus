@@ -9,7 +9,7 @@ msgstr ""
 "Project-Id-Version: rufus\n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2016-03-08 02:28+0000\n"
-"PO-Revision-Date: 2016-05-25 23:49+0000\n"
+"PO-Revision-Date: 2016-05-26 19:23+0000\n"
 "Last-Translator: Roddy Shuler <roddy@endlessm.com>\n"
 "Language-Team: French (http://www.transifex.com/endless-mobile-inc/rufus/language/fr/)\n"
 "MIME-Version: 1.0\n"
@@ -177,10 +177,6 @@ msgctxt "CloseAppButton"
 msgid "Close"
 msgstr "Fermer"
 
-msgctxt "ThankYouMessage"
-msgid "Great! Your Endless USB device has been successfully created."
-msgstr "Félicitations ! Votre stockage USB est maintenant prêt pour Endless."
-
 msgctxt "InstallerVersion"
 msgid "Version:"
 msgstr "Version :"
@@ -267,7 +263,7 @@ msgstr "Endless – Annulation"
 
 msgctxt "MSG_095"
 msgid "Endless Image"
-msgstr ""
+msgstr "Image Perpétuelle"
 
 msgctxt "MSG_105"
 msgid ""
@@ -277,7 +273,7 @@ msgstr "Annuler peut laisser le dispositif dans un état INUTILISABLE.\nSi vous 
 
 msgctxt "MSG_107"
 msgid "All files"
-msgstr ""
+msgstr "Tous les fichiers"
 
 msgctxt "MSG_201"
 msgid "Cancelling, please wait"
@@ -346,6 +342,27 @@ msgstr "https://support.endlessm.com/hc/en-us"
 msgctxt "MSG_315"
 msgid "%s Download"
 msgstr "Téléchargement : %s"
+
+msgctxt "MSG_316"
+msgid "Full"
+msgstr "Full"
+
+msgctxt "MSG_317"
+msgid "Live"
+msgstr "Live"
+
+msgctxt "MSG_318"
+msgid "Installer"
+msgstr "Installateur"
+
+msgctxt "MSG_319"
+msgid "%ls (%s)"
+msgstr "%ls (%s)"
+
+msgctxt "MSG_320"
+msgid ""
+"Great! Your Endless OS %ls %ls %ls %ls USB has been successfully created."
+msgstr "Super ! Ton USB %ls %ls %ls %ls OS Perpétuel a été créé avec succès."
 
 msgctxt "MSG_400"
 msgid "Light"

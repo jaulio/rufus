@@ -162,10 +162,6 @@ msgctxt "CloseAppButton"
 msgid "Close"
 msgstr ""
 
-msgctxt "ThankYouMessage"
-msgid "Great! Your Endless USB device has been successfully created."
-msgstr ""
-
 msgctxt "InstallerVersion"
 msgid "Version:"
 msgstr ""
@@ -324,6 +320,26 @@ msgstr ""
 
 msgctxt "MSG_315"
 msgid "%s Download"
+msgstr ""
+
+msgctxt "MSG_316"
+msgid "Full"
+msgstr ""
+
+msgctxt "MSG_317"
+msgid "Live"
+msgstr ""
+
+msgctxt "MSG_318"
+msgid "Installer"
+msgstr ""
+
+msgctxt "MSG_319"
+msgid "%ls (%s)"
+msgstr ""
+
+msgctxt "MSG_320"
+msgid "Great! Your Endless OS %ls %ls %ls %ls USB has been successfully created."
 msgstr ""
 
 msgctxt "MSG_400"

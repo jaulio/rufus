@@ -9,7 +9,7 @@ msgstr ""
 "Project-Id-Version: rufus\n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2016-03-08 02:28+0000\n"
-"PO-Revision-Date: 2016-05-25 23:21+0000\n"
+"PO-Revision-Date: 2016-05-26 17:52+0000\n"
 "Last-Translator: Roddy Shuler <roddy@endlessm.com>\n"
 "Language-Team: Bengali (http://www.transifex.com/endless-mobile-inc/rufus/language/bn/)\n"
 "MIME-Version: 1.0\n"
@@ -177,10 +177,6 @@ msgctxt "CloseAppButton"
 msgid "Close"
 msgstr ""
 
-msgctxt "ThankYouMessage"
-msgid "Great! Your Endless USB device has been successfully created."
-msgstr ""
-
 msgctxt "InstallerVersion"
 msgid "Version:"
 msgstr ""
@@ -345,6 +341,27 @@ msgstr "https://support.endlessm.com/hc/en-us"
 
 msgctxt "MSG_315"
 msgid "%s Download"
+msgstr ""
+
+msgctxt "MSG_316"
+msgid "Full"
+msgstr "Full"
+
+msgctxt "MSG_317"
+msgid "Live"
+msgstr "Live"
+
+msgctxt "MSG_318"
+msgid "Installer"
+msgstr ""
+
+msgctxt "MSG_319"
+msgid "%ls (%s)"
+msgstr ""
+
+msgctxt "MSG_320"
+msgid ""
+"Great! Your Endless OS %ls %ls %ls %ls USB has been successfully created."
 msgstr ""
 
 msgctxt "MSG_400"
