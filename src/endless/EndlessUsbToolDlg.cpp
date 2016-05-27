@@ -389,6 +389,11 @@ void CEndlessUsbToolDlg::OnDocumentComplete(LPDISPATCH pDisp, LPCTSTR szUrl)
 	ApplyRufusLocalization(); //apply_localization(IDD_ENDLESSUSBTOOL_DIALOG, GetSafeHwnd());
     UpdateFileEntries(true);
 
+    if (nWindowsVersion == WINDOWS_XP) {
+        CallJavascript(_T(JS_ENABLE_BUTTON), CComVariant(HTML_BUTTON_ID(_T(ELEMENT_INSTALL_BUTTON))), CComVariant(FALSE));
+    }
+
+
 	return;
 error:
 	uprintf("OnDocumentComplete Exit with error");
@@ -2305,6 +2310,8 @@ void CEndlessUsbToolDlg::LeavingDevicesPage()
 // Install Page Handlers
 HRESULT CEndlessUsbToolDlg::OnInstallCancelClicked(IHTMLElement* pElement)
 {
+    if (IsButtonDisabled(pElement)) return S_OK;
+
     if (!CancelInstall()) {
         CallJavascript(_T(JS_ENABLE_BUTTON), CComVariant(HTML_BUTTON_ID(_T(ELEMENT_INSTALL_CANCEL))), CComVariant(FALSE));
         return S_OK;
