@@ -105,6 +105,9 @@
     <ClInclude Include="Version.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="gpt\crc32.h">
+      <Filter>Header Files\gpt</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="EndlessUsbTool.cpp">
@@ -175,6 +178,9 @@
     </ClCompile>
     <ClCompile Include="PGPSignature.cpp">
       <Filter>Source Files\pgp</Filter>
+    </ClCompile>
+    <ClCompile Include="gpt\crc32.c">
+      <Filter>Source Files\gpt</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

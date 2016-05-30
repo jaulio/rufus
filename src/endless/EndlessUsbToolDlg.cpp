@@ -2743,7 +2743,7 @@ ULONGLONG CEndlessUsbToolDlg::GetExtractedSize(const CString& filename)
     else return 0;
 
     CStringA asciiFileName(filename);
-    return get_archive_disk_image_size(asciiFileName, compression_type);
+    return get_eos_archive_disk_image_size(asciiFileName, compression_type);
 }
 
 void CEndlessUsbToolDlg::GetIEVersion()

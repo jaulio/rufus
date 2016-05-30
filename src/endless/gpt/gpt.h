@@ -69,10 +69,11 @@ PACK(struct ptable {
     struct gpt_partition partitions[4]; // we only care about the first 4 partitions   
 });
 
-uint64_t get_archive_disk_image_size(const char *filepath, int compression_type);
+uint64_t get_eos_archive_disk_image_size(const char *filepath, int compression_type);
+int is_eos_gpt_valid(struct ptable *pt);
+uint8_t is_nth_flag_set(uint64_t flags, uint8_t n);
 
 #ifdef DEBUG_PRINTS
-uint8_t is_nth_flag_set(uint64_t flags, uint8_t n);
 void attributes_to_ascii(const uint8_t *attr, char *s);
 void guid_to_ascii(const uint8_t *guid, char *s);
 void gpt_header_show(const char *msg, const struct gpt_header *header);
