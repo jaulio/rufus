@@ -37,6 +37,9 @@
     <Filter Include="Source Files\pgp">
       <UniqueIdentifier>{d407e9f3-1a5a-4e7c-a316-bad5af8b4dce}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Resource Files\Fonts">
+      <UniqueIdentifier>{eb816419-08c4-478e-975e-0f629f716a0a}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <Text Include="ReadMe.txt" />
@@ -196,14 +199,30 @@
     <None Include="res\EndlessUsbTool.js">
       <Filter>Resource Files</Filter>
     </None>
-    <None Include="res\endless.loc" />
-    <None Include="..\..\res\uefi\uefi-ntfs.img" />
-    <None Include="res\EndlessFonts.css" />
-    <None Include="res\fonts\eot\Lato-Regular.eot" />
-    <None Include="res\fonts\eot\Lato-Medium.eot" />
-    <None Include="res\fonts\eot\Lato-Bold.eot" />
-    <None Include="res\fonts\eot\Lato-Black.eot" />
-    <None Include="res\fonts\eot\Lato-Light.eot" />
+    <None Include="res\fonts\eot\Lato-Black.eot">
+      <Filter>Resource Files\Fonts</Filter>
+    </None>
+    <None Include="res\fonts\eot\Lato-Bold.eot">
+      <Filter>Resource Files\Fonts</Filter>
+    </None>
+    <None Include="res\fonts\eot\Lato-Light.eot">
+      <Filter>Resource Files\Fonts</Filter>
+    </None>
+    <None Include="res\fonts\eot\Lato-Medium.eot">
+      <Filter>Resource Files\Fonts</Filter>
+    </None>
+    <None Include="res\fonts\eot\Lato-Regular.eot">
+      <Filter>Resource Files\Fonts</Filter>
+    </None>
+    <None Include="res\EndlessFonts.css">
+      <Filter>Resource Files</Filter>
+    </None>
+    <None Include="..\..\res\uefi\uefi-ntfs.img">
+      <Filter>Resource Files</Filter>
+    </None>
+    <None Include="res\endless.loc">
+      <Filter>Resource Files</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="EndlessUsbTool.rc">
@@ -240,10 +259,20 @@
     </Image>
   </ItemGroup>
   <ItemGroup>
-    <Font Include="res\fonts\ttf\Lato-Regular.ttf" />
-    <Font Include="res\fonts\ttf\Lato-Medium.ttf" />
-    <Font Include="res\fonts\ttf\Lato-Bold.ttf" />
-    <Font Include="res\fonts\ttf\Lato-Black.ttf" />
-    <Font Include="res\fonts\ttf\Lato-Light.ttf" />
+    <Font Include="res\fonts\ttf\Lato-Black.ttf">
+      <Filter>Resource Files\Fonts</Filter>
+    </Font>
+    <Font Include="res\fonts\ttf\Lato-Bold.ttf">
+      <Filter>Resource Files\Fonts</Filter>
+    </Font>
+    <Font Include="res\fonts\ttf\Lato-Light.ttf">
+      <Filter>Resource Files\Fonts</Filter>
+    </Font>
+    <Font Include="res\fonts\ttf\Lato-Medium.ttf">
+      <Filter>Resource Files\Fonts</Filter>
+    </Font>
+    <Font Include="res\fonts\ttf\Lato-Regular.ttf">
+      <Filter>Resource Files\Fonts</Filter>
+    </Font>
   </ItemGroup>
 </Project>

@@ -40,7 +40,7 @@ b {
 	padding-bottom: 6px;
 	text-align: center;
 	width: 100%;
-	height: 100%;
+	height: 17px; /* .Button.height - padding-top - padding-bottom */
 	background: #fafafa; /*older than IE6 */
 	filter: progid:DXImageTransform.Microsoft.gradient( startColorstr='#fafafa', endColorstr='#e0e0e0', GradientType=0); /* IE6-9 */
 	background-image: linear-gradient(to bottom, #fafafa, #ededed 40%, #e0e0e0); /* IE10+ */
@@ -52,6 +52,10 @@ b {
 	font-size: 13px;
 	font-family: LatoMedium;
 	letter-spacing: 0.5px;
+}
+
+.Button div:not([maxIE8]) {
+	height: 100%;
 }
 
 .Button div:hover {
