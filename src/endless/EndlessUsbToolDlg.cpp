@@ -336,6 +336,7 @@ CEndlessUsbToolDlg::CEndlessUsbToolDlg(CWnd* pParent /*=NULL*/)
     m_FilesChangedHandle(INVALID_HANDLE_VALUE),
     m_fileScanThread(INVALID_HANDLE_VALUE),
     m_operationThread(INVALID_HANDLE_VALUE),
+    m_downloadUpdateThread(INVALID_HANDLE_VALUE),
     m_spStatusElem(NULL),
     m_spWindowElem(NULL),
     m_dispexWindow(NULL),
@@ -581,10 +582,11 @@ BOOL CEndlessUsbToolDlg::OnInitDialog()
 void CEndlessUsbToolDlg::Uninit()
 {
     int handlesCount = 0;
-    HANDLE handlesToWaitFor[2];
+    HANDLE handlesToWaitFor[3];
     
     if (m_fileScanThread != INVALID_HANDLE_VALUE) handlesToWaitFor[handlesCount++] = m_fileScanThread;
     if (m_operationThread != INVALID_HANDLE_VALUE) handlesToWaitFor[handlesCount++] = m_operationThread;
+    if (m_downloadUpdateThread != INVALID_HANDLE_VALUE) handlesToWaitFor[handlesCount++] = m_downloadUpdateThread;
 
     if (handlesCount > 0) {
         SetEvent(m_cancelOperationEvent);
@@ -1586,7 +1588,7 @@ checkEntries:
         // start the change notifications thread
         if (hasLocalImages && m_fileScanThread == INVALID_HANDLE_VALUE) {
             m_fileScanThread = CreateThread(NULL, 0, CEndlessUsbToolDlg::FileScanThread, (LPVOID)this, 0, NULL);
-        }        
+        }
         
         CallJavascript(_T(JS_SHOW_ELEMENT), CComVariant(ELEMENT_LOCAL_FILES_FOUND), CComVariant(hasLocalImages));
         CallJavascript(_T(JS_SHOW_ELEMENT), CComVariant(ELEMENT_LOCAL_FILES_NOT_FOUND), CComVariant(!hasLocalImages));
@@ -1680,9 +1682,6 @@ void CEndlessUsbToolDlg::StartJSONDownload()
         // RADU: add error handling so we at least show the user there was an error starting the download
         status = m_downloadManager.AddDownload(DownloadType_t::DownloadTypeReleseJson, urls, files, false);
     }
-
-    // RADU: add error handling so we at least show the user there was an error starting the download
-    //status = m_downloadManager.AddDownload(DownloadType_t::DownloadTypeReleseJson, urls, files, false);
 }
 
 #define JSON_IMAGES             "images"
@@ -1767,6 +1766,7 @@ bool CEndlessUsbToolDlg::ParseJsonFile(LPCTSTR filename, bool isInstallerJson)
 
     if (!latestEntry.isNull()) {
         uprintf("Selected version '%ls'", latestVersion);
+        m_downloadManager.SetLatestEosVersion(latestVersion);
         uint32_t personalityMsgId = 0;
         personalities = latestEntry[JSON_IMG_PERSONALITIES];
         for (Json::ValueIterator persIt = personalities.begin(); persIt != personalities.end(); persIt++) {
@@ -2193,6 +2193,11 @@ HRESULT CEndlessUsbToolDlg::OnSelectUSBNextClicked(IHTMLElement* pElement)
                     return S_OK;
                 }
             }
+        }
+
+        // Create a thread to poll the download progress regularly as the event based BITS one is very irregular
+        if (m_downloadUpdateThread == INVALID_HANDLE_VALUE) {
+            m_downloadUpdateThread = CreateThread(NULL, 0, CEndlessUsbToolDlg::UpdateDownloadProgressThread, (LPVOID)this, 0, NULL);
         }
 
         // add remote installer data to local installer data
@@ -2759,4 +2764,63 @@ void CEndlessUsbToolDlg::GetIEVersion()
     CString version = versionValue;
     version = version.Left(version.Find(L'.'));
     m_ieVersion = _wtoi(version);
+}
+
+
+DWORD WINAPI CEndlessUsbToolDlg::UpdateDownloadProgressThread(void* param)
+{
+    CComPtr<IBackgroundCopyManager> bcManager;
+    CComPtr<IBackgroundCopyJob> currentJob;
+    DownloadStatus_t *downloadStatus = NULL;
+    CEndlessUsbToolDlg *dlg = (CEndlessUsbToolDlg*)param;
+    RemoteImageEntry_t remote;
+    DownloadType_t downloadType = dlg->GetSelectedDownloadType();
+    POSITION pos = dlg->m_remoteImages.FindIndex(dlg->m_selectedRemoteIndex);
+    CString jobName;
+
+    IFFALSE_RETURN_VALUE(pos != NULL, "Index value not valid.", 0);
+    remote = dlg->m_remoteImages.GetAt(pos);
+
+    // Specify the appropriate COM threading model for your application.
+    HRESULT hr = CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
+    IFFALSE_GOTO(SUCCEEDED(hr), "Error on calling CoInitializeEx", done);
+
+    hr = CoCreateInstance(__uuidof(BackgroundCopyManager), NULL, CLSCTX_LOCAL_SERVER, __uuidof(IBackgroundCopyManager), (void**)&bcManager);
+    IFFALSE_GOTO(SUCCEEDED(hr), "Error creating instance of BackgroundCopyManager.", done);
+
+    jobName = DownloadManager::GetJobName(downloadType);
+    jobName += remote.downloadJobName;
+    IFFALSE_GOTO(SUCCEEDED(DownloadManager::GetExistingJob(bcManager, jobName, currentJob)), "No download job found", done);
+
+    while (TRUE)
+    {
+        DWORD dwStatus = WaitForSingleObject(dlg->m_cancelOperationEvent, 2000);
+        switch (dwStatus) {
+            case WAIT_OBJECT_0:
+            {
+                uprintf("CEndlessUsbToolDlg::UpdateDownloadProgressThread cancel requested");
+                goto done;
+                break;
+            }
+            case WAIT_TIMEOUT:
+            {
+                downloadStatus = new DownloadStatus_t;
+                downloadStatus->done = false;
+                downloadStatus->error = false;
+                bool result = dlg->m_downloadManager.GetDownloadProgress(currentJob, downloadStatus, jobName);
+                if (!result || downloadStatus->done || downloadStatus->error) {
+                    uprintf("CEndlessUsbToolDlg::UpdateDownloadProgressThread - Exiting");
+                    delete downloadStatus;
+                    goto done;
+                }
+                ::PostMessage(dlg->m_hWnd, WM_FILE_DOWNLOAD_STATUS, (WPARAM)downloadStatus, 0);
+                break;
+            }
+        }
+    }
+
+done:
+
+    CoUninitialize();
+    return 0;
 }

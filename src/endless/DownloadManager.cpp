@@ -17,6 +17,7 @@ DownloadManager::DownloadManager()
 {
     m_bcManager = NULL;
     m_PendingJobModificationCount = 0;
+    m_latestEosVersion = "";
 }
 
 DownloadManager::~DownloadManager()
@@ -87,7 +88,7 @@ bool DownloadManager::AddDownload(DownloadType_t type, ListOfStrings urls, ListO
         uprintf("Error: AddDownload NO SUFFIX ADDED");
     }
         
-    IFFALSE_GOTO(SUCCEEDED(GetExistingJob(jobName, currentJob)), "No previous download job found", usecurrentjob);
+    IFFALSE_GOTO(SUCCEEDED(GetExistingJob(m_bcManager, jobName, currentJob)), "No previous download job found", usecurrentjob);
     IFFALSE_GOTO(resumeExisting, "Canceling exiting download on request.", canceljob);
     
     if (currentJob != NULL) {
@@ -241,6 +242,7 @@ STDMETHODIMP DownloadManager::JobError(IBackgroundCopyJob *pJob, IBackgroundCopy
         if (pszJobName && pszErrorDescription)
         {
             //Do something with the job name and description. 
+            uprintf("Error on download %ls: [%ls]", pszJobName, pszErrorDescription);
         }
 
         CoTaskMemFree(pszJobName);
@@ -369,7 +371,7 @@ HRESULT DownloadManager::QueryInterface(REFIID riid, LPVOID *ppvObj)
 
 // Helper methods
 
-HRESULT DownloadManager::GetExistingJob(LPCWSTR jobName, CComPtr<IBackgroundCopyJob> &existingJob)
+HRESULT DownloadManager::GetExistingJob(CComPtr<IBackgroundCopyManager> &bcManager, LPCWSTR jobName, CComPtr<IBackgroundCopyJob> &existingJob)
 {
     CComPtr<IEnumBackgroundCopyJobs> enumJobs;
     CComPtr<IBackgroundCopyJob> job;
@@ -379,7 +381,9 @@ HRESULT DownloadManager::GetExistingJob(LPCWSTR jobName, CComPtr<IBackgroundCopy
     LPWSTR displayName = NULL;
     BG_JOB_STATE state;
 
-    hr = m_bcManager->EnumJobs(0, &enumJobs);
+    IFFALSE_GOTOERROR(bcManager != NULL, "Manager or job is NULL. Nothing to uninit.");
+
+    hr = bcManager->EnumJobs(0, &enumJobs);
     IFFALSE_GOTOERROR(SUCCEEDED(hr), "Error calling EnumJobs.");
     
     hr = enumJobs->GetCount(&jobCount);
@@ -440,7 +444,8 @@ void DownloadManager::ClearExtraDownloadJobs()
         hr = job->GetDisplayName(&displayName);
         IFFALSE_CONTINUE(SUCCEEDED(hr), "Error querying for display name.");
         if (displayName == _tcsstr(displayName, DOWNLOAD_JOB_PREFIX)) {
-            if (NULL == foundJobs.Find(displayName)) {
+            bool cancelJob = m_latestEosVersion != _T("") && NULL == _tcsstr(displayName, m_latestEosVersion);
+            if (!cancelJob && NULL == foundJobs.Find(displayName)) {
                 foundJobs.AddTail(displayName);
                 job->Suspend();
                 uprintf("Suspending job %d name %ls", index, displayName);
@@ -464,4 +469,34 @@ error:
 CString DownloadManager::GetJobName(DownloadType_t type)
 {
     return CString(DOWNLOAD_JOB_PREFIX) + DownloadTypeToString(type);
+}
+
+bool DownloadManager::GetDownloadProgress(CComPtr<IBackgroundCopyJob> &currentJob, DownloadStatus_t *downloadStatus, const CString &jobName)
+{
+    HRESULT hr;
+    BG_JOB_STATE State;
+    bool result = false;
+
+    hr = currentJob->GetState(&State);
+    IFFALSE_GOTOERROR(SUCCEEDED(hr), "Error querying for job state");
+
+    switch (State) {
+    case BG_JOB_STATE_TRANSFERRED:
+    case BG_JOB_STATE_ACKNOWLEDGED:
+    case BG_JOB_STATE_SUSPENDED:
+        downloadStatus->done = true;
+        break;
+    case BG_JOB_STATE_ERROR:
+    case BG_JOB_STATE_CANCELLED:
+        downloadStatus->error = true;
+        break;
+    }
+    downloadStatus->jobName = jobName;
+
+    hr = currentJob->GetProgress(&downloadStatus->progress);
+    IFFALSE_GOTOERROR(SUCCEEDED(hr), "Error querying for job progress");
+
+    result = true;
+error:
+    return result;
 }

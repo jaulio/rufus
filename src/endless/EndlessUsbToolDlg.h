@@ -114,6 +114,7 @@ private:
     HANDLE m_closeAppEvent;
     HANDLE m_fileScanThread;
     HANDLE m_operationThread;
+    HANDLE m_downloadUpdateThread;
     bool m_useLocalFile;
     long m_selectedRemoteIndex;
     long m_baseImageRemoteIndex;
@@ -185,7 +186,7 @@ private:
     static bool FileHashingCallback(__int64 currentSize, __int64 totalSize, LPVOID context);
     
     static DWORD WINAPI FileCopyThread(void* param);
-    static DWORD CALLBACK CEndlessUsbToolDlg::CopyProgressRoutine(
+    static DWORD CALLBACK CopyProgressRoutine(
         LARGE_INTEGER TotalFileSize,
         LARGE_INTEGER TotalBytesTransferred,
         LARGE_INTEGER StreamSize,
@@ -203,4 +204,6 @@ private:
     static ULONGLONG GetExtractedSize(const CString& filename);
 
     void GetIEVersion();
+
+    static DWORD WINAPI UpdateDownloadProgressThread(void* param);
 };

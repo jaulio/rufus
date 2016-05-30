@@ -54,6 +54,9 @@ public:
 
     static CString GetJobName(DownloadType_t type);
 
+    static bool GetDownloadProgress(CComPtr<IBackgroundCopyJob> &currentJob, DownloadStatus_t *downloadStatus, const CString &jobName);
+    static HRESULT GetExistingJob(CComPtr<IBackgroundCopyManager> &bcManager, LPCWSTR jobName, CComPtr<IBackgroundCopyJob> &existingJob);
+
     // IUnknown implementation
     DECLARE_IUNKNOWN;
 
@@ -62,6 +65,11 @@ public:
     STDMETHOD(JobError)(IBackgroundCopyJob *pJob, IBackgroundCopyError *pError);
     STDMETHOD(JobModification)(IBackgroundCopyJob *JobModification, DWORD dwReserved);
 
+    void SetLatestEosVersion(CString latestEosVersion)
+    {
+        m_latestEosVersion = latestEosVersion;
+    }
+
 private:
     LONG m_PendingJobModificationCount;
     static volatile ULONG m_refCount;
@@ -69,7 +77,7 @@ private:
     DWORD m_statusMsgId;
     CComPtr<IBackgroundCopyManager> m_bcManager;
     CComPtr<IBackgroundCopyJob> m_bcReleaseJson;
+    CString m_latestEosVersion;
 
-    HRESULT GetExistingJob(LPCWSTR jobName, CComPtr<IBackgroundCopyJob> &existingJob);
     void ClearExtraDownloadJobs();
 };
