@@ -102,6 +102,9 @@
     <ClInclude Include="PGPSignature.h">
       <Filter>Header Files\pgp</Filter>
     </ClInclude>
+    <ClInclude Include="Version.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="EndlessUsbTool.cpp">

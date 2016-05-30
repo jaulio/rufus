@@ -12,6 +12,7 @@
 
 #include "json/json.h"
 #include <fstream>
+#include "Version.h"
 
 // Rufus include files
 extern "C" {
@@ -140,6 +141,8 @@ BOOL FormatDrive(DWORD DriveIndex);
 #define ELEMENT_ERROR_MESSAGE           "ErrorMessage"
 #define ELEMENT_ERROR_CLOSE_BUTTON      "CloseAppButton1"
 #define ELEMENT_ENDLESS_SUPPORT         "EndlessSupport"
+
+#define ELEMENT_VERSION_CONTAINER          "VersionContainer"
 
 // Javascript methods
 #define JS_SET_PROGRESS                 "setProgress"
@@ -393,6 +396,7 @@ void CEndlessUsbToolDlg::OnDocumentComplete(LPDISPATCH pDisp, LPCTSTR szUrl)
         CallJavascript(_T(JS_ENABLE_BUTTON), CComVariant(HTML_BUTTON_ID(_T(ELEMENT_INSTALL_BUTTON))), CComVariant(FALSE));
     }
 
+    SetElementText(_T(ELEMENT_VERSION_CONTAINER), CComBSTR(RELEASE_VER_STR));
 
 	return;
 error:
