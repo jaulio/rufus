@@ -64,7 +64,8 @@
                 <div class="FullWidthContent PageSubtitle">
 					<div id="SelectFileSubtitle">Select the Endless OS version you'd like to install.</div>
 					<div id="NoInternetConnection" class="hidden">
-						<span id="OfflineText">You are offline.</span> <span id="ExtraOfflineText">Change your Network Settings to connect to the Internet.</span>
+						<div id="NoInternetConnectionTitle">Unfortunately, there is a problem connecting to the server.</div>
+						<div id="NoInternetConnectionSubtitle">Make sure you're <a id='ConnectedLink'>connected to the internet</a>, and if the problem persists, visit our <a id='ConnectedSupportLink'>support</a>.</div>
 					</div>
 				</div>
 				<div class="ContentContainer hidden" id="SelectFileLocalPresent">
@@ -76,8 +77,8 @@
                     
                     <div class="ContentTitle" id="DownloadNewImage">Download new file:</div>
                     <input type="radio" name="OperatingSystemType" id="OperatingSystemTypeOnline" disabled="disabled"/>
-                    <select id="OnlineImagesSelect" onclick="selectImageClicked('OperatingSystemTypeOnline');" disabled="disabled">                        
-                    </select>                    
+                    <select id="OnlineImagesSelect" onclick="selectImageClicked('OperatingSystemTypeOnline');" disabled="disabled">
+                    </select>
                 </div>
 				
 				<div class="ContentContainer" id="SelectFileLocalNotPresent">

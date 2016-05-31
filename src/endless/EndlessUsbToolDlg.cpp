@@ -114,6 +114,12 @@ BOOL FormatDrive(DWORD DriveIndex);
 #define ELEMENT_DOWNLOAD_LIGHT_SIZE     "LightDownloadSubtitle"
 #define ELEMENT_DOWNLOAD_FULL_SIZE      "FullDownloadSubtitle"
 
+#define ELEMENT_CONNECTED_LINK          "ConnectedLink"
+#define ELEMENT_CONNECTED_SUPPORT_LINK  "ConnectedSupportLink"
+
+#define ELEMENT_SET_FILE_TITLE          "SelectFilePageTitle"
+#define ELEMENT_SET_FILE_SUBTITLE       "SelectFileSubtitle"
+
 //Select USB page elements
 #define ELEMENT_SELUSB_PREV_BUTTON      "SelectUSBPreviousButton"
 #define ELEMENT_SELUSB_NEXT_BUTTON      "SelectUSBNextButton"
@@ -179,6 +185,7 @@ enum custom_message {
     WM_FINISHED_FILE_VERIFICATION,
     WM_FINISHED_FILE_COPY,
     WM_FINISHED_ALL_OPERATIONS,
+    WM_INTERNET_CONNECTION_STATE,
 };
 
 enum endless_action_type {    
@@ -209,6 +216,10 @@ const wchar_t* mainWindowTitle = L"Endless USB Creator";
 // Radu: How much do we need to reserve for the exfat partition header?
 // reserve 10 mb for now; this will also include the signature file
 #define INSTALLER_DELTA_SIZE (10*1024*1024)
+
+
+#define UPDATE_DOWNLOAD_PROGRESS_TIME       2000
+#define CHECK_INTERNET_CONNECTION_TIME      5000
 
 // utility method for quick char* UTF8 conversion to BSTR
 CComBSTR UTF8ToBSTR(const char *txt) {
@@ -297,6 +308,9 @@ BEGIN_DHTML_EVENT_MAP(CEndlessUsbToolDlg)
     DHTML_EVENT_ONCLICK(_T(ELEMENT_DOWNLOAD_LIGHT_BUTTON), OnDownloadLightButtonClicked)
     DHTML_EVENT_ONCLICK(_T(ELEMENT_DOWNLOAD_FULL_BUTTON), OnDownloadFullButtonClicked)
 
+    DHTML_EVENT_ONCLICK(_T(ELEMENT_CONNECTED_LINK), OnLinkClicked)
+    DHTML_EVENT_ONCLICK(_T(ELEMENT_CONNECTED_SUPPORT_LINK), OnLinkClicked)
+
 	// Select USB Page handlers
 	DHTML_EVENT_ONCLICK(_T(ELEMENT_SELUSB_PREV_BUTTON), OnSelectUSBPreviousClicked)
 	DHTML_EVENT_ONCLICK(_T(ELEMENT_SELUSB_NEXT_BUTTON), OnSelectUSBNextClicked)
@@ -338,6 +352,7 @@ CEndlessUsbToolDlg::CEndlessUsbToolDlg(UINT globalMessage, CWnd* pParent /*=NULL
     m_fileScanThread(INVALID_HANDLE_VALUE),
     m_operationThread(INVALID_HANDLE_VALUE),
     m_downloadUpdateThread(INVALID_HANDLE_VALUE),
+    m_checkConnectionThread(INVALID_HANDLE_VALUE),
     m_spStatusElem(NULL),
     m_spWindowElem(NULL),
     m_dispexWindow(NULL),
@@ -350,7 +365,8 @@ CEndlessUsbToolDlg::CEndlessUsbToolDlg(UINT globalMessage, CWnd* pParent /*=NULL
     m_cancelOperationEvent(CreateEvent(NULL, TRUE, FALSE, NULL)),
     m_closeRequested(false),
     m_ieVersion(0),
-    m_globalWndMessage(globalMessage)
+    m_globalWndMessage(globalMessage),
+    m_isConnected(false)
 {
     m_hIcon = AfxGetApp()->LoadIcon(IDR_MAINFRAME);    
 
@@ -400,6 +416,10 @@ void CEndlessUsbToolDlg::OnDocumentComplete(LPDISPATCH pDisp, LPCTSTR szUrl)
     }
 
     SetElementText(_T(ELEMENT_VERSION_CONTAINER), CComBSTR(RELEASE_VER_STR));
+
+    if (m_checkConnectionThread == INVALID_HANDLE_VALUE) {
+        m_checkConnectionThread = CreateThread(NULL, 0, CEndlessUsbToolDlg::CheckInternetConnectionThread, (LPVOID)this, 0, NULL);
+    }
 
 	return;
 error:
@@ -584,11 +604,12 @@ BOOL CEndlessUsbToolDlg::OnInitDialog()
 void CEndlessUsbToolDlg::Uninit()
 {
     int handlesCount = 0;
-    HANDLE handlesToWaitFor[3];
+    HANDLE handlesToWaitFor[4];
     
     if (m_fileScanThread != INVALID_HANDLE_VALUE) handlesToWaitFor[handlesCount++] = m_fileScanThread;
     if (m_operationThread != INVALID_HANDLE_VALUE) handlesToWaitFor[handlesCount++] = m_operationThread;
     if (m_downloadUpdateThread != INVALID_HANDLE_VALUE) handlesToWaitFor[handlesCount++] = m_downloadUpdateThread;
+    if (m_checkConnectionThread != INVALID_HANDLE_VALUE) handlesToWaitFor[handlesCount++] = m_checkConnectionThread;
 
     if (handlesCount > 0) {
         SetEvent(m_cancelOperationEvent);
@@ -1082,6 +1103,21 @@ LRESULT CEndlessUsbToolDlg::WindowProc(UINT message, WPARAM wParam, LPARAM lPara
             FormatStatus = 0;
             break;
         }
+        case WM_INTERNET_CONNECTION_STATE:
+        {
+            bool connected = ((BOOL)wParam) == TRUE;
+            m_isConnected = connected;
+
+            if (m_isConnected) {
+                StartJSONDownload();
+            }
+
+            CallJavascript(_T(JS_ENABLE_DOWNLOAD), CComVariant(m_remoteImages.GetCount() != 0), CComVariant(connected));
+            CallJavascript(_T(JS_ENABLE_BUTTON), CComVariant(HTML_BUTTON_ID(_T(ELEMENT_DOWNLOAD_LIGHT_BUTTON))), CComVariant(connected && (m_baseImageRemoteIndex != -1)));
+
+            break;
+        }
+
         default:
             if (m_globalWndMessage == message) {
                 SetForegroundWindow();
@@ -1219,6 +1255,11 @@ void CEndlessUsbToolDlg::ApplyRufusLocalization()
 			break;
 		}
 	}
+
+    if (m_imageFiles.GetCount() != 0) {
+        SetElementText(_T(ELEMENT_SET_FILE_TITLE), UTF8ToBSTR(lmprintf(MSG_321)));
+        SetElementText(_T(ELEMENT_SET_FILE_SUBTITLE), UTF8ToBSTR(lmprintf(MSG_322)));
+    }
 
 	return;
 }
@@ -1365,8 +1406,11 @@ HRESULT CEndlessUsbToolDlg::OnTryEndlessSelected(IHTMLElement* pElement)
 {
     m_liveInstall = true;
 
+    CComPtr<IHTMLElement> selectElem;
+    HRESULT hr = GetElement(_T(ELEMENT_REMOTE_SELECT), &selectElem);
+    IFFALSE_RETURN_VALUE(SUCCEEDED(hr), "OnTryEndlessSelected: querying for local select element.", S_OK);
+    OnSelectedRemoteFileChanged(selectElem);
     ChangePage(_T(ELEMENT_FIRST_PAGE), _T(ELEMENT_FILE_PAGE));
-    StartJSONDownload();
 
 	return S_OK;
 }
@@ -1376,7 +1420,11 @@ HRESULT CEndlessUsbToolDlg::OnInstallEndlessSelected(IHTMLElement* pElement)
     if (IsButtonDisabled(pElement)) return S_OK;
 
     m_liveInstall = false;
-    StartJSONDownload();
+
+    CComPtr<IHTMLElement> selectElem;
+    HRESULT hr = GetElement(_T(ELEMENT_REMOTE_SELECT), &selectElem);
+    IFFALSE_RETURN_VALUE(SUCCEEDED(hr), "OnInstallEndlessSelected: querying for local select element.", S_OK);
+    OnSelectedRemoteFileChanged(selectElem);
     ChangePage(_T(ELEMENT_FIRST_PAGE), _T(ELEMENT_FILE_PAGE));
 
 	return S_OK;
@@ -1398,8 +1446,10 @@ HRESULT CEndlessUsbToolDlg::OnLinkClicked(IHTMLElement* pElement)
         msg_id = MSG_312;
     } else if (id == _T(ELEMENT_SECUREBOOT_HOWTO) || id == _T(ELEMENT_SECUREBOOT_HOWTO2)) {
         msg_id = MSG_313;
-    } else if (id == _T(ELEMENT_ENDLESS_SUPPORT)) {
+    } else if (id == _T(ELEMENT_ENDLESS_SUPPORT) || id == _T(ELEMENT_CONNECTED_SUPPORT_LINK)) {
         msg_id = MSG_314;
+    } else if (id == _T(ELEMENT_CONNECTED_LINK)) {
+        WinExec("c:\\windows\\system32\\control.exe ncpa.cpl", SW_NORMAL);
     } else {
         msg_id = 0;
         uprintf("Unknown link clicked %ls", id);
@@ -1437,6 +1487,9 @@ HRESULT CEndlessUsbToolDlg::OnLanguageChanged(IHTMLElement* pElement)
 		uprintf("Save locale to settings?");
 
 	ApplyRufusLocalization();
+
+    m_selectedRemoteIndex = -1;
+    UpdateDownloadOptions();
 
 	return S_OK;
 
@@ -1599,6 +1652,11 @@ checkEntries:
         CallJavascript(_T(JS_SHOW_ELEMENT), CComVariant(ELEMENT_LOCAL_FILES_FOUND), CComVariant(hasLocalImages));
         CallJavascript(_T(JS_SHOW_ELEMENT), CComVariant(ELEMENT_LOCAL_FILES_NOT_FOUND), CComVariant(!hasLocalImages));
         CallJavascript(_T(JS_SHOW_ELEMENT), CComVariant(HTML_BUTTON_ID(ELEMENT_SELFILE_NEXT_BUTTON)), CComVariant(hasLocalImages));
+
+        if (hasLocalImages) {
+            SetElementText(_T(ELEMENT_SET_FILE_TITLE), UTF8ToBSTR(lmprintf(MSG_321)));
+            SetElementText(_T(ELEMENT_SET_FILE_SUBTITLE), UTF8ToBSTR(lmprintf(MSG_322)));
+        }
     }
 
     CallJavascript(_T(JS_ENABLE_ELEMENT), CComVariant(_T(ELEMENT_FILES_SELECT)), CComVariant(hasLocalImages));
@@ -1650,44 +1708,30 @@ DWORD WINAPI CEndlessUsbToolDlg::FileScanThread(void* param)
 void CEndlessUsbToolDlg::StartJSONDownload()
 {
     char tmp_path[MAX_PATH] = "";
-    DWORD flags = 0;
-    BOOL result = InternetGetConnectedState(&flags, 0);
     bool status;
 
-    // RADU: poll InternetGetConnectedState to get connection state
-
-    if (result == FALSE) {
-        luprintf("Device not connected to internet [0x%x], error=%s", flags, WindowsErrorString());
-        CallJavascript(_T(JS_ENABLE_DOWNLOAD), CComVariant(FALSE));
+    if (!m_isConnected) {
+        uprintf("Device not connected to internet");
+        CallJavascript(_T(JS_ENABLE_DOWNLOAD), CComVariant(FALSE), CComVariant(FALSE));
         return;
     }
 
-    result = InternetCheckConnection(JSON_URL(JSON_LIVE_FILE), FLAG_ICC_FORCE_CONNECTION, 0);
-    if(result == FALSE) {
-        CallJavascript(_T(JS_ENABLE_DOWNLOAD), CComVariant(FALSE));
-        luprintf("Cannot connect to server to download JSON, error=%d, %s", GetLastError(), WindowsErrorString());
+    if (m_remoteImages.GetCount() != 0) {
+        uprintf("List of remote images already downloaded");
         return;
     }
 
-    //ListOfStrings urls, files;
+    // Addd both JSONs to download, maybe user goes back and switches between Try and Install
     CString liveJson(JSON_PACKED(JSON_LIVE_FILE));
     liveJson = GET_LOCAL_PATH(liveJson);
     CString installerJson(JSON_PACKED(JSON_INSTALLER_FILE));
     installerJson = GET_LOCAL_PATH(installerJson);
 
-    if (m_liveInstall) {
-        ListOfStrings urls = { JSON_URL(JSON_LIVE_FILE) };
-        ListOfStrings files = { liveJson };
+    ListOfStrings urls = { JSON_URL(JSON_LIVE_FILE), JSON_URL(JSON_INSTALLER_FILE) };
+    ListOfStrings files = { liveJson, installerJson };
 
-        // RADU: add error handling so we at least show the user there was an error starting the download
-        status = m_downloadManager.AddDownload(DownloadType_t::DownloadTypeReleseJson, urls, files, false);
-    } else {        
-        ListOfStrings urls = { JSON_URL(JSON_LIVE_FILE), JSON_URL(JSON_INSTALLER_FILE) };
-        ListOfStrings files = { liveJson, installerJson };
-
-        // RADU: add error handling so we at least show the user there was an error starting the download
-        status = m_downloadManager.AddDownload(DownloadType_t::DownloadTypeReleseJson, urls, files, false);
-    }
+    // RADU: add error handling so we at least show the user there was an error starting the download
+    status = m_downloadManager.AddDownload(DownloadType_t::DownloadTypeReleseJson, urls, files, false);
 }
 
 #define JSON_IMAGES             "images"
@@ -1855,11 +1899,12 @@ void CEndlessUsbToolDlg::UpdateDownloadOptions()
 
     // add options to UI
     bool updatedFullSize = false;
+    long selectIndex = -1;
     CallJavascript(_T(JS_ENABLE_BUTTON), CComVariant(HTML_BUTTON_ID(_T(ELEMENT_DOWNLOAD_LIGHT_BUTTON))), CComVariant(FALSE));
     for (POSITION pos = m_remoteImages.GetHeadPosition(); pos != NULL; ) {
         RemoteImageEntry_t imageEntry = m_remoteImages.GetNext(pos);
-        long selectIndex = 0;
         bool matchesLanguage = languagePersonalty == imageEntry.personality;
+
         hr = AddEntryToSelect(_T(ELEMENT_REMOTE_SELECT), CComBSTR(""), CComBSTR(imageEntry.displayName), &selectIndex, matchesLanguage);
         IFFALSE_PRINTERROR(SUCCEEDED(hr), "Error adding remote image to list.");
 
@@ -1889,7 +1934,7 @@ void CEndlessUsbToolDlg::UpdateDownloadOptions()
     }
 
     bool foundRemoteImages = m_remoteImages.GetCount() != 0;
-    hr = CallJavascript(_T(JS_ENABLE_DOWNLOAD), CComVariant(foundRemoteImages));
+    hr = CallJavascript(_T(JS_ENABLE_DOWNLOAD), CComVariant(foundRemoteImages), CComVariant(m_isConnected));
     IFFALSE_PRINTERROR(SUCCEEDED(hr), "Error calling javascript to enable/disable download posibility.");
 
     if (m_imageFiles.GetCount() == 0) {
@@ -1906,7 +1951,7 @@ void CEndlessUsbToolDlg::UpdateDownloadOptions()
 
 error:
     // RADU: disable downloading here I assume? Or retry download/parse?    
-    CallJavascript(_T(JS_ENABLE_DOWNLOAD), CComVariant(FALSE));
+    CallJavascript(_T(JS_ENABLE_DOWNLOAD), CComVariant(FALSE), CComVariant(m_isConnected));
     CallJavascript(_T(JS_ENABLE_BUTTON), CComVariant(HTML_BUTTON_ID(_T(ELEMENT_DOWNLOAD_LIGHT_BUTTON))), CComVariant(FALSE));
     return;
 }
@@ -2800,7 +2845,7 @@ DWORD WINAPI CEndlessUsbToolDlg::UpdateDownloadProgressThread(void* param)
 
     while (TRUE)
     {
-        DWORD dwStatus = WaitForSingleObject(dlg->m_cancelOperationEvent, 2000);
+        DWORD dwStatus = WaitForSingleObject(dlg->m_cancelOperationEvent, UPDATE_DOWNLOAD_PROGRESS_TIME);
         switch (dwStatus) {
             case WAIT_OBJECT_0:
             {
@@ -2828,5 +2873,44 @@ DWORD WINAPI CEndlessUsbToolDlg::UpdateDownloadProgressThread(void* param)
 done:
 
     CoUninitialize();
+    return 0;
+}
+
+DWORD WINAPI CEndlessUsbToolDlg::CheckInternetConnectionThread(void* param)
+{
+    CEndlessUsbToolDlg *dlg = (CEndlessUsbToolDlg*)param;
+    DWORD flags;
+    BOOL result = FALSE, connected = FALSE, firstTime = TRUE;
+
+    while (TRUE) {
+        DWORD dwStatus = WaitForSingleObject(dlg->m_cancelOperationEvent, firstTime ? 0 : CHECK_INTERNET_CONNECTION_TIME);
+        switch (dwStatus) {
+            case WAIT_OBJECT_0:
+            {
+                uprintf("CEndlessUsbToolDlg::CheckInternetConnectionThread cancel requested");
+                goto done;
+            }
+            case WAIT_TIMEOUT:
+            {
+                flags = 0;
+                result = InternetGetConnectedState(&flags, 0);
+                IFFALSE_BREAK(result, "Device not connected to internet.");
+
+                result = InternetCheckConnection(JSON_URL(JSON_LIVE_FILE), FLAG_ICC_FORCE_CONNECTION, 0);
+                IFFALSE_BREAK(result, "Cannot connect to server to download JSON.");
+
+                result = TRUE;
+                break;
+            }
+        }
+
+        if (firstTime || result != connected) {
+            firstTime = FALSE;
+            connected = result;
+            ::PostMessage(dlg->m_hWnd, WM_INTERNET_CONNECTION_STATE, (WPARAM)connected, 0);
+        }
+    }
+
+done:
     return 0;
 }

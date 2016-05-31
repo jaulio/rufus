@@ -472,15 +472,24 @@ select:disabled {
 }
 
 #NoInternetConnection {
-	color: #000000;
-	font-size: 13px;
 	text-align: center;
+}
+
+#NoInternetConnectionTitle {
+	color: #000000;
+	font-family: LatoBold;
+	font-size: 16px;
+	margin-top: -20px;
+}
+
+#NoInternetConnectionSubtitle {
+	font-size: 13px;
+	margin-top: 5px;
 }
 
 #OfflineText {
 	font-family: LatoBold;
 }
-
 
 #NewDiskNameContainer {
 	margin-top: 10px;

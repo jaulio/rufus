@@ -115,12 +115,14 @@ private:
     HANDLE m_fileScanThread;
     HANDLE m_operationThread;
     HANDLE m_downloadUpdateThread;
+    HANDLE m_checkConnectionThread;
     bool m_useLocalFile;
     long m_selectedRemoteIndex;
     long m_baseImageRemoteIndex;
     bool m_usbDeleteAgreement;
     bool m_closeRequested;
     int m_currentStep;
+    bool m_isConnected;
     CMap<CString, LPCTSTR, pFileImageEntry_t, pFileImageEntry_t> m_imageFiles;
     CList<CString> m_imageIndexToPath;
     CList<RemoteImageEntry_t> m_remoteImages;
@@ -207,4 +209,5 @@ private:
     void GetIEVersion();
 
     static DWORD WINAPI UpdateDownloadProgressThread(void* param);
+    static DWORD WINAPI CheckInternetConnectionThread(void* param);
 };

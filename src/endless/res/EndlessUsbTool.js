@@ -34,12 +34,13 @@ function enableElement(id, enable) {
 	}
 }
 
-function enableDownload(enable) {
+function enableDownload(enable, internetConnected) {
     enableElement("OperatingSystemTypeOnline", enable);
     enableElement("OnlineImagesSelect", enable);
 
-	showElement("NoInternetConnection", !enable);
-	
+	showElement("SelectFileSubtitle", internetConnected);
+	showElement("NoInternetConnection", !internetConnected);
+
 	enableElement("DownloadLanguageSelect", enable);
 //	enableButton("DownloadLightButtonC", enable); //disabled by C++
 	enableButton("DownloadFullButtonC", enable);
