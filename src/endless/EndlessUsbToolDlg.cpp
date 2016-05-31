@@ -159,17 +159,23 @@ BOOL FormatDrive(DWORD DriveIndex);
 
 // Personalities
 
-#define PERSONALITY_BASE            L"base"
-#define PERSONALITY_ENGLISH         L"en"
-#define PERSONALITY_SPANISH         L"es"
-#define PERSONALITY_PORTUGHESE      L"pt_BR"
+#define PERSONALITY_BASE                L"base"
+#define PERSONALITY_ENGLISH             L"en"
+#define PERSONALITY_SPANISH             L"es"
+#define PERSONALITY_PORTUGHESE          L"pt_BR"
+#define PERSONALITY_ARABIC              L"ar"
+#define PERSONALITY_SPANISH_GUATEMALA   L"es_GT"
+#define PERSONALITY_FRENCH              L"fr"
 
 static const wchar_t *globalAvailablePersonalities[] =
 {
     PERSONALITY_BASE,
     PERSONALITY_ENGLISH,
     PERSONALITY_SPANISH,
-    PERSONALITY_PORTUGHESE
+    PERSONALITY_PORTUGHESE,
+    PERSONALITY_ARABIC,
+    PERSONALITY_SPANISH_GUATEMALA,
+    PERSONALITY_FRENCH,
 };
 
 
@@ -378,6 +384,9 @@ CEndlessUsbToolDlg::CEndlessUsbToolDlg(UINT globalMessage, CWnd* pParent /*=NULL
     m_localeToPersonality["en-US"] = PERSONALITY_ENGLISH;
     m_localeToPersonality["es-ES"] = PERSONALITY_SPANISH;
     m_localeToPersonality["pt-BR"] = PERSONALITY_PORTUGHESE;
+    m_localeToPersonality["ar-SA"] = PERSONALITY_ARABIC;
+    m_localeToPersonality["es-GT"] = PERSONALITY_SPANISH_GUATEMALA;
+    m_localeToPersonality["fr-FR"] = PERSONALITY_FRENCH;
 }
 
 void CEndlessUsbToolDlg::DoDataExchange(CDataExchange* pDX)
@@ -1405,12 +1414,7 @@ bool CEndlessUsbToolDlg::IsButtonDisabled(IHTMLElement *pElement)
 HRESULT CEndlessUsbToolDlg::OnTryEndlessSelected(IHTMLElement* pElement)
 {
     m_liveInstall = true;
-
-    CComPtr<IHTMLElement> selectElem;
-    HRESULT hr = GetElement(_T(ELEMENT_REMOTE_SELECT), &selectElem);
-    IFFALSE_RETURN_VALUE(SUCCEEDED(hr), "OnTryEndlessSelected: querying for local select element.", S_OK);
-    OnSelectedRemoteFileChanged(selectElem);
-    ChangePage(_T(ELEMENT_FIRST_PAGE), _T(ELEMENT_FILE_PAGE));
+    GoToSelectFilePage();
 
 	return S_OK;
 }
@@ -1420,14 +1424,27 @@ HRESULT CEndlessUsbToolDlg::OnInstallEndlessSelected(IHTMLElement* pElement)
     if (IsButtonDisabled(pElement)) return S_OK;
 
     m_liveInstall = false;
-
-    CComPtr<IHTMLElement> selectElem;
-    HRESULT hr = GetElement(_T(ELEMENT_REMOTE_SELECT), &selectElem);
-    IFFALSE_RETURN_VALUE(SUCCEEDED(hr), "OnInstallEndlessSelected: querying for local select element.", S_OK);
-    OnSelectedRemoteFileChanged(selectElem);
-    ChangePage(_T(ELEMENT_FIRST_PAGE), _T(ELEMENT_FILE_PAGE));
+    GoToSelectFilePage();
 
 	return S_OK;
+}
+
+void CEndlessUsbToolDlg::GoToSelectFilePage() {
+    POSITION p = m_remoteImages.FindIndex(m_baseImageRemoteIndex);
+    IFFALSE_RETURN(p != NULL, "Index value not valid.");
+    RemoteImageEntry_t r = m_remoteImages.GetAt(p);
+
+    // Update light download size
+    ULONGLONG size = r.compressedSize + (m_liveInstall ? 0 : m_installerImage.compressedSize);
+    CComBSTR sizeText = UTF8ToBSTR(lmprintf(MSG_315, SizeToHumanReadable(size, FALSE, use_fake_units)));
+    SetElementText(_T(ELEMENT_DOWNLOAD_LIGHT_SIZE), sizeText);
+
+    // Update full download size
+    CComPtr<IHTMLElement> selectElem;
+    HRESULT hr = GetElement(_T(ELEMENT_REMOTE_SELECT), &selectElem);
+    IFFALSE_RETURN(SUCCEEDED(hr), "GoToSelectFilePage: querying for local select element.");
+    OnSelectedRemoteFileChanged(selectElem);
+    ChangePage(_T(ELEMENT_FIRST_PAGE), _T(ELEMENT_FILE_PAGE));
 }
 
 HRESULT CEndlessUsbToolDlg::OnLinkClicked(IHTMLElement* pElement)

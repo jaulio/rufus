@@ -210,4 +210,6 @@ private:
 
     static DWORD WINAPI UpdateDownloadProgressThread(void* param);
     static DWORD WINAPI CheckInternetConnectionThread(void* param);
+
+    void GoToSelectFilePage();
 };

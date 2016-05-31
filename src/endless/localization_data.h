@@ -137,6 +137,9 @@ const loc_control_id control_id[] = {
 	LOC_CTRL(MSG_401),
 	LOC_CTRL(MSG_402),
 	LOC_CTRL(MSG_403),
+	LOC_CTRL(MSG_404),
+	LOC_CTRL(MSG_405),
+	LOC_CTRL(MSG_406),
 };
 
 // Dialog data
