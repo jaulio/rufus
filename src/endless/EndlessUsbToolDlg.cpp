@@ -225,7 +225,7 @@ const wchar_t* mainWindowTitle = L"Endless USB Creator";
 
 
 #define UPDATE_DOWNLOAD_PROGRESS_TIME       2000
-#define CHECK_INTERNET_CONNECTION_TIME      5000
+#define CHECK_INTERNET_CONNECTION_TIME      3000
 
 // utility method for quick char* UTF8 conversion to BSTR
 CComBSTR UTF8ToBSTR(const char *txt) {
@@ -1430,20 +1430,25 @@ HRESULT CEndlessUsbToolDlg::OnInstallEndlessSelected(IHTMLElement* pElement)
 }
 
 void CEndlessUsbToolDlg::GoToSelectFilePage() {
+    CComPtr<IHTMLElement> selectElem;
+    CComBSTR sizeText;
+    RemoteImageEntry_t r;
+
     POSITION p = m_remoteImages.FindIndex(m_baseImageRemoteIndex);
-    IFFALSE_RETURN(p != NULL, "Index value not valid.");
-    RemoteImageEntry_t r = m_remoteImages.GetAt(p);
+    IFFALSE_GOTOERROR(p != NULL, "Index value not valid.");
+    r = m_remoteImages.GetAt(p);
 
     // Update light download size
     ULONGLONG size = r.compressedSize + (m_liveInstall ? 0 : m_installerImage.compressedSize);
-    CComBSTR sizeText = UTF8ToBSTR(lmprintf(MSG_315, SizeToHumanReadable(size, FALSE, use_fake_units)));
+    sizeText = UTF8ToBSTR(lmprintf(MSG_315, SizeToHumanReadable(size, FALSE, use_fake_units)));
     SetElementText(_T(ELEMENT_DOWNLOAD_LIGHT_SIZE), sizeText);
 
     // Update full download size
-    CComPtr<IHTMLElement> selectElem;
     HRESULT hr = GetElement(_T(ELEMENT_REMOTE_SELECT), &selectElem);
-    IFFALSE_RETURN(SUCCEEDED(hr), "GoToSelectFilePage: querying for local select element.");
+    IFFALSE_GOTOERROR(SUCCEEDED(hr), "GoToSelectFilePage: querying for local select element.");
     OnSelectedRemoteFileChanged(selectElem);
+
+error:
     ChangePage(_T(ELEMENT_FIRST_PAGE), _T(ELEMENT_FILE_PAGE));
 }
 
