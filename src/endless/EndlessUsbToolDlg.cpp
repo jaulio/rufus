@@ -324,7 +324,7 @@ END_DISPATCH_MAP()
 CMap<CString, LPCTSTR, uint32_t, uint32_t> CEndlessUsbToolDlg::m_personalityToLocaleMsg;
 CMap<CStringA, LPCSTR, CString, LPCTSTR> CEndlessUsbToolDlg::m_localeToPersonality;
 
-CEndlessUsbToolDlg::CEndlessUsbToolDlg(CWnd* pParent /*=NULL*/)
+CEndlessUsbToolDlg::CEndlessUsbToolDlg(UINT globalMessage, CWnd* pParent /*=NULL*/)
     : CDHtmlDialog(IDD_ENDLESSUSBTOOL_DIALOG, IDR_HTML_ENDLESSUSBTOOL_DIALOG, pParent),
     m_selectedLocale(NULL),
     m_liveInstall(false),
@@ -349,7 +349,8 @@ CEndlessUsbToolDlg::CEndlessUsbToolDlg(CWnd* pParent /*=NULL*/)
     m_currentStep(OP_NO_OPERATION_IN_PROGRESS),
     m_cancelOperationEvent(CreateEvent(NULL, TRUE, FALSE, NULL)),
     m_closeRequested(false),
-    m_ieVersion(0)
+    m_ieVersion(0),
+    m_globalWndMessage(globalMessage)
 {
     m_hIcon = AfxGetApp()->LoadIcon(IDR_MAINFRAME);    
 
@@ -1082,6 +1083,10 @@ LRESULT CEndlessUsbToolDlg::WindowProc(UINT message, WPARAM wParam, LPARAM lPara
             break;
         }
         default:
+            if (m_globalWndMessage == message) {
+                SetForegroundWindow();
+            }
+
             //luprintf("Untreated message %d(0x%X)", message, message);
             break;
         }

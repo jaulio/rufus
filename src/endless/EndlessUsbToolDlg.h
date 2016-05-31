@@ -31,7 +31,7 @@ class CEndlessUsbToolDlg : public CDHtmlDialog
 {
 	// Construction
 public:
-	CEndlessUsbToolDlg(CWnd* pParent = NULL);	// standard constructor
+	CEndlessUsbToolDlg(UINT globalMessage, CWnd* pParent = NULL);	// standard constructor
 
 // Dialog Data
 #ifdef AFX_DESIGN_TIME
@@ -145,6 +145,7 @@ private:
 
     DownloadManager m_downloadManager;
     DWORD m_ieVersion;
+    UINT m_globalWndMessage;
 
     void StartOperationThread(int operation, LPTHREAD_START_ROUTINE threadRoutine, LPVOID param = NULL);
 
