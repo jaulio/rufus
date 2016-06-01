@@ -51,11 +51,19 @@ msgid "Next"
 msgstr ""
 
 msgctxt "SelectFilePageTitle"
-msgid "Select Your Endless OS Version"
+msgid "Select Your Experience"
 msgstr ""
 
 msgctxt "SelectFileSubtitle"
 msgid "Choose the Endless OS version that’s best for you."
+msgstr ""
+
+msgctxt "NoInternetConnectionTitle"
+msgid "Unfortunately, there is a problem connecting to the server."
+msgstr ""
+
+msgctxt "NoInternetConnectionSubtitle"
+msgid "Make sure you're <a id='ConnectedLink'>connected to the internet</a>, and if the problem persists, visit our <a id='ConnectedSupportLink'>support</a>."
 msgstr ""
 
 msgctxt "ExistingImageFile"
@@ -64,14 +72,6 @@ msgstr ""
 
 msgctxt "DownloadNewImage"
 msgid "Download a new version:"
-msgstr ""
-
-msgctxt "OfflineText"
-msgid "You are offline."
-msgstr ""
-
-msgctxt "ExtraOfflineText"
-msgid "Change your Network Settings to connect to the Internet."
 msgstr ""
 
 msgctxt "LightVersionText"
@@ -342,6 +342,14 @@ msgctxt "MSG_320"
 msgid "Great! Your Endless OS %ls %ls %ls %ls USB has been successfully created."
 msgstr ""
 
+msgctxt "MSG_321"
+msgid "Select Your Endless OS Version"
+msgstr ""
+
+msgctxt "MSG_322"
+msgid "Is this the Endless OS version you’d like to use? If not, download another."
+msgstr ""
+
 msgctxt "MSG_400"
 msgid "Light"
 msgstr ""
@@ -356,4 +364,12 @@ msgstr ""
 
 msgctxt "MSG_403"
 msgid "Portuguese (Brazilian)"
+msgstr ""
+
+msgctxt "MSG_404"
+msgid "Arabic"
+msgstr ""
+
+msgctxt "MSG_406"
+msgid "French"
 msgstr ""
