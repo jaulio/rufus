@@ -513,8 +513,11 @@ void CEndlessUsbToolDlg::InitRufus()
 // The scanning process can be blocking for message processing => use a thread
 DWORD WINAPI CEndlessUsbToolDlg::RufusISOScanThread(LPVOID param)
 {
-    if (image_path == NULL)
+    if (image_path == NULL) {
+        uprintf("ERROR: image_path is NULL");
         goto out;
+    }
+
     PrintInfoDebug(0, MSG_202);
 
     img_report.is_iso = (BOOLEAN)ExtractISO(image_path, "", TRUE);
@@ -2206,7 +2209,7 @@ HRESULT CEndlessUsbToolDlg::OnSelectUSBNextClicked(IHTMLElement* pElement)
         StartOperationThread(OP_VERIFYING_SIGNATURE, CEndlessUsbToolDlg::FileVerificationThread);
     } else {
         UpdateCurrentStep(OP_DOWNLOADING_FILES);
-        
+
         RemoteImageEntry_t remote = m_remoteImages.GetAt(m_remoteImages.FindIndex(m_selectedRemoteIndex));
         DownloadType_t downloadType = GetSelectedDownloadType();
 
@@ -2216,6 +2219,11 @@ HRESULT CEndlessUsbToolDlg::OnSelectUSBNextClicked(IHTMLElement* pElement)
         // live image signature file
         CString urlAsc = CString(RELEASE_JSON_URLPATH) + remote.urlSignature;
         m_localFileSig = GET_LOCAL_PATH(CSTRING_GET_LAST(remote.urlSignature, '/'));
+
+        // add image file path for Rufus
+        safe_free(image_path);
+        CComBSTR bstrString(m_localFile);
+        image_path = _com_util::ConvertBSTRToString(bstrString);
 
         // List of files to download
         //ListOfStrings urls, files;
