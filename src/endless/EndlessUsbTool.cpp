@@ -10,6 +10,24 @@
 #define new DEBUG_NEW
 #endif
 
+class CAppCmdLineInfo : public CCommandLineInfo
+{
+public:
+    CAppCmdLineInfo(void) :
+        logDebugInfo(false) {}
+
+    virtual void ParseParam(const TCHAR* pszParam, BOOL bFlag, BOOL bLast)
+    {
+        if (0 == _tcscmp(_T("debug"), pszParam)) {
+            logDebugInfo = true;
+        } else {
+            CCommandLineInfo::ParseParam(pszParam, bFlag, bLast);
+        }
+    }
+
+    bool logDebugInfo;
+};
+
 
 // CEndlessUsbToolApp
 
@@ -51,8 +69,11 @@ BOOL CEndlessUsbToolApp::InitInstance()
 
 	CWinApp::InitInstance();
 
-
 	AfxEnableControlContainer();
+
+    // check command line parameters;
+    CAppCmdLineInfo commandLineInfo;
+    ParseCommandLine(commandLineInfo);
 
 	// Create the shell manager, in case the dialog contains
 	// any shell tree view or shell list view controls.
@@ -66,7 +87,7 @@ BOOL CEndlessUsbToolApp::InitInstance()
     HANDLE singleInstanceMutex = CreateMutex(NULL, TRUE, _T("Global\\EndlessUsbTool"));
 
     if (singleInstanceMutex != NULL && GetLastError() != ERROR_ALREADY_EXISTS) {
-        CEndlessUsbToolDlg dlg(wndMsg);
+        CEndlessUsbToolDlg dlg(wndMsg, commandLineInfo.logDebugInfo);
         m_pMainWnd = &dlg;
         INT_PTR nResponse = dlg.DoModal();
         if (nResponse == IDOK)

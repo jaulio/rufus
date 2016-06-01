@@ -342,7 +342,7 @@ END_DISPATCH_MAP()
 CMap<CString, LPCTSTR, uint32_t, uint32_t> CEndlessUsbToolDlg::m_personalityToLocaleMsg;
 CMap<CStringA, LPCSTR, CString, LPCTSTR> CEndlessUsbToolDlg::m_localeToPersonality;
 
-CEndlessUsbToolDlg::CEndlessUsbToolDlg(UINT globalMessage, CWnd* pParent /*=NULL*/)
+CEndlessUsbToolDlg::CEndlessUsbToolDlg(UINT globalMessage, bool enableLogDebugging, CWnd* pParent /*=NULL*/)
     : CDHtmlDialog(IDD_ENDLESSUSBTOOL_DIALOG, IDR_HTML_ENDLESSUSBTOOL_DIALOG, pParent),
     m_selectedLocale(NULL),
     m_liveInstall(false),
@@ -370,7 +370,8 @@ CEndlessUsbToolDlg::CEndlessUsbToolDlg(UINT globalMessage, CWnd* pParent /*=NULL
     m_closeRequested(false),
     m_ieVersion(0),
     m_globalWndMessage(globalMessage),
-    m_isConnected(false)
+    m_isConnected(false),
+    m_enableLogDebugging(enableLogDebugging)
 {
     m_hIcon = AfxGetApp()->LoadIcon(IDR_MAINFRAME);    
 
@@ -384,6 +385,13 @@ CEndlessUsbToolDlg::CEndlessUsbToolDlg(UINT globalMessage, CWnd* pParent /*=NULL
     m_localeToPersonality["pt-BR"] = PERSONALITY_PORTUGHESE;
     m_localeToPersonality["ar-SA"] = PERSONALITY_ARABIC;
     m_localeToPersonality["fr-FR"] = PERSONALITY_FRENCH;
+}
+
+CEndlessUsbToolDlg::~CEndlessUsbToolDlg() {
+    if (m_enableLogDebugging) {
+        m_enableLogDebugging = false;
+        m_logFile.Close();
+    }
 }
 
 void CEndlessUsbToolDlg::DoDataExchange(CDataExchange* pDX)
@@ -446,17 +454,11 @@ void CEndlessUsbToolDlg::InitRufus()
     hDiskID = m_hWnd;
     hInfo = m_hWnd;
 
-    hMainInstance = AfxGetResourceHandle();
-
-    // Retrieve the current application directory as well as the system & sysnative dirs
-    if(GetModuleFileNameA(NULL, app_dir, sizeof(app_dir)) == 0) {
-        uprintf("Could not get current directory: %s", WindowsErrorString());
-        app_dir[0] = 0;
+    if (m_enableLogDebugging) {
+        hLog = m_hWnd;
     }
-    CStringA appDirStr = app_dir;
-    appDirStr = CSTRING_GET_PATH(appDirStr, '\\');
-    strcpy_s(app_dir, appDirStr);
-    m_appDir = appDirStr;
+
+    hMainInstance = AfxGetResourceHandle();
 
     if (GetSystemDirectoryU(system_dir, sizeof(system_dir)) == 0) {
         uprintf("Could not get system directory: %s", WindowsErrorString());
@@ -549,7 +551,9 @@ BOOL CEndlessUsbToolDlg::OnInitDialog()
 {
 	CDHtmlDialog::OnInitDialog();
 
-	// Set the icon for this dialog.  The framework does this automatically
+    InitLogging();
+
+    // Set the icon for this dialog.  The framework does this automatically
 	//  when the application's main window is not a dialog
 	SetIcon(m_hIcon, TRUE);			// Set big icon
 	SetIcon(m_hIcon, FALSE);		// Set small icon
@@ -625,7 +629,7 @@ void CEndlessUsbToolDlg::Uninit()
         DWORD waitStatus = WaitForMultipleObjects(handlesCount, handlesToWaitFor, TRUE, THREADS_WAIT_TIMEOUT);
 
         if (waitStatus == WAIT_TIMEOUT) {
-            uprintf("Error: waited for %d millis for threads to finish.");
+            uprintf("Error: waited for %d millis for threads to finish.", THREADS_WAIT_TIMEOUT);
         }
     }
 
@@ -837,6 +841,22 @@ LRESULT CEndlessUsbToolDlg::WindowProc(UINT message, WPARAM wParam, LPARAM lPara
     error:
         uprintf("CEndlessUsbToolDlg::WindowProc called with %d[0x%X] (%d, %d); FAILURE %x", message, message, lParam, wParam, hr);
         return -1;
+    } else if (m_enableLogDebugging && message >= EM_GETSEL && message < EM_GETIMESTATUS) {
+        // Handle messages sent to the log window
+        // Do not use any method that calls _uprintf as it will generate an infinite recursive loop
+        // Use OutputDebugString instead.
+        switch (message) {
+            case EM_SETSEL:
+            {
+                static CStringA strMessage;
+                char *logMessage = (char*)lParam;
+                CStringA time(CTime::GetCurrentTime().Format(_T("%H:%M:%S - ")));
+                strMessage = time + CStringA(logMessage);
+                m_logFile.Write(strMessage, strMessage.GetLength());
+                free(logMessage);
+                break;
+            }
+        }
     } else {
         switch (message) {
         case WM_SETTEXT:
@@ -2942,4 +2962,40 @@ DWORD WINAPI CEndlessUsbToolDlg::CheckInternetConnectionThread(void* param)
 
 done:
     return 0;
+}
+
+void CEndlessUsbToolDlg::InitLogging()
+{
+    // Retrieve the current application directory as well as the system & sysnative dirs
+    if (GetModuleFileNameA(NULL, app_dir, sizeof(app_dir)) == 0) {
+        uprintf("Could not get current directory: %s", WindowsErrorString());
+        app_dir[0] = 0;
+    }
+    CStringA appDirStr = app_dir;
+    appDirStr = CSTRING_GET_PATH(appDirStr, '\\');
+    strcpy_s(app_dir, appDirStr);
+    m_appDir = appDirStr;
+
+    if (!m_enableLogDebugging) {
+        uprintf("Logging not enabled.");
+        return;
+    }
+
+    // Create file name
+    CTime time = CTime::GetCurrentTime();
+    CString s = time.Format(_T("%Y%m%d_%H_%M_%S"));
+    CString fileName(mainWindowTitle);
+    fileName.Replace(L" ", L"");
+    fileName += s;
+    fileName += L".log";
+    fileName = GET_LOCAL_PATH(fileName);
+
+    try {
+        BOOL result = m_logFile.Open(fileName, CFile::modeWrite | CFile::typeUnicode | CFile::shareDenyWrite | CFile::modeCreate | CFile::osWriteThrough);
+        if (!result) m_enableLogDebugging = false;
+    } catch (CFileException *ex) {
+        m_enableLogDebugging = false;
+        uprintf("CFileException on file [%ls] with cause [%d] and OS error [%d]", fileName, ex->m_cause, ex->m_lOsError);
+        ex->Delete();
+    }
 }

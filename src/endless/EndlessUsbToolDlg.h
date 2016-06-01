@@ -31,7 +31,8 @@ class CEndlessUsbToolDlg : public CDHtmlDialog
 {
 	// Construction
 public:
-	CEndlessUsbToolDlg(UINT globalMessage, CWnd* pParent = NULL);	// standard constructor
+	CEndlessUsbToolDlg(UINT globalMessage, bool enableLogDebugging, CWnd* pParent = NULL);	// standard constructor
+    ~CEndlessUsbToolDlg();
 
 // Dialog Data
 #ifdef AFX_DESIGN_TIME
@@ -149,6 +150,9 @@ private:
     DWORD m_ieVersion;
     UINT m_globalWndMessage;
 
+    bool m_enableLogDebugging;
+    CFile m_logFile;
+
     void StartOperationThread(int operation, LPTHREAD_START_ROUTINE threadRoutine, LPVOID param = NULL);
 
 	void InitRufus();
@@ -212,4 +216,5 @@ private:
     static DWORD WINAPI CheckInternetConnectionThread(void* param);
 
     void GoToSelectFilePage();
+    void InitLogging();
 };

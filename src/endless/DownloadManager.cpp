@@ -291,7 +291,7 @@ STDMETHODIMP DownloadManager::JobModification(IBackgroundCopyJob *JobModificatio
                 if (BG_JOB_STATE_TRANSFERRED == State) {
                     //Call pJob->Complete(); to acknowledge that the transfer is complete
                     //and make the file available to the client.                    
-                    uprintf("DONE\n");
+                    uprintf("Job %ls DONE\n", pszJobName);
                     hr = JobModification->Complete();
                     if (FAILED(hr)) JobModification->Cancel();
                     downloadStatus->done = true;
@@ -304,7 +304,7 @@ STDMETHODIMP DownloadManager::JobModification(IBackgroundCopyJob *JobModificatio
                     LPWSTR str[1024];
                     memset(str, 0, 1024);
                     error->GetErrorDescription(GetUserDefaultLangID(), str);
-                    uprintf("ERROR!%ls\n", str);
+                    uprintf("Job %ls ERROR!%ls\n", pszJobName, str);
                     if (BG_JOB_STATE_ERROR == State) {
                         downloadStatus->error = true;
                     }
@@ -316,27 +316,27 @@ STDMETHODIMP DownloadManager::JobModification(IBackgroundCopyJob *JobModificatio
                     
                 }
                 else if (BG_JOB_STATE_QUEUED == State) {
-                    uprintf("QUEUED\n");
+                    uprintf("Job %ls QUEUED\n", pszJobName);
                 }
                 else if (BG_JOB_STATE_CONNECTING == State) {
-                    uprintf("CONNECTING\n");
+                    uprintf("%ls CONNECTING\n", pszJobName);
                 }
                 else if (BG_JOB_STATE_SUSPENDED == State) {
-                    uprintf("SUSPENDED\n");
+                    uprintf("Job %ls SUSPENDED\n", pszJobName);
                     //m_bcJob->Cancel();
                 }
                 else if (BG_JOB_STATE_TRANSIENT_ERROR == State) {
-                    uprintf("TRANSIENT ERROR\n");
+                    uprintf("Job %ls TRANSIENT ERROR\n", pszJobName);
                 }
                 else if (BG_JOB_STATE_ACKNOWLEDGED == State) {                    
-                    uprintf("ACKNOWLEDGED\n");
+                    uprintf("Job %ls ACKNOWLEDGED\n", pszJobName);
                     downloadStatus->done = true;
                 }
                 else if (BG_JOB_STATE_CANCELLED == State) {
-                    uprintf("CANCELLED\n");
+                    uprintf("Job %ls CANCELLED\n", pszJobName);
                     downloadStatus->error = true;
                 } else {
-                    uprintf("Unknown download state %d\n", State);
+                    uprintf("Job %ls Unknown download state %d\n", pszJobName, State);
                 }
 
                 if(downloadStatus != NULL && m_dispatchWindow != NULL) ::PostMessage(m_dispatchWindow, m_statusMsgId, (WPARAM)downloadStatus, 0);
