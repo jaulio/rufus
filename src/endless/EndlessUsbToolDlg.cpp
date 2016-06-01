@@ -164,7 +164,6 @@ BOOL FormatDrive(DWORD DriveIndex);
 #define PERSONALITY_SPANISH             L"es"
 #define PERSONALITY_PORTUGHESE          L"pt_BR"
 #define PERSONALITY_ARABIC              L"ar"
-#define PERSONALITY_SPANISH_GUATEMALA   L"es_GT"
 #define PERSONALITY_FRENCH              L"fr"
 
 static const wchar_t *globalAvailablePersonalities[] =
@@ -174,7 +173,6 @@ static const wchar_t *globalAvailablePersonalities[] =
     PERSONALITY_SPANISH,
     PERSONALITY_PORTUGHESE,
     PERSONALITY_ARABIC,
-    PERSONALITY_SPANISH_GUATEMALA,
     PERSONALITY_FRENCH,
 };
 
@@ -385,7 +383,6 @@ CEndlessUsbToolDlg::CEndlessUsbToolDlg(UINT globalMessage, CWnd* pParent /*=NULL
     m_localeToPersonality["es-ES"] = PERSONALITY_SPANISH;
     m_localeToPersonality["pt-BR"] = PERSONALITY_PORTUGHESE;
     m_localeToPersonality["ar-SA"] = PERSONALITY_ARABIC;
-    m_localeToPersonality["es-GT"] = PERSONALITY_SPANISH_GUATEMALA;
     m_localeToPersonality["fr-FR"] = PERSONALITY_FRENCH;
 }
 

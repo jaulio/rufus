@@ -215,8 +215,7 @@ t MSG_401 "English"
 t MSG_402 "Spanish"
 t MSG_403 "Portuguese (Brazilian)"
 t MSG_404 "Arabic"
-t MSG_405 "Spanish (Guatemala)"
-t MSG_406 "French"
+t MSG_405 "French"
 
 ################################################################################
 ############################# TRANSLATOR END COPY ##############################
