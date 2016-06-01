@@ -1446,7 +1446,9 @@ void CEndlessUsbToolDlg::GoToSelectFilePage() {
     // Update full download size
     HRESULT hr = GetElement(_T(ELEMENT_REMOTE_SELECT), &selectElem);
     IFFALSE_GOTOERROR(SUCCEEDED(hr), "GoToSelectFilePage: querying for local select element.");
+    bool useLocalFile = m_useLocalFile;
     OnSelectedRemoteFileChanged(selectElem);
+    m_useLocalFile = useLocalFile;
 
 error:
     ChangePage(_T(ELEMENT_FIRST_PAGE), _T(ELEMENT_FILE_PAGE));
@@ -2120,7 +2122,7 @@ HRESULT CEndlessUsbToolDlg::OnSelectedRemoteFileChanged(IHTMLElement* pElement)
     POSITION p = m_remoteImages.FindIndex(selectedIndex);
     IFFALSE_RETURN_VALUE(p != NULL, "Index value not valid.", S_OK);
     RemoteImageEntry_t r = m_remoteImages.GetAt(p);
-    uprintf("OnSelectedImageFileChanged to REMOTE [%ls]", r.displayName);
+    uprintf("OnSelectedRemoteFileChanged to REMOTE [%ls]", r.displayName);
 
     if (r.personality != PERSONALITY_BASE) {
         ULONGLONG size = r.compressedSize + (m_liveInstall ? 0 : m_installerImage.compressedSize);
