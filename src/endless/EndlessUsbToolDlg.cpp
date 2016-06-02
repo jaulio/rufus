@@ -203,12 +203,18 @@ enum endless_action_type {
 
 #define TID_UPDATE_FILES                TID_REFRESH_TIMER + 1
 
+//#define ENABLE_JSON_COMPRESSION 1
+
 #define RELEASE_JSON_URLPATH    _T("https://d1anzknqnc1kmb.cloudfront.net/")
 #define JSON_LIVE_FILE          "releases-eos.json"
 #define JSON_INSTALLER_FILE     "releases-eosinstaller.json"
 #define JSON_GZIP               ".gz"
 #define JSON_PACKED(__file__)   __file__ JSON_GZIP
+#ifdef ENABLE_JSON_COMPRESSION
 #define JSON_URL(__file__)      RELEASE_JSON_URLPATH _T(JSON_PACKED(__file__))
+#else
+#define JSON_URL(__file__)      RELEASE_JSON_URLPATH _T(__file__)
+#endif // ENABLE_JSON_COMPRESSION
 #define SIGNATURE_FILE_EXT      L".asc"
 
 #define ENDLESS_OS "Endless OS"
@@ -1765,10 +1771,16 @@ void CEndlessUsbToolDlg::StartJSONDownload()
         return;
     }
 
-    // Addd both JSONs to download, maybe user goes back and switches between Try and Install
+    // Add both JSONs to download, maybe user goes back and switches between Try and Install
+#ifdef ENABLE_JSON_COMPRESSION
     CString liveJson(JSON_PACKED(JSON_LIVE_FILE));
-    liveJson = GET_LOCAL_PATH(liveJson);
     CString installerJson(JSON_PACKED(JSON_INSTALLER_FILE));
+#else
+    CString liveJson(JSON_LIVE_FILE);
+    CString installerJson(JSON_INSTALLER_FILE);
+#endif // ENABLE_JSON_COMPRESSION
+
+    liveJson = GET_LOCAL_PATH(liveJson);
     installerJson = GET_LOCAL_PATH(installerJson);
 
     ListOfStrings urls = { JSON_URL(JSON_LIVE_FILE), JSON_URL(JSON_INSTALLER_FILE) };
@@ -1913,19 +1925,26 @@ error:
 void CEndlessUsbToolDlg::UpdateDownloadOptions()
 {
     CString languagePersonalty = PERSONALITY_ENGLISH;
-    CString filePathGz, filePath;
+    CString filePath;
+#ifdef ENABLE_JSON_COMPRESSION
+    CString filePathGz;
+#endif // ENABLE_JSON_COMPRESSION
 
     m_remoteImages.RemoveAll();
 
-    filePathGz = GET_LOCAL_PATH(CString(JSON_PACKED(JSON_LIVE_FILE)));
     filePath = GET_LOCAL_PATH(CString(JSON_LIVE_FILE));
+#ifdef ENABLE_JSON_COMPRESSION
+    filePathGz = GET_LOCAL_PATH(CString(JSON_PACKED(JSON_LIVE_FILE)));
     IFFALSE_GOTOERROR(UnpackFile(CStringA(filePathGz), CStringA(filePath)), "Error uncompressing eos JSON file.");
+#endif // ENABLE_JSON_COMPRESSION
     IFFALSE_GOTOERROR(ParseJsonFile(filePath, false), "Error parsing eos JSON file.");
 
     if (!m_liveInstall) {
-        filePathGz = GET_LOCAL_PATH(CString(JSON_PACKED(JSON_INSTALLER_FILE)));
         filePath = GET_LOCAL_PATH(CString(JSON_INSTALLER_FILE));
+#ifdef ENABLE_JSON_COMPRESSION
+        filePathGz = GET_LOCAL_PATH(CString(JSON_PACKED(JSON_INSTALLER_FILE)));
         IFFALSE_GOTOERROR(UnpackFile(CStringA(filePathGz), CStringA(filePath)), "Error uncompressing eosinstaller JSON file.");
+#endif // ENABLE_JSON_COMPRESSION
         IFFALSE_GOTOERROR(ParseJsonFile(filePath, true), "Error parsing eosinstaller JSON file.");
     }
 
