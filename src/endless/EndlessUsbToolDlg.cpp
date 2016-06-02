@@ -462,10 +462,6 @@ void CEndlessUsbToolDlg::InitRufus()
     hDiskID = m_hWnd;
     hInfo = m_hWnd;
 
-    if (m_enableLogDebugging) {
-        hLog = m_hWnd;
-    }
-
     hMainInstance = AfxGetResourceHandle();
 
     if (GetSystemDirectoryU(system_dir, sizeof(system_dir)) == 0) {
@@ -494,9 +490,6 @@ void CEndlessUsbToolDlg::InitRufus()
     //if (GetLibraryHandle("Riched20") == NULL) {
     //    uprintf("Could not load RichEdit library - some dialogs may not display: %s\n", WindowsErrorString());
     //}
-
-    // Set the Windows version
-    GetWindowsVersion();
 
     // We use local group policies rather than direct registry manipulation
     // 0x9e disables removable and fixed drive notifications
@@ -2997,6 +2990,9 @@ void CEndlessUsbToolDlg::InitLogging()
     strcpy_s(app_dir, appDirStr);
     m_appDir = appDirStr;
 
+    // Set the Windows version
+    GetWindowsVersion();
+
     if (!m_enableLogDebugging) {
         uprintf("Logging not enabled.");
         return;
@@ -3013,7 +3009,17 @@ void CEndlessUsbToolDlg::InitLogging()
 
     try {
         BOOL result = m_logFile.Open(fileName, CFile::modeWrite | CFile::typeUnicode | CFile::shareDenyWrite | CFile::modeCreate | CFile::osWriteThrough);
-        if (!result) m_enableLogDebugging = false;
+        if (!result) {
+            m_enableLogDebugging = false;
+        } else {
+            hLog = m_hWnd;
+        }
+
+        uprintf("Log original date time %ls\n", s);
+        uprintf("Application version: %s\n", RELEASE_VER_STR);
+        uprintf("Windows version: %s\n", WindowsVersionStr);
+        uprintf("Windows version number: 0x%X\n", nWindowsVersion);
+        uprintf("-----------------------------------\n", s);
     } catch (CFileException *ex) {
         m_enableLogDebugging = false;
         uprintf("CFileException on file [%ls] with cause [%d] and OS error [%d]", fileName, ex->m_cause, ex->m_lOsError);
