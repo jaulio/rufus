@@ -75,6 +75,27 @@ b {
     transition-duration: 50ms; /* IE10+ */
 }
 
+.ButtonClose {
+	background-image:url("res:/IMG/#208");
+	background-repeat: no-repeat;
+	background-position: center;
+	border: none;
+	width: 33px !important;
+	height: 33px !important;
+}
+
+.ButtonClose:hover {
+	border: 1px solid;
+	border-color: #a1a1a1;
+	border-radius: 3px;
+	width: 31px !important;
+	height: 31px !important;
+}
+
+.ButtonClose:active {
+	background-color: #d6d6d6;
+}
+
 /* Blue button */
 .ButtonBlue {
 	width: 160px;

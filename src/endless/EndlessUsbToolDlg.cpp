@@ -94,6 +94,7 @@ BOOL FormatDrive(DWORD DriveIndex);
 #define ELEMENT_INSTALL_BUTTON          "InstallEndlessButton"
 #define ELEMENT_COMPARE_OPTIONS         "CompareOptionsLink"
 #define ELEMENT_LANGUAGE_SELECT         "LanguageSelect"
+#define ELEMENT_FIRST_CLOSE_BUTTON      "FirstPageCloseButton"
 //Select File page elements
 #define ELEMENT_SELFILE_PREV_BUTTON     "SelectFilePreviousButton"
 #define ELEMENT_SELFILE_NEXT_BUTTON     "SelectFileNextButton"
@@ -306,6 +307,7 @@ BEGIN_DHTML_EVENT_MAP(CEndlessUsbToolDlg)
     DHTML_EVENT_ONCLICK(_T(ELEMENT_INSTALL_BUTTON), OnInstallEndlessSelected)
 	DHTML_EVENT_ONCHANGE(_T(ELEMENT_LANGUAGE_SELECT), OnLanguageChanged)
 	DHTML_EVENT_ONCLICK(_T(ELEMENT_COMPARE_OPTIONS), OnLinkClicked)
+    DHTML_EVENT_ONCLICK(_T(ELEMENT_FIRST_CLOSE_BUTTON), OnCloseAppClicked)
 
 	// Select File Page handlers
 	DHTML_EVENT_ONCLICK(_T(ELEMENT_SELFILE_PREV_BUTTON), OnSelectFilePreviousClicked)
