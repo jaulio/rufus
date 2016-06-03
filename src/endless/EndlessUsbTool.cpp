@@ -109,8 +109,6 @@ BOOL CEndlessUsbToolApp::InitInstance()
         ::SendMessage(HWND_BROADCAST, wndMsg, 0, 0);
     }
 
-done:
-
 	// Delete the shell manager created above.
 	if (pShellManager != NULL)
 	{

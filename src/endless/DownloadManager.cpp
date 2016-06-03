@@ -15,6 +15,8 @@ volatile ULONG DownloadManager::m_refCount = 0;
 
 DownloadManager::DownloadManager()
 {
+    FUNCTION_ENTER;
+
     m_bcManager = NULL;
     m_PendingJobModificationCount = 0;
     m_latestEosVersion = "";
@@ -22,10 +24,13 @@ DownloadManager::DownloadManager()
 
 DownloadManager::~DownloadManager()
 {
+    FUNCTION_ENTER;
 }
 
 bool DownloadManager::Init(HWND window, DWORD statusMessageId)
 {
+    FUNCTION_ENTER;
+
     CComPtr<IEnumBackgroundCopyJobs> enumJobs;
     CComPtr<IBackgroundCopyJob> job;
     ULONG jobCount = 0;
@@ -68,6 +73,8 @@ error:
 
 bool DownloadManager::AddDownload(DownloadType_t type, ListOfStrings urls, ListOfStrings files, bool resumeExisting, LPCTSTR jobSuffix)
 {
+    FUNCTION_ENTER;
+
     LPWSTR local = NULL, remote = NULL;
     CComPtr<IBackgroundCopyJob> currentJob;
     GUID jobId;
@@ -188,6 +195,8 @@ STDMETHODIMP DownloadManager::JobTransferred(IBackgroundCopyJob *pJob)
 
 STDMETHODIMP DownloadManager::JobError(IBackgroundCopyJob *pJob, IBackgroundCopyError *pError)
 {
+    FUNCTION_ENTER;
+
     HRESULT hr;
     BG_FILE_PROGRESS Progress;
     BG_ERROR_CONTEXT Context;
@@ -373,6 +382,8 @@ HRESULT DownloadManager::QueryInterface(REFIID riid, LPVOID *ppvObj)
 
 HRESULT DownloadManager::GetExistingJob(CComPtr<IBackgroundCopyManager> &bcManager, LPCWSTR jobName, CComPtr<IBackgroundCopyJob> &existingJob)
 {
+    FUNCTION_ENTER;
+
     CComPtr<IEnumBackgroundCopyJobs> enumJobs;
     CComPtr<IBackgroundCopyJob> job;
     HRESULT hr;
@@ -419,6 +430,8 @@ error:
 
 void DownloadManager::ClearExtraDownloadJobs()
 {
+    FUNCTION_ENTER;
+
     CComPtr<IEnumBackgroundCopyJobs> enumJobs;
     CComPtr<IBackgroundCopyJob> job;
     HRESULT hr;
