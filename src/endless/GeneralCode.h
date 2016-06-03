@@ -13,6 +13,7 @@
 #define IFFALSE_BREAK(__CONDITION__, __ERRROR_MSG__) if(!(__CONDITION__)) { uprintf(__ERRROR_MSG__); break; }
 #define IFFALSE_CONTINUE(__CONDITION__, __ERRROR_MSG__) if(!(__CONDITION__)) { uprintf(__ERRROR_MSG__); continue; }
 
+#define FUNCTION_ENTER uprintf("%s:%d %s", __FILE__, __LINE__, __FUNCTION__)
 
 /* Command copied from https://gitlab.com/tortoisegit/tortoisegit/blob/e1262ead5495ecc7902b61ac3e1f3da22294bb2d/src/version.h */
 /* gpg --armor --export 587A279C | sed -e s/^/\"/ -e s/\$/\\\\n\"/ */

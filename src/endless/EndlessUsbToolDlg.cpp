@@ -381,6 +381,7 @@ CEndlessUsbToolDlg::CEndlessUsbToolDlg(UINT globalMessage, bool enableLogDebuggi
     m_isConnected(false),
     m_enableLogDebugging(enableLogDebugging)
 {
+    FUNCTION_ENTER;
     m_hIcon = AfxGetApp()->LoadIcon(IDR_MAINFRAME);    
 
     size_t personalitiesCount = sizeof(globalAvailablePersonalities) / sizeof(globalAvailablePersonalities[0]);
@@ -396,6 +397,7 @@ CEndlessUsbToolDlg::CEndlessUsbToolDlg(UINT globalMessage, bool enableLogDebuggi
 }
 
 CEndlessUsbToolDlg::~CEndlessUsbToolDlg() {
+    FUNCTION_ENTER;
     if (m_enableLogDebugging) {
         m_enableLogDebugging = false;
         m_logFile.Close();
@@ -415,6 +417,7 @@ END_MESSAGE_MAP()
 // Browse navigation handling methods
 void CEndlessUsbToolDlg::OnDocumentComplete(LPDISPATCH pDisp, LPCTSTR szUrl)
 {
+    FUNCTION_ENTER;
 	CDHtmlDialog::OnDocumentComplete(pDisp, szUrl);
 
 	uprintf("OnDocumentComplete '%ls'", szUrl);
@@ -450,6 +453,8 @@ error:
 
 void CEndlessUsbToolDlg::InitRufus()
 {
+    FUNCTION_ENTER;
+
     // RADU: try to remove the need for this
     hMainDialog = m_hWnd;
     hDeviceList = m_hWnd;
@@ -516,6 +521,8 @@ void CEndlessUsbToolDlg::InitRufus()
 // The scanning process can be blocking for message processing => use a thread
 DWORD WINAPI CEndlessUsbToolDlg::RufusISOScanThread(LPVOID param)
 {
+    FUNCTION_ENTER;
+
     if (image_path == NULL) {
         uprintf("ERROR: image_path is NULL");
         goto out;
@@ -550,6 +557,8 @@ out:
 
 BOOL CEndlessUsbToolDlg::OnInitDialog()
 {
+    FUNCTION_ENTER;
+
 	CDHtmlDialog::OnInitDialog();
 
     InitLogging();
@@ -617,6 +626,8 @@ BOOL CEndlessUsbToolDlg::OnInitDialog()
 #define THREADS_WAIT_TIMEOUT 10000 // 10 seconds
 void CEndlessUsbToolDlg::Uninit()
 {
+    FUNCTION_ENTER;
+
     int handlesCount = 0;
     HANDLE handlesToWaitFor[4];
     
@@ -1192,6 +1203,7 @@ LRESULT CEndlessUsbToolDlg::WindowProc(UINT message, WPARAM wParam, LPARAM lPara
 // Disable context menu
 STDMETHODIMP CEndlessUsbToolDlg::ShowContextMenu(DWORD dwID, POINT *ppt, IUnknown *pcmdtReserved, IDispatch *pdispReserved)
 {
+    FUNCTION_ENTER;
 	return S_OK;
 }
 
@@ -1220,6 +1232,8 @@ HRESULT CEndlessUsbToolDlg::OnHtmlMouseDown(IHTMLElement* pElement)
 // Private methods
 void CEndlessUsbToolDlg::LoadLocalizationData()
 {
+    FUNCTION_ENTER;
+
 	const char* rufus_loc = "endless.loc";
     int lcid = GetUserDefaultUILanguage();
 	BYTE *loc_data;
@@ -1267,6 +1281,8 @@ error:
 
 void CEndlessUsbToolDlg::ApplyRufusLocalization()
 {
+    FUNCTION_ENTER;
+
 	loc_cmd* lcmd = NULL;
 	int dlg_id = IDD_ENDLESSUSBTOOL_DIALOG;
 	HWND hCtrl = NULL;
@@ -1324,6 +1340,8 @@ void CEndlessUsbToolDlg::ApplyRufusLocalization()
 
 void CEndlessUsbToolDlg::AddLanguagesToUI()
 {
+    FUNCTION_ENTER;
+
 	loc_cmd* lcmd = NULL;
 	CComPtr<IHTMLSelectElement> selectElement;
 	CComPtr<IHTMLOptionElement> optionElement;
@@ -1346,6 +1364,8 @@ void CEndlessUsbToolDlg::AddLanguagesToUI()
 
 void CEndlessUsbToolDlg::ChangePage(PCTSTR oldPage, PCTSTR newPage)
 {
+    FUNCTION_ENTER;
+
 	CComPtr<IHTMLElement> pOldPage = NULL, pNewPage = NULL;
 
     CallJavascript(_T(JS_SHOW_ELEMENT), CComVariant(oldPage), CComVariant(FALSE));
@@ -1378,6 +1398,8 @@ error:
 
 HRESULT CEndlessUsbToolDlg::ClearSelectElement(PCTSTR selectId)
 {
+    FUNCTION_ENTER;
+
     CComPtr<IHTMLSelectElement> selectElement;
     HRESULT hr;
 
@@ -1440,6 +1462,8 @@ error:
 
 bool CEndlessUsbToolDlg::IsButtonDisabled(IHTMLElement *pElement)
 {
+    FUNCTION_ENTER;
+
     CComPtr<IHTMLElement> parentElem;
     CComBSTR className;
     if (FAILED(pElement->get_parentElement(&parentElem)) || parentElem == NULL) return true;
@@ -1462,6 +1486,8 @@ bool CEndlessUsbToolDlg::IsButtonDisabled(IHTMLElement *pElement)
 // First Page Handlers
 HRESULT CEndlessUsbToolDlg::OnTryEndlessSelected(IHTMLElement* pElement)
 {
+    FUNCTION_ENTER;
+
     m_liveInstall = true;
     GoToSelectFilePage();
 
@@ -1472,13 +1498,18 @@ HRESULT CEndlessUsbToolDlg::OnInstallEndlessSelected(IHTMLElement* pElement)
 {
     if (IsButtonDisabled(pElement)) return S_OK;
 
+    FUNCTION_ENTER;
+
     m_liveInstall = false;
     GoToSelectFilePage();
 
 	return S_OK;
 }
 
-void CEndlessUsbToolDlg::GoToSelectFilePage() {
+void CEndlessUsbToolDlg::GoToSelectFilePage()
+{
+    FUNCTION_ENTER;
+
     CComPtr<IHTMLElement> selectElem;
     CComBSTR sizeText;
     RemoteImageEntry_t r;
@@ -1505,6 +1536,8 @@ error:
 
 HRESULT CEndlessUsbToolDlg::OnLinkClicked(IHTMLElement* pElement)
 {
+    FUNCTION_ENTER;
+
     CComBSTR id;
     HRESULT hr;
     uint32_t msg_id = 0;
@@ -1539,6 +1572,8 @@ HRESULT CEndlessUsbToolDlg::OnLinkClicked(IHTMLElement* pElement)
 
 HRESULT CEndlessUsbToolDlg::OnLanguageChanged(IHTMLElement* pElement)
 {
+    FUNCTION_ENTER;
+
 	CComPtr<IHTMLSelectElement> selectElement;
 	CComBSTR selectedValue;
 
@@ -1573,6 +1608,8 @@ error:
 
 void CEndlessUsbToolDlg::UpdateFileEntries(bool shouldInit)
 {
+    FUNCTION_ENTER;
+
     CComPtr<IHTMLElement> pElement;
     CComPtr<IHTMLSelectElement> selectElement;
     HRESULT hr;
@@ -1738,6 +1775,8 @@ checkEntries:
 
 DWORD WINAPI CEndlessUsbToolDlg::FileScanThread(void* param)
 {
+    FUNCTION_ENTER;
+
     CEndlessUsbToolDlg *dlg = (CEndlessUsbToolDlg*)param;
     DWORD error = 0;
     HANDLE handlesToWaitFor[2];
@@ -1780,6 +1819,8 @@ DWORD WINAPI CEndlessUsbToolDlg::FileScanThread(void* param)
 
 void CEndlessUsbToolDlg::StartJSONDownload()
 {
+    FUNCTION_ENTER;
+
     char tmp_path[MAX_PATH] = "";
     bool status;
 
@@ -1838,6 +1879,8 @@ do { \
 
 bool CEndlessUsbToolDlg::UnpackFile(LPCSTR archive, LPCSTR destination)
 {
+    FUNCTION_ENTER;
+
     int64_t result = 0;
 
     // RADU: provide a progress function and move this from UI thread
@@ -1851,6 +1894,8 @@ bool CEndlessUsbToolDlg::UnpackFile(LPCSTR archive, LPCSTR destination)
 
 bool CEndlessUsbToolDlg::ParseJsonFile(LPCTSTR filename, bool isInstallerJson)
 {
+    FUNCTION_ENTER;
+
     Json::Reader reader;
     Json::Value rootValue, imagesElem, jsonElem, personalities, persImages, persImage, fullImage, latestEntry;
     CString latestVersion("");
@@ -1947,6 +1992,8 @@ error:
 
 void CEndlessUsbToolDlg::UpdateDownloadOptions()
 {
+    FUNCTION_ENTER;
+
     CString languagePersonalty = PERSONALITY_ENGLISH;
     CString filePath;
 #ifdef ENABLE_JSON_COMPRESSION
@@ -2045,6 +2092,8 @@ error:
 // Select File Page Handlers
 HRESULT CEndlessUsbToolDlg::OnSelectFilePreviousClicked(IHTMLElement* pElement)
 {
+    FUNCTION_ENTER;
+
     ChangePage(_T(ELEMENT_FILE_PAGE), _T(ELEMENT_FIRST_PAGE));
 
 	return S_OK;
@@ -2052,6 +2101,8 @@ HRESULT CEndlessUsbToolDlg::OnSelectFilePreviousClicked(IHTMLElement* pElement)
 
 HRESULT CEndlessUsbToolDlg::OnSelectFileNextClicked(IHTMLElement* pElement)
 {
+    FUNCTION_ENTER;
+
     LPITEMIDLIST pidlDesktop = NULL;
     SHChangeNotifyEntry NotifyEntry;
     
@@ -2151,6 +2202,8 @@ HRESULT CEndlessUsbToolDlg::OnSelectFileButtonClicked(IHTMLElement* pElement)
 
 HRESULT CEndlessUsbToolDlg::OnSelectedImageFileChanged(IHTMLElement* pElement)
 {
+    FUNCTION_ENTER;
+
     CComPtr<IHTMLSelectElement> selectElement;
     CComBSTR selectedValue;
 
@@ -2171,6 +2224,8 @@ HRESULT CEndlessUsbToolDlg::OnSelectedImageFileChanged(IHTMLElement* pElement)
 
 HRESULT CEndlessUsbToolDlg::OnSelectedRemoteFileChanged(IHTMLElement* pElement)
 {
+    FUNCTION_ENTER;
+
     CComPtr<IHTMLSelectElement> selectElement;
     long selectedIndex;
 
@@ -2199,6 +2254,8 @@ HRESULT CEndlessUsbToolDlg::OnSelectedRemoteFileChanged(IHTMLElement* pElement)
 
 HRESULT CEndlessUsbToolDlg::OnSelectedImageTypeChanged(IHTMLElement* pElement)
 {
+    FUNCTION_ENTER;
+
     CComBSTR id;
     HRESULT hr;
     CComPtr<IHTMLElement> selectElem;
@@ -2222,6 +2279,8 @@ HRESULT CEndlessUsbToolDlg::OnSelectedImageTypeChanged(IHTMLElement* pElement)
 
 HRESULT CEndlessUsbToolDlg::OnDownloadLightButtonClicked(IHTMLElement* pElement)
 {
+    FUNCTION_ENTER;
+
     m_selectedRemoteIndex = m_baseImageRemoteIndex;
     OnSelectFileNextClicked(pElement);
 
@@ -2229,6 +2288,8 @@ HRESULT CEndlessUsbToolDlg::OnDownloadLightButtonClicked(IHTMLElement* pElement)
 }
 HRESULT CEndlessUsbToolDlg::OnDownloadFullButtonClicked(IHTMLElement* pElement)
 {
+    FUNCTION_ENTER;
+
     // trigger select onchange to update selected index
     CComPtr<IHTMLElement> pSelElem;
     GetElement(_T(ELEMENT_SELFILE_DOWN_LANG), &pSelElem);
@@ -2250,6 +2311,8 @@ HRESULT CEndlessUsbToolDlg::OnDownloadFullButtonClicked(IHTMLElement* pElement)
 // Select USB Page Handlers
 HRESULT CEndlessUsbToolDlg::OnSelectUSBPreviousClicked(IHTMLElement* pElement)
 {
+    FUNCTION_ENTER;
+
 	LeavingDevicesPage();
 	ChangePage(_T(ELEMENT_USB_PAGE), _T(ELEMENT_FILE_PAGE));
 
@@ -2259,6 +2322,8 @@ HRESULT CEndlessUsbToolDlg::OnSelectUSBPreviousClicked(IHTMLElement* pElement)
 HRESULT CEndlessUsbToolDlg::OnSelectUSBNextClicked(IHTMLElement* pElement)
 {
     if (IsButtonDisabled(pElement)) return S_OK;
+
+    FUNCTION_ENTER;
 
 	LeavingDevicesPage();
 
@@ -2366,6 +2431,8 @@ HRESULT CEndlessUsbToolDlg::OnSelectUSBNextClicked(IHTMLElement* pElement)
 
 void CEndlessUsbToolDlg::StartOperationThread(int operation, LPTHREAD_START_ROUTINE threadRoutine, LPVOID param)
 {
+    FUNCTION_ENTER;
+
     if (m_operationThread != INVALID_HANDLE_VALUE) {
         uprintf("StartThread: Another operation is in progress. Current operation %ls(%d), requested operation %ls(%d)", 
             OperationToStr(m_currentStep), m_currentStep, OperationToStr(operation), operation);
@@ -2386,6 +2453,8 @@ void CEndlessUsbToolDlg::StartOperationThread(int operation, LPTHREAD_START_ROUT
 
 HRESULT CEndlessUsbToolDlg::OnSelectedUSBDiskChanged(IHTMLElement* pElement)
 {
+    FUNCTION_ENTER;
+
     //int i;
     char fs_type[32];
     int deviceIndex = ComboBox_GetCurSel(hDeviceList);
@@ -2436,6 +2505,8 @@ error:
 
 HRESULT CEndlessUsbToolDlg::OnAgreementCheckboxChanged(IHTMLElement *pElement)
 {
+    FUNCTION_ENTER;
+
     m_usbDeleteAgreement = !m_usbDeleteAgreement;
     OnSelectedUSBDiskChanged(NULL);
     
@@ -2445,6 +2516,8 @@ HRESULT CEndlessUsbToolDlg::OnAgreementCheckboxChanged(IHTMLElement *pElement)
 
 void CEndlessUsbToolDlg::LeavingDevicesPage()
 {
+    FUNCTION_ENTER;
+
     PF_INIT(SHChangeNotifyDeregister, Shell32);
 
     if (pfSHChangeNotifyDeregister != NULL && m_shellNotificationsRegister != 0) {
@@ -2457,6 +2530,8 @@ void CEndlessUsbToolDlg::LeavingDevicesPage()
 HRESULT CEndlessUsbToolDlg::OnInstallCancelClicked(IHTMLElement* pElement)
 {
     if (IsButtonDisabled(pElement)) return S_OK;
+
+    FUNCTION_ENTER;
 
     if (!CancelInstall()) {
         return S_OK;
@@ -2510,6 +2585,8 @@ DownloadType_t CEndlessUsbToolDlg::GetSelectedDownloadType()
 
 void CEndlessUsbToolDlg::OnClose()
 {
+    FUNCTION_ENTER;
+
     if (!CancelInstall()) {
         m_closeRequested = true;
         return;
@@ -2555,6 +2632,8 @@ void CEndlessUsbToolDlg::UpdateCurrentStep(int currentStep)
         uprintf("Already at step %ls(%d)", OperationToStr(currentStep), currentStep);
         return;
     }
+
+    FUNCTION_ENTER;
 
     int nrSteps = m_useLocalFile ? 2 : 3;
     int nrCurrentStep;
@@ -2618,6 +2697,8 @@ bool CEndlessUsbToolDlg::FileHashingCallback(__int64 currentSize, __int64 totalS
 
 DWORD WINAPI CEndlessUsbToolDlg::FileVerificationThread(void* param)
 {
+    FUNCTION_ENTER;
+
     CEndlessUsbToolDlg *dlg = (CEndlessUsbToolDlg*) param;
     CString filename = dlg->m_localFile;
     CString signatureFilename = dlg->m_localFileSig;
@@ -2671,6 +2752,8 @@ const GUID PARTITION_BASIC_DATA_GUID =
 
 DWORD WINAPI CEndlessUsbToolDlg::FileCopyThread(void* param)
 {
+    FUNCTION_ENTER;
+
     CEndlessUsbToolDlg *dlg = (CEndlessUsbToolDlg*)param;
     
     HANDLE hPhysical = INVALID_HANDLE_VALUE;
@@ -2800,6 +2883,8 @@ DWORD CALLBACK CEndlessUsbToolDlg::CopyProgressRoutine(
     LPVOID        lpData
 )
 {
+    FUNCTION_ENTER;
+
     CEndlessUsbToolDlg *dlg = (CEndlessUsbToolDlg*)lpData;
 
     DWORD dwWaitStatus = WaitForSingleObject((HANDLE)dlg->m_cancelOperationEvent, 0);
@@ -2818,6 +2903,8 @@ DWORD CALLBACK CEndlessUsbToolDlg::CopyProgressRoutine(
 
 bool CEndlessUsbToolDlg::ParseImgFileName(const CString& filename, CString &personality, CString &version, bool &installerImage)
 {
+    FUNCTION_ENTER;
+
     // parse filename to get personality and version
     CString lastPart;
     PCTSTR t1 = _T("-"), t2 = _T(".");
@@ -2863,6 +2950,8 @@ error:
 
 void CEndlessUsbToolDlg::GetImgDisplayName(CString &displayName, const CString &version, const CString &personality, ULONGLONG size)
 {
+    FUNCTION_ENTER;
+
     ULONGLONG actualsize = m_liveInstall ? size : (size + m_installerImage.compressedSize);
     // Create display name
     displayName = _T(ENDLESS_OS);
@@ -2882,6 +2971,8 @@ void CEndlessUsbToolDlg::GetImgDisplayName(CString &displayName, const CString &
 
 ULONGLONG CEndlessUsbToolDlg::GetExtractedSize(const CString& filename)
 {
+    FUNCTION_ENTER;
+
     CString ext = CSTRING_GET_LAST(filename, '.');
     int compression_type;
     if (ext == "gz") compression_type = BLED_COMPRESSION_GZIP;
@@ -2894,6 +2985,8 @@ ULONGLONG CEndlessUsbToolDlg::GetExtractedSize(const CString& filename)
 
 void CEndlessUsbToolDlg::GetIEVersion()
 {
+    FUNCTION_ENTER;
+
     CRegKey registryKey;
     LSTATUS result;
     wchar_t versionValue[256];
@@ -2915,6 +3008,8 @@ void CEndlessUsbToolDlg::GetIEVersion()
 
 DWORD WINAPI CEndlessUsbToolDlg::UpdateDownloadProgressThread(void* param)
 {
+    FUNCTION_ENTER;
+
     CComPtr<IBackgroundCopyManager> bcManager;
     CComPtr<IBackgroundCopyJob> currentJob;
     DownloadStatus_t *downloadStatus = NULL;
@@ -2973,6 +3068,8 @@ done:
 
 DWORD WINAPI CEndlessUsbToolDlg::CheckInternetConnectionThread(void* param)
 {
+    FUNCTION_ENTER;
+
     CEndlessUsbToolDlg *dlg = (CEndlessUsbToolDlg*)param;
     DWORD flags;
     BOOL result = FALSE, connected = FALSE, firstTime = TRUE;
@@ -3061,6 +3158,8 @@ void CEndlessUsbToolDlg::InitLogging()
 
 void CEndlessUsbToolDlg::EnableHibenate(bool enable)
 {
+    FUNCTION_ENTER;
+
     EXECUTION_STATE flags;
 
     if (!enable) {
