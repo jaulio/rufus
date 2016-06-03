@@ -217,4 +217,6 @@ private:
 
     void GoToSelectFilePage();
     void InitLogging();
+
+    void EnableHibenate(bool enable = true);
 };

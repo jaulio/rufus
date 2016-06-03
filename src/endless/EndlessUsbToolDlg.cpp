@@ -1112,6 +1112,8 @@ LRESULT CEndlessUsbToolDlg::WindowProc(UINT message, WPARAM wParam, LPARAM lPara
             m_operationThread = INVALID_HANDLE_VALUE;
             m_currentStep = OP_NO_OPERATION_IN_PROGRESS;
 
+            EnableHibenate();
+
             if (!IS_ERROR(FormatStatus)) {
                 PrintInfo(0, MSG_210);
                 m_operationThread = INVALID_HANDLE_VALUE;
@@ -1145,6 +1147,32 @@ LRESULT CEndlessUsbToolDlg::WindowProc(UINT message, WPARAM wParam, LPARAM lPara
             CallJavascript(_T(JS_ENABLE_DOWNLOAD), CComVariant(m_remoteImages.GetCount() != 0), CComVariant(connected));
             CallJavascript(_T(JS_ENABLE_BUTTON), CComVariant(HTML_BUTTON_ID(_T(ELEMENT_DOWNLOAD_LIGHT_BUTTON))), CComVariant(connected && (m_baseImageRemoteIndex != -1)));
 
+            break;
+        }
+
+        case WM_POWERBROADCAST:
+        {
+            uprintf("Received WM_POWERBROADCAST with WPARAM 0x%X LPARAM 0x%X", wParam, lParam);
+            bool shouldStopSuspend = m_currentStep != OP_NO_OPERATION_IN_PROGRESS;
+            if (shouldStopSuspend && lParam & PBT_APMQUERYSUSPEND) {
+                uprintf("Received WM_POWERBROADCAST with PBT_APMQUERYSUSPEND and trying to cancel it.");
+                return BROADCAST_QUERY_DENY;
+            } else {
+                if (wParam == PBT_APMSUSPEND) {
+                    uprintf("Received PBT_APMSUSPEND so canceling the operation.");
+                    bool operation_in_progress = m_currentStep == OP_FLASHING_DEVICE;
+                    SetEvent(m_cancelOperationEvent);
+                    if (operation_in_progress) {
+                        FormatStatus = ERROR_SEVERITY_ERROR | FAC(FACILITY_STORAGE) | ERROR_CANCELLED;
+                    } else {
+                        m_downloadManager.Uninit();
+                        FormatStatus = ERROR_SEVERITY_ERROR | FAC(FACILITY_STORAGE) | ERROR_CANCELLED;
+                        PostMessage(WM_FINISHED_ALL_OPERATIONS, (WPARAM)FALSE, 0);
+                    }
+                }
+
+                return TRUE;
+            }
             break;
         }
 
@@ -2237,6 +2265,8 @@ HRESULT CEndlessUsbToolDlg::OnSelectUSBNextClicked(IHTMLElement* pElement)
     SetElementText(_T(ELEMENT_INSTALL_STATUS), CComBSTR(""));
     SetElementText(_T(ELEMENT_INSTALL_DESCRIPTION), CComBSTR(""));
 
+    EnableHibenate(false);
+
     // Radu: we need to download an installer if only a live image is found and full install was selected
     if (m_useLocalFile) {
         m_localFile = image_path;
@@ -2429,7 +2459,6 @@ HRESULT CEndlessUsbToolDlg::OnInstallCancelClicked(IHTMLElement* pElement)
     if (IsButtonDisabled(pElement)) return S_OK;
 
     if (!CancelInstall()) {
-        CallJavascript(_T(JS_ENABLE_BUTTON), CComVariant(HTML_BUTTON_ID(_T(ELEMENT_INSTALL_CANCEL))), CComVariant(FALSE));
         return S_OK;
     }
 
@@ -2457,9 +2486,12 @@ bool CEndlessUsbToolDlg::CancelInstall()
 {
     bool operation_in_progress = m_currentStep == OP_FLASHING_DEVICE;
 
+    uprintf("Cancel requested. Operation in progress: %s", operation_in_progress ? "YES" : "NO");
     if (operation_in_progress) {
         int result = MessageBoxExU(hMainDialog, lmprintf(MSG_105), lmprintf(MSG_049), MB_YESNO | MB_ICONWARNING | MB_IS_RTL, selected_langid);
         if (result == IDYES) {
+            uprintf("Cancel operation confirmed.");
+            CallJavascript(_T(JS_ENABLE_BUTTON), CComVariant(HTML_BUTTON_ID(_T(ELEMENT_INSTALL_CANCEL))), CComVariant(FALSE));
             FormatStatus = ERROR_SEVERITY_ERROR | FAC(FACILITY_STORAGE) | ERROR_CANCELLED;
             uprintf("Cancelling current operation.");
             CString str = UTF8ToCString(lmprintf(MSG_201));
@@ -3025,4 +3057,21 @@ void CEndlessUsbToolDlg::InitLogging()
         uprintf("CFileException on file [%ls] with cause [%d] and OS error [%d]", fileName, ex->m_cause, ex->m_lOsError);
         ex->Delete();
     }
+}
+
+void CEndlessUsbToolDlg::EnableHibenate(bool enable)
+{
+    EXECUTION_STATE flags;
+
+    if (!enable) {
+        if (nWindowsVersion == WINDOWS_XP) {
+            flags = ES_CONTINUOUS | ES_SYSTEM_REQUIRED;
+        } else {
+            flags = ES_CONTINUOUS | ES_SYSTEM_REQUIRED | ES_AWAYMODE_REQUIRED;
+        }
+    } else {
+        flags = ES_CONTINUOUS;
+    }
+
+    SetThreadExecutionState(flags);
 }
