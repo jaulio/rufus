@@ -218,5 +218,7 @@ private:
     void GoToSelectFilePage();
     void InitLogging();
 
-    void EnableHibenate(bool enable = true);
+    void EnableHibernate(bool enable = true);
+
+    void CancelRunningOperation();
 };

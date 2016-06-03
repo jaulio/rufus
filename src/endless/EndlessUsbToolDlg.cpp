@@ -230,7 +230,10 @@ const wchar_t* mainWindowTitle = L"Endless USB Creator";
 
 
 #define UPDATE_DOWNLOAD_PROGRESS_TIME       2000
-#define CHECK_INTERNET_CONNECTION_TIME      3000
+#define CHECK_INTERNET_CONNECTION_TIME      2000
+
+
+#define FORMAT_STATUS_CANCEL (ERROR_SEVERITY_ERROR | FAC(FACILITY_STORAGE) | ERROR_CANCELLED)
 
 // utility method for quick char* UTF8 conversion to BSTR
 CComBSTR UTF8ToBSTR(const char *txt) {
@@ -1123,7 +1126,7 @@ LRESULT CEndlessUsbToolDlg::WindowProc(UINT message, WPARAM wParam, LPARAM lPara
             m_operationThread = INVALID_HANDLE_VALUE;
             m_currentStep = OP_NO_OPERATION_IN_PROGRESS;
 
-            EnableHibenate();
+            EnableHibernate();
 
             if (!IS_ERROR(FormatStatus)) {
                 PrintInfo(0, MSG_210);
@@ -1132,6 +1135,7 @@ LRESULT CEndlessUsbToolDlg::WindowProc(UINT message, WPARAM wParam, LPARAM lPara
             } else if (SCODE_CODE(FormatStatus) == ERROR_CANCELLED) {
                 PrintInfo(0, MSG_211);
                 if (m_closeRequested) {
+                    Uninit();
                     AfxPostQuitMessage(0);
                 } else {
                     // RADU: change the text on the error page 
@@ -1153,6 +1157,8 @@ LRESULT CEndlessUsbToolDlg::WindowProc(UINT message, WPARAM wParam, LPARAM lPara
 
             if (m_isConnected) {
                 StartJSONDownload();
+            } else if(m_currentStep == OP_DOWNLOADING_FILES) {
+                CancelRunningOperation();
             }
 
             CallJavascript(_T(JS_ENABLE_DOWNLOAD), CComVariant(m_remoteImages.GetCount() != 0), CComVariant(connected));
@@ -1171,15 +1177,7 @@ LRESULT CEndlessUsbToolDlg::WindowProc(UINT message, WPARAM wParam, LPARAM lPara
             } else {
                 if (wParam == PBT_APMSUSPEND) {
                     uprintf("Received PBT_APMSUSPEND so canceling the operation.");
-                    bool operation_in_progress = m_currentStep == OP_FLASHING_DEVICE;
-                    SetEvent(m_cancelOperationEvent);
-                    if (operation_in_progress) {
-                        FormatStatus = ERROR_SEVERITY_ERROR | FAC(FACILITY_STORAGE) | ERROR_CANCELLED;
-                    } else {
-                        m_downloadManager.Uninit();
-                        FormatStatus = ERROR_SEVERITY_ERROR | FAC(FACILITY_STORAGE) | ERROR_CANCELLED;
-                        PostMessage(WM_FINISHED_ALL_OPERATIONS, (WPARAM)FALSE, 0);
-                    }
+                    CancelRunningOperation();
                 }
 
                 return TRUE;
@@ -2330,7 +2328,7 @@ HRESULT CEndlessUsbToolDlg::OnSelectUSBNextClicked(IHTMLElement* pElement)
     SetElementText(_T(ELEMENT_INSTALL_STATUS), CComBSTR(""));
     SetElementText(_T(ELEMENT_INSTALL_DESCRIPTION), CComBSTR(""));
 
-    EnableHibenate(false);
+    EnableHibernate(false);
 
     // Radu: we need to download an installer if only a live image is found and full install was selected
     if (m_useLocalFile) {
@@ -2372,7 +2370,7 @@ HRESULT CEndlessUsbToolDlg::OnSelectUSBNextClicked(IHTMLElement* pElement)
                     ChangePage(_T(ELEMENT_USB_PAGE), _T(ELEMENT_INSTALL_PAGE));
                     // RADU: add custom error values for each of the errors so we can identify them and show a custom message for each
                     uprintf("Error adding files for download");
-                    FormatStatus = ERROR_SEVERITY_ERROR | FAC(FACILITY_STORAGE) | ERROR_CANCELLED;
+                    FormatStatus = FORMAT_STATUS_CANCEL;
                     PostMessage(WM_FINISHED_ALL_OPERATIONS, (WPARAM)FALSE, 0);
                     return S_OK;
                 }
@@ -2397,7 +2395,7 @@ HRESULT CEndlessUsbToolDlg::OnSelectUSBNextClicked(IHTMLElement* pElement)
                     ChangePage(_T(ELEMENT_USB_PAGE), _T(ELEMENT_INSTALL_PAGE));
                     // RADU: add custom error values for each of the errors so we can identify them and show a custom message for each
                     uprintf("Error adding files for download");
-                    FormatStatus = ERROR_SEVERITY_ERROR | FAC(FACILITY_STORAGE) | ERROR_CANCELLED;
+                    FormatStatus = FORMAT_STATUS_CANCEL;
                     PostMessage(WM_FINISHED_ALL_OPERATIONS, (WPARAM)FALSE, 0);
                     return S_OK;
                 }
@@ -2537,13 +2535,7 @@ HRESULT CEndlessUsbToolDlg::OnInstallCancelClicked(IHTMLElement* pElement)
         return S_OK;
     }
 
-    if(m_operationThread != INVALID_HANDLE_VALUE) {
-        SetEvent(m_cancelOperationEvent);
-    } else {
-        m_downloadManager.Uninit();
-        FormatStatus = ERROR_SEVERITY_ERROR | FAC(FACILITY_STORAGE) | ERROR_CANCELLED;
-        PostMessage(WM_FINISHED_ALL_OPERATIONS, (WPARAM)FALSE, 0);
-    }
+    CancelRunningOperation();
 
     return S_OK;
 }
@@ -2563,15 +2555,17 @@ bool CEndlessUsbToolDlg::CancelInstall()
 
     uprintf("Cancel requested. Operation in progress: %s", operation_in_progress ? "YES" : "NO");
     if (operation_in_progress) {
-        int result = MessageBoxExU(hMainDialog, lmprintf(MSG_105), lmprintf(MSG_049), MB_YESNO | MB_ICONWARNING | MB_IS_RTL, selected_langid);
-        if (result == IDYES) {
-            uprintf("Cancel operation confirmed.");
-            CallJavascript(_T(JS_ENABLE_BUTTON), CComVariant(HTML_BUTTON_ID(_T(ELEMENT_INSTALL_CANCEL))), CComVariant(FALSE));
-            FormatStatus = ERROR_SEVERITY_ERROR | FAC(FACILITY_STORAGE) | ERROR_CANCELLED;
-            uprintf("Cancelling current operation.");
-            CString str = UTF8ToCString(lmprintf(MSG_201));
-            SetElementText(_T(ELEMENT_INSTALL_DESCRIPTION), CComBSTR(str));
-            SetElementText(_T(ELEMENT_INSTALL_STATUS), CComBSTR(""));
+        if (FormatStatus != FORMAT_STATUS_CANCEL) {
+            int result = MessageBoxExU(hMainDialog, lmprintf(MSG_105), lmprintf(MSG_049), MB_YESNO | MB_ICONWARNING | MB_IS_RTL, selected_langid);
+            if (result == IDYES) {
+                uprintf("Cancel operation confirmed.");
+                CallJavascript(_T(JS_ENABLE_BUTTON), CComVariant(HTML_BUTTON_ID(_T(ELEMENT_INSTALL_CANCEL))), CComVariant(FALSE));
+                FormatStatus = FORMAT_STATUS_CANCEL;
+                uprintf("Cancelling current operation.");
+                CString str = UTF8ToCString(lmprintf(MSG_201));
+                SetElementText(_T(ELEMENT_INSTALL_DESCRIPTION), CComBSTR(str));
+                SetElementText(_T(ELEMENT_INSTALL_STATUS), CComBSTR(""));
+            }
         }
     }
 
@@ -3089,7 +3083,7 @@ DWORD WINAPI CEndlessUsbToolDlg::CheckInternetConnectionThread(void* param)
                 IFFALSE_BREAK(result, "Device not connected to internet.");
 
                 result = InternetCheckConnection(JSON_URL(JSON_LIVE_FILE), FLAG_ICC_FORCE_CONNECTION, 0);
-                IFFALSE_BREAK(result, "Cannot connect to server to download JSON.");
+                IFFALSE_BREAK(result, "Cannot connect to server hosting the JSON file.");
 
                 result = TRUE;
                 break;
@@ -3156,7 +3150,7 @@ void CEndlessUsbToolDlg::InitLogging()
     }
 }
 
-void CEndlessUsbToolDlg::EnableHibenate(bool enable)
+void CEndlessUsbToolDlg::EnableHibernate(bool enable)
 {
     FUNCTION_ENTER;
 
@@ -3173,4 +3167,17 @@ void CEndlessUsbToolDlg::EnableHibenate(bool enable)
     }
 
     SetThreadExecutionState(flags);
+}
+
+void CEndlessUsbToolDlg::CancelRunningOperation()
+{
+    FUNCTION_ENTER;
+
+    SetEvent(m_cancelOperationEvent);
+
+    FormatStatus = FORMAT_STATUS_CANCEL;
+    if (m_currentStep != OP_FLASHING_DEVICE) {
+        m_downloadManager.Uninit();
+        PostMessage(WM_FINISHED_ALL_OPERATIONS, (WPARAM)FALSE, 0);
+    }
 }
