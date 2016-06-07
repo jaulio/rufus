@@ -35,15 +35,15 @@ function enableElement(id, enable) {
 }
 
 function enableDownload(enable, internetConnected) {
-    enableElement("OperatingSystemTypeOnline", enable);
-    enableElement("OnlineImagesSelect", enable);
+    enableElement("OperatingSystemTypeOnline", internetConnected && enable);
+    enableElement("OnlineImagesSelect", internetConnected && enable);
 
 	showElement("SelectFileSubtitle", internetConnected);
 	showElement("NoInternetConnection", !internetConnected);
 
-	enableElement("DownloadLanguageSelect", enable);
-//	enableButton("DownloadLightButtonC", enable); //disabled by C++
-	enableButton("DownloadFullButtonC", enable);
+	enableElement("DownloadLanguageSelect", internetConnected && enable);
+//	enableButton("DownloadLightButtonC", internetConnected && enable); //disabled by C++
+	enableButton("DownloadFullButtonC", internetConnected && enable);
 
 	enableButton("SelectFileNextButtonC", enable);
 }
