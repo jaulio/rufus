@@ -256,6 +256,22 @@ CString UTF8ToCString(const char *txt) {
     return return_value;
 }
 
+CStringA ConvertUnicodeToUTF8(const CStringW& uni)
+{
+    if (uni.IsEmpty()) return ""; // nothing to do
+    CStringA utf8;
+    int cc = 0;
+    // get length (cc) of the new multibyte string excluding the \0 terminator first
+    if ((cc = WideCharToMultiByte(CP_UTF8, 0, uni, -1, NULL, 0, 0, 0) - 1) > 0)
+    {
+        // convert
+        char *buf = utf8.GetBuffer(cc);
+        if (buf) WideCharToMultiByte(CP_UTF8, 0, uni, -1, buf, cc, 0, 0);
+        utf8.ReleaseBuffer();
+    }
+    return utf8;
+}
+
 static LPCTSTR OperationToStr(int op)
 {
     switch (op)
@@ -1092,15 +1108,14 @@ LRESULT CEndlessUsbToolDlg::WindowProc(UINT message, WPARAM wParam, LPARAM lPara
                 bool verifiedInstallerImage = (m_localFile == m_localInstallerImage.filePath);
                 if (!m_liveInstall && !verifiedInstallerImage) {
                     safe_free(image_path);
-                    CComBSTR bstrString(m_localInstallerImage.filePath);
-                    image_path = _com_util::ConvertBSTRToString(bstrString);
+                    image_path = wchar_to_utf8(m_localInstallerImage.filePath);
 
                     // Radu: please make time to refactor this.
                     // store this to copy them
                     m_LiveFile = m_localFile;
                     m_LiveFileSig = m_localFileSig;
 
-                    m_localFile = image_path;
+                    m_localFile = UTF8ToCString(image_path);
                     m_localFileSig = m_localFile + SIGNATURE_FILE_EXT;
                     StartOperationThread(OP_VERIFYING_SIGNATURE, CEndlessUsbToolDlg::FileVerificationThread);
                 } else {
@@ -1747,7 +1762,7 @@ checkEntries:
     if (m_useLocalFile) {
         safe_free(image_path);
         if (selectedValue != NULL) {
-            image_path = _com_util::ConvertBSTRToString(selectedValue);
+            image_path = wchar_to_utf8(selectedValue);
         }
     }
 
@@ -2003,7 +2018,7 @@ void CEndlessUsbToolDlg::UpdateDownloadOptions()
     filePath = GET_LOCAL_PATH(CString(JSON_LIVE_FILE));
 #ifdef ENABLE_JSON_COMPRESSION
     filePathGz = GET_LOCAL_PATH(CString(JSON_PACKED(JSON_LIVE_FILE)));
-    IFFALSE_GOTOERROR(UnpackFile(CStringA(filePathGz), CStringA(filePath)), "Error uncompressing eos JSON file.");
+    IFFALSE_GOTOERROR(UnpackFile(ConvertUnicodeToUTF8(filePathGz), ConvertUnicodeToUTF8(filePath)), "Error uncompressing eos JSON file.");
 #endif // ENABLE_JSON_COMPRESSION
     IFFALSE_GOTOERROR(ParseJsonFile(filePath, false), "Error parsing eos JSON file.");
 
@@ -2011,7 +2026,7 @@ void CEndlessUsbToolDlg::UpdateDownloadOptions()
         filePath = GET_LOCAL_PATH(CString(JSON_INSTALLER_FILE));
 #ifdef ENABLE_JSON_COMPRESSION
         filePathGz = GET_LOCAL_PATH(CString(JSON_PACKED(JSON_INSTALLER_FILE)));
-        IFFALSE_GOTOERROR(UnpackFile(CStringA(filePathGz), CStringA(filePath)), "Error uncompressing eosinstaller JSON file.");
+        IFFALSE_GOTOERROR(UnpackFile(ConvertUnicodeToUTF8(filePathGz), ConvertUnicodeToUTF8(filePath)), "Error uncompressing eosinstaller JSON file.");
 #endif // ENABLE_JSON_COMPRESSION
         IFFALSE_GOTOERROR(ParseJsonFile(filePath, true), "Error parsing eosinstaller JSON file.");
     }
@@ -2129,7 +2144,7 @@ HRESULT CEndlessUsbToolDlg::OnSelectFileNextClicked(IHTMLElement* pElement)
     ULONGLONG size = 0;
     bool isInstallerImage = false;
     if (m_useLocalFile) {
-        selectedImage = image_path;
+        selectedImage = UTF8ToCString(image_path);
         pFileImageEntry_t localEntry = NULL;
         if (!m_imageFiles.Lookup(selectedImage, localEntry)) {
             uprintf("ERROR: Selected local file not found.");
@@ -2187,7 +2202,7 @@ HRESULT CEndlessUsbToolDlg::OnSelectFileButtonClicked(IHTMLElement* pElement)
     //EXT_DECL(img_ext, NULL, __VA_GROUP__("*.img;*.gz;*.xz"), __VA_GROUP__(lmprintf(MSG_095)));
 
     //char *image_path = FileDialog(FALSE, NULL, &img_ext, 0);
-    //CString selectedFilePath(image_path);
+    //CString selectedFilePath = Utf8ToCString(image_path);
 
     //CFile file(selectedFilePath, CFile::modeRead);
 
@@ -2212,7 +2227,7 @@ HRESULT CEndlessUsbToolDlg::OnSelectedImageFileChanged(IHTMLElement* pElement)
     IFFALSE_RETURN_VALUE(SUCCEEDED(hr) && selectElement != NULL, "Error getting selected file value", S_OK);
 
     safe_free(image_path);
-    image_path = _com_util::ConvertBSTRToString(selectedValue);
+    image_path = wchar_to_utf8(selectedValue);
     uprintf("OnSelectedImageFileChanged to LOCAL [%s]", image_path);
 
     m_useLocalFile = true;
@@ -2332,7 +2347,7 @@ HRESULT CEndlessUsbToolDlg::OnSelectUSBNextClicked(IHTMLElement* pElement)
 
     // Radu: we need to download an installer if only a live image is found and full install was selected
     if (m_useLocalFile) {
-        m_localFile = image_path;
+        m_localFile = UTF8ToCString(image_path);
         m_localFileSig = m_localFile + SIGNATURE_FILE_EXT;
 
         StartOperationThread(OP_VERIFYING_SIGNATURE, CEndlessUsbToolDlg::FileVerificationThread);
@@ -2351,8 +2366,7 @@ HRESULT CEndlessUsbToolDlg::OnSelectUSBNextClicked(IHTMLElement* pElement)
 
         // add image file path for Rufus
         safe_free(image_path);
-        CComBSTR bstrString(m_localFile);
-        image_path = _com_util::ConvertBSTRToString(bstrString);
+        image_path = wchar_to_utf8(m_localFile);
 
         // List of files to download
         //ListOfStrings urls, files;
@@ -2468,7 +2482,7 @@ HRESULT CEndlessUsbToolDlg::OnSelectedUSBDiskChanged(IHTMLElement* pElement)
     ULONGLONG size = 0;
     if (m_useLocalFile) {
         pFileImageEntry_t localEntry = NULL;
-        CString selectedImage(image_path);
+        CString selectedImage = UTF8ToCString(image_path);
 
         size = GetExtractedSize(selectedImage);
         if (!m_liveInstall && m_imageFiles.Lookup(selectedImage, localEntry)) {
@@ -2877,7 +2891,7 @@ DWORD CALLBACK CEndlessUsbToolDlg::CopyProgressRoutine(
     LPVOID        lpData
 )
 {
-    FUNCTION_ENTER;
+    //FUNCTION_ENTER;
 
     CEndlessUsbToolDlg *dlg = (CEndlessUsbToolDlg*)lpData;
 
@@ -2973,7 +2987,7 @@ ULONGLONG CEndlessUsbToolDlg::GetExtractedSize(const CString& filename)
     else if (ext == "xz") compression_type = BLED_COMPRESSION_XZ;
     else return 0;
 
-    CStringA asciiFileName(filename);
+    CStringA asciiFileName = ConvertUnicodeToUTF8(filename);
     return get_eos_archive_disk_image_size(asciiFileName, compression_type);
 }
 
@@ -3103,15 +3117,18 @@ done:
 
 void CEndlessUsbToolDlg::InitLogging()
 {
-    // Retrieve the current application directory as well as the system & sysnative dirs
-    if (GetModuleFileNameA(NULL, app_dir, sizeof(app_dir)) == 0) {
-        uprintf("Could not get current directory: %s", WindowsErrorString());
+    TCHAR *path = m_appDir.GetBufferSetLength(MAX_PATH + 1);
+    // Retrieve the current application directory
+    if (GetModuleFileName(NULL, path, MAX_PATH) == 0) {
+        uprintf("Could not get current directory    : %s", WindowsErrorString());
         app_dir[0] = 0;
+        m_appDir = _T("");
+    } else {
+        m_appDir = CSTRING_GET_PATH(m_appDir, _T('\\'));
+        strcpy_s(app_dir, sizeof(app_dir) - 1, ConvertUnicodeToUTF8(m_appDir));
+        app_dir[sizeof(app_dir) - 1] = 0;
     }
-    CStringA appDirStr = app_dir;
-    appDirStr = CSTRING_GET_PATH(appDirStr, '\\');
-    strcpy_s(app_dir, appDirStr);
-    m_appDir = appDirStr;
+    m_appDir.ReleaseBuffer();
 
     // Set the Windows version
     GetWindowsVersion();
