@@ -15,6 +15,15 @@ typedef struct FileImageEntry {
     BOOL stillPresent;
 } FileImageEntry_t, *pFileImageEntry_t;
 
+typedef enum ErrorCause {
+    ErrorCauseGeneric,
+    ErrorCauseCanceled,
+    ErrorCauseDownloadFailed,
+    ErrorCauseVerificationFailed,
+    ErrorCauseWriteFailed,
+    ErrorCauseNone
+} ErrorCause_t;
+
 typedef struct RemoteImageEntry {
     ULONGLONG compressedSize;
     ULONGLONG extractedSize;
@@ -112,7 +121,7 @@ private:
     BOOL m_automount;
     HANDLE m_FilesChangedHandle;
     HANDLE m_cancelOperationEvent;
-    HANDLE m_closeAppEvent;
+    HANDLE m_closeFileScanThreadEvent;
     HANDLE m_fileScanThread;
     HANDLE m_operationThread;
     HANDLE m_downloadUpdateThread;
@@ -152,6 +161,7 @@ private:
 
     bool m_enableLogDebugging;
     CFile m_logFile;
+    ErrorCause_t m_lastErrorCause;
 
     void StartOperationThread(int operation, LPTHREAD_START_ROUTINE threadRoutine, LPVOID param = NULL);
 
@@ -182,7 +192,7 @@ private:
 
 	void Uninit();
 
-    void ErrorOccured(const CString errorMessage);
+    void ErrorOccured(ErrorCause_t errorCause);
 
     HRESULT CallJavascript(LPCTSTR method, CComVariant parameter1, CComVariant parameter2 = NULL);
     void UpdateCurrentStep(int currentStep);

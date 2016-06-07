@@ -144,12 +144,15 @@ BOOL FormatDrive(DWORD DriveIndex);
 #define ELEMENT_INSTALLER_LANGUAGE      "InstallerVersionLanguage"
 #define ELEMENT_INSTALLER_CONTENT       "InstallerContentValue"
 #define ELEMENT_THANKYOU_MESSAGE        "ThankYouMessage"
+#define ELEMENT_USBBOOT_HOWTO           "UsbBootHowToLink"
 //Error page
 #define ELEMENT_ERROR_MESSAGE           "ErrorMessage"
 #define ELEMENT_ERROR_CLOSE_BUTTON      "CloseAppButton1"
 #define ELEMENT_ENDLESS_SUPPORT         "EndlessSupport"
+#define ELEMENT_ERROR_SUGGESTION        "ErrorMessageSuggestion"
+#define ELEMENT_ERROR_BUTTON            "ErrorContinueButton"
 
-#define ELEMENT_VERSION_CONTAINER          "VersionContainer"
+#define ELEMENT_VERSION_CONTAINER       "VersionContainer"
 
 // Javascript methods
 #define JS_SET_PROGRESS                 "setProgress"
@@ -295,6 +298,20 @@ static LPCTSTR OperationToStr(int op)
     }
 }
 
+static LPCTSTR ErrorCauseToStr(ErrorCause_t errorCause)
+{
+    switch (errorCause)
+    {
+        TOSTR(ErrorCauseGeneric);
+        TOSTR(ErrorCauseCanceled);
+        TOSTR(ErrorCauseDownloadFailed);
+        TOSTR(ErrorCauseVerificationFailed);
+        TOSTR(ErrorCauseWriteFailed);
+        TOSTR(ErrorCauseNone);
+        default: return _T("Error Cause Unknown");
+    }
+}
+
 
 extern "C" void UpdateProgress(int op, float percent)
 {
@@ -354,7 +371,8 @@ BEGIN_DHTML_EVENT_MAP(CEndlessUsbToolDlg)
 
 	// Thank You Page handlers
 	DHTML_EVENT_ONCLICK(_T(ELEMENT_SECUREBOOT_HOWTO2), OnLinkClicked)
-    DHTML_EVENT_ONCLICK(_T(ELEMENT_CLOSE_BUTTON), OnCloseAppClicked)    
+    DHTML_EVENT_ONCLICK(_T(ELEMENT_CLOSE_BUTTON), OnCloseAppClicked)
+    DHTML_EVENT_ONCLICK(_T(ELEMENT_USBBOOT_HOWTO), OnLinkClicked)
 
     // Error Page handlers
     DHTML_EVENT_ONCLICK(_T(ELEMENT_ERROR_CLOSE_BUTTON), OnCloseAppClicked)
@@ -394,11 +412,13 @@ CEndlessUsbToolDlg::CEndlessUsbToolDlg(UINT globalMessage, bool enableLogDebuggi
     m_usbDeleteAgreement(false),
     m_currentStep(OP_NO_OPERATION_IN_PROGRESS),
     m_cancelOperationEvent(CreateEvent(NULL, TRUE, FALSE, NULL)),
+    m_closeFileScanThreadEvent(CreateEvent(NULL, TRUE, FALSE, NULL)),
     m_closeRequested(false),
     m_ieVersion(0),
     m_globalWndMessage(globalMessage),
     m_isConnected(false),
-    m_enableLogDebugging(enableLogDebugging)
+    m_enableLogDebugging(enableLogDebugging),
+    m_lastErrorCause(ErrorCause_t::ErrorCauseNone)
 {
     FUNCTION_ENTER;
     m_hIcon = AfxGetApp()->LoadIcon(IDR_MAINFRAME);    
@@ -656,7 +676,8 @@ void CEndlessUsbToolDlg::Uninit()
     if (m_checkConnectionThread != INVALID_HANDLE_VALUE) handlesToWaitFor[handlesCount++] = m_checkConnectionThread;
 
     if (handlesCount > 0) {
-        SetEvent(m_cancelOperationEvent);
+        if (m_closeFileScanThreadEvent != INVALID_HANDLE_VALUE) SetEvent(m_closeFileScanThreadEvent);
+        if (m_cancelOperationEvent != INVALID_HANDLE_VALUE) SetEvent(m_cancelOperationEvent);
         DWORD waitStatus = WaitForMultipleObjects(handlesCount, handlesToWaitFor, TRUE, THREADS_WAIT_TIMEOUT);
 
         if (waitStatus == WAIT_TIMEOUT) {
@@ -667,6 +688,11 @@ void CEndlessUsbToolDlg::Uninit()
     if (m_cancelOperationEvent != INVALID_HANDLE_VALUE) {
         CloseHandle(m_cancelOperationEvent);
         m_cancelOperationEvent = INVALID_HANDLE_VALUE;
+    }
+
+    if (m_closeFileScanThreadEvent != INVALID_HANDLE_VALUE) {
+        CloseHandle(m_closeFileScanThreadEvent);
+        m_closeFileScanThreadEvent = INVALID_HANDLE_VALUE;
     }
 
     m_downloadManager.Uninit();
@@ -958,7 +984,7 @@ LRESULT CEndlessUsbToolDlg::WindowProc(UINT message, WPARAM wParam, LPARAM lPara
             if (!img_report.is_bootable_img ||
                 (img_report.compression_type != BLED_COMPRESSION_GZIP && img_report.compression_type != BLED_COMPRESSION_XZ)) {
                 uprintf("FAILURE: selected image is not bootable and compresion is different frome what is expected: xz/gz");
-                ErrorOccured(UTF8ToCString(lmprintf(MSG_303)));
+                ErrorOccured(ErrorCause_t::ErrorCauseVerificationFailed);
             } else {
                 uprintf("Bootable image selected with correct format.");
 
@@ -1031,6 +1057,9 @@ LRESULT CEndlessUsbToolDlg::WindowProc(UINT message, WPARAM wParam, LPARAM lPara
             if (!IS_ERROR(FormatStatus) && !m_liveInstall) {
                 StartOperationThread(OP_FILE_COPY, CEndlessUsbToolDlg::FileCopyThread);
             } else {
+                if (IS_ERROR(FormatStatus) && m_lastErrorCause != ErrorCause_t::ErrorCauseNone) {
+                    m_lastErrorCause = ErrorCause_t::ErrorCauseWriteFailed;
+                }
                 PostMessage(WM_FINISHED_ALL_OPERATIONS, 0, 0);
             }
             break;
@@ -1049,7 +1078,8 @@ LRESULT CEndlessUsbToolDlg::WindowProc(UINT message, WPARAM wParam, LPARAM lPara
             bool isReleaseJsonDownload = downloadStatus->jobName == DownloadManager::GetJobName(DownloadType_t::DownloadTypeReleseJson);
             // DO STUFF
             if (downloadStatus->error) {
-                ErrorOccured(UTF8ToCString(lmprintf(MSG_300)));
+                m_lastErrorCause = ErrorCause_t::ErrorCauseDownloadFailed;
+                ErrorOccured(ErrorCause_t::ErrorCauseDownloadFailed);
             } else if (downloadStatus->done) {
                 uprintf("Download done for %ls", downloadStatus->jobName);
 
@@ -1123,10 +1153,12 @@ LRESULT CEndlessUsbToolDlg::WindowProc(UINT message, WPARAM wParam, LPARAM lPara
                 }
             }
             else {
-                uprintf("Verification failed.");
-                // RADU: add more specific errors
-                FormatStatus = ERROR_SEVERITY_ERROR | FAC(FACILITY_STORAGE) | APPERR(ERROR_GEN_FAILURE);
-                PostMessage(UM_FORMAT_COMPLETED, (WPARAM)FALSE, 0);
+                uprintf("Signature verification failed.");
+                if (m_lastErrorCause == ErrorCause_t::ErrorCauseNone) {
+                    ErrorOccured(ErrorCause_t::ErrorCauseVerificationFailed);
+                } else {
+                    ErrorOccured(m_lastErrorCause);
+                }
             }
             break;
         }
@@ -1143,24 +1175,15 @@ LRESULT CEndlessUsbToolDlg::WindowProc(UINT message, WPARAM wParam, LPARAM lPara
 
             EnableHibernate();
 
-            if (!IS_ERROR(FormatStatus)) {
+            switch (m_lastErrorCause) {
+            case ErrorCause_t::ErrorCauseNone:
                 PrintInfo(0, MSG_210);
                 m_operationThread = INVALID_HANDLE_VALUE;
                 ChangePage(_T(ELEMENT_INSTALL_PAGE), _T(ELEMENT_SUCCESS_PAGE));
-            } else if (SCODE_CODE(FormatStatus) == ERROR_CANCELLED) {
-                PrintInfo(0, MSG_211);
-                if (m_closeRequested) {
-                    Uninit();
-                    AfxPostQuitMessage(0);
-                } else {
-                    // RADU: change the text on the error page 
-                    ErrorOccured(L"");
-                }
-            }
-            else {
-                PrintInfo(0, MSG_212);
-                CString error = UTF8ToCString(StrError(FormatStatus, FALSE));
-                ErrorOccured(error);
+                break;
+            default:
+                ErrorOccured(m_lastErrorCause);
+                break;
             }
             FormatStatus = 0;
             break;
@@ -1173,6 +1196,7 @@ LRESULT CEndlessUsbToolDlg::WindowProc(UINT message, WPARAM wParam, LPARAM lPara
             if (m_isConnected) {
                 StartJSONDownload();
             } else if(m_currentStep == OP_DOWNLOADING_FILES) {
+                m_lastErrorCause = ErrorCause_t::ErrorCauseDownloadFailed;
                 CancelRunningOperation();
             }
 
@@ -1192,6 +1216,7 @@ LRESULT CEndlessUsbToolDlg::WindowProc(UINT message, WPARAM wParam, LPARAM lPara
             } else {
                 if (wParam == PBT_APMSUSPEND) {
                     uprintf("Received PBT_APMSUSPEND so canceling the operation.");
+                    m_lastErrorCause = ErrorCause_t::ErrorCauseDownloadFailed;
                     CancelRunningOperation();
                 }
 
@@ -1387,10 +1412,41 @@ void CEndlessUsbToolDlg::ChangePage(PCTSTR oldPage, PCTSTR newPage)
 	return;
 }
 
-void CEndlessUsbToolDlg::ErrorOccured(CString errorMessage)
+void CEndlessUsbToolDlg::ErrorOccured(ErrorCause_t errorCause)
 {
-    uprintf("Error occured %ls", errorMessage);
+    uint32_t buttonMsgId = 0, suggestionMsgId = 0;
+
     //SetElementText(_T(ELEMENT_ERROR_MESSAGE), CComBSTR(errorMessage));
+    switch (errorCause) {
+    case ErrorCause_t::ErrorCauseDownloadFailed:
+        buttonMsgId = MSG_326;
+        suggestionMsgId = MSG_323;
+        break;
+    case ErrorCause_t::ErrorCauseVerificationFailed:
+        buttonMsgId = MSG_327;
+        suggestionMsgId = MSG_324;
+        break;
+    case ErrorCause_t::ErrorCauseCanceled:
+    case ErrorCause_t::ErrorCauseWriteFailed:
+        buttonMsgId = MSG_328;
+        suggestionMsgId = MSG_325;
+        break;
+    default:
+        uprintf("Unhandled error cause %ls(%d)", ErrorCauseToStr(errorCause), errorCause);
+        break;
+    }
+
+    if (buttonMsgId != 0) {
+        SetElementText(_T(ELEMENT_ERROR_BUTTON), UTF8ToBSTR(lmprintf(buttonMsgId)));
+        CallJavascript(_T(JS_SHOW_ELEMENT), CComVariant(HTML_BUTTON_ID(ELEMENT_ERROR_BUTTON)), CComVariant(TRUE));
+    } else {
+        CallJavascript(_T(JS_SHOW_ELEMENT), CComVariant(HTML_BUTTON_ID(ELEMENT_ERROR_BUTTON)), CComVariant(FALSE));
+    }
+
+    if (suggestionMsgId != 0) {
+        SetElementText(_T(ELEMENT_ERROR_SUGGESTION), UTF8ToBSTR(lmprintf(suggestionMsgId)));
+    }
+
     ChangePage(_T(ELEMENT_INSTALL_PAGE), _T(ELEMENT_ERROR_PAGE));
 }
 
@@ -1569,6 +1625,8 @@ HRESULT CEndlessUsbToolDlg::OnLinkClicked(IHTMLElement* pElement)
         msg_id = MSG_314;
     } else if (id == _T(ELEMENT_CONNECTED_LINK)) {
         WinExec("c:\\windows\\system32\\control.exe ncpa.cpl", SW_NORMAL);
+    } else if (id == _T(ELEMENT_USBBOOT_HOWTO)) {
+        msg_id = MSG_329;
     } else {
         msg_id = 0;
         uprintf("Unknown link clicked %ls", id);
@@ -1796,7 +1854,7 @@ DWORD WINAPI CEndlessUsbToolDlg::FileScanThread(void* param)
     DWORD changeNotifyFilter = FILE_NOTIFY_CHANGE_FILE_NAME;
     //changeNotifyFilter |= FILE_NOTIFY_CHANGE_SIZE;
 
-    handlesToWaitFor[0] = dlg->m_cancelOperationEvent;
+    handlesToWaitFor[0] = dlg->m_closeFileScanThreadEvent;
     handlesToWaitFor[1] = FindFirstChangeNotification(dlg->m_appDir, FALSE, changeNotifyFilter);
     if (handlesToWaitFor[1] == INVALID_HANDLE_VALUE) {
         error = GetLastError();
@@ -2385,7 +2443,8 @@ HRESULT CEndlessUsbToolDlg::OnSelectUSBNextClicked(IHTMLElement* pElement)
                     // RADU: add custom error values for each of the errors so we can identify them and show a custom message for each
                     uprintf("Error adding files for download");
                     FormatStatus = FORMAT_STATUS_CANCEL;
-                    PostMessage(WM_FINISHED_ALL_OPERATIONS, (WPARAM)FALSE, 0);
+                    m_lastErrorCause = ErrorCause_t::ErrorCauseDownloadFailed;
+                    PostMessage(WM_FINISHED_ALL_OPERATIONS, 0, 0);
                     return S_OK;
                 }
             }
@@ -2409,7 +2468,7 @@ HRESULT CEndlessUsbToolDlg::OnSelectUSBNextClicked(IHTMLElement* pElement)
                     ChangePage(_T(ELEMENT_USB_PAGE), _T(ELEMENT_INSTALL_PAGE));
                     // RADU: add custom error values for each of the errors so we can identify them and show a custom message for each
                     uprintf("Error adding files for download");
-                    FormatStatus = FORMAT_STATUS_CANCEL;
+                    m_lastErrorCause = ErrorCause_t::ErrorCauseDownloadFailed;
                     PostMessage(WM_FINISHED_ALL_OPERATIONS, (WPARAM)FALSE, 0);
                     return S_OK;
                 }
@@ -2431,11 +2490,12 @@ HRESULT CEndlessUsbToolDlg::OnSelectUSBNextClicked(IHTMLElement* pElement)
 
     // RADU: wait for File scanning thread
     if (m_fileScanThread != INVALID_HANDLE_VALUE) {
-        SetEvent(m_cancelOperationEvent);        
+        SetEvent(m_closeFileScanThreadEvent);
         uprintf("Waiting for scan files thread.");
         WaitForSingleObject(m_fileScanThread, 5000);
         m_fileScanThread = INVALID_HANDLE_VALUE;
-        ResetEvent(m_cancelOperationEvent);
+        CloseHandle(m_closeFileScanThreadEvent);
+        m_closeFileScanThreadEvent = INVALID_HANDLE_VALUE;
     }
 
 	return S_OK;
@@ -2459,6 +2519,7 @@ void CEndlessUsbToolDlg::StartOperationThread(int operation, LPTHREAD_START_ROUT
         m_operationThread = INVALID_HANDLE_VALUE;
         uprintf("Error: Unable to start thread.");
         FormatStatus = ERROR_SEVERITY_ERROR | FAC(FACILITY_STORAGE) | APPERR(ERROR_CANT_START_THREAD);
+        m_lastErrorCause = ErrorCause_t::ErrorCauseGeneric;
         PostMessage(WM_FINISHED_ALL_OPERATIONS, (WPARAM)FALSE, 0);
     }
 }
@@ -2549,6 +2610,7 @@ HRESULT CEndlessUsbToolDlg::OnInstallCancelClicked(IHTMLElement* pElement)
         return S_OK;
     }
 
+    m_lastErrorCause = ErrorCause_t::ErrorCauseCanceled;
     CancelRunningOperation();
 
     return S_OK;
@@ -2575,6 +2637,7 @@ bool CEndlessUsbToolDlg::CancelInstall()
                 uprintf("Cancel operation confirmed.");
                 CallJavascript(_T(JS_ENABLE_BUTTON), CComVariant(HTML_BUTTON_ID(_T(ELEMENT_INSTALL_CANCEL))), CComVariant(FALSE));
                 FormatStatus = FORMAT_STATUS_CANCEL;
+                m_lastErrorCause = ErrorCause_t::ErrorCauseCanceled;
                 uprintf("Cancelling current operation.");
                 CString str = UTF8ToCString(lmprintf(MSG_201));
                 SetElementText(_T(ELEMENT_INSTALL_DESCRIPTION), CComBSTR(str));
@@ -2875,7 +2938,7 @@ error:
 
     uprintf("FileCopyThread exited with error.");
     FormatStatus = ERROR_SEVERITY_ERROR | FAC(FACILITY_STORAGE) | ERROR_OPEN_FAILED;
-    dlg->PostMessage(WM_FINISHED_FILE_COPY, 0, 0);
+    dlg->m_lastErrorCause = ErrorCause_t::ErrorCauseWriteFailed;dlg->PostMessage(WM_FINISHED_FILE_COPY, 0, 0);
     return 0;
 }
 

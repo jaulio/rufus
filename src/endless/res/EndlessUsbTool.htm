@@ -223,7 +223,8 @@
 						<div id="ReminderTextContainer">
 							<div id="SecureBootReminder1">Restart your computer and select "boot from USB" to <install> <try> Endless.</div>
 							<span id="SecureBootReminder2">Remember to switch off Secure Boot in order to boot from external media correctly.</span>
-							<a id="SecureBootHowToReminder">How should I do it?</a>
+							<a id="SecureBootHowToReminder">How should I do it?</a><br/>
+							<a id="UsbBootHowToLink">How should I do it?</a>
 						</div>
 					</div>
 				</div>
@@ -247,10 +248,10 @@
             <div class="PageContent">
 				<div class="ContentContainer">
 					<div id="ErrorImage"></div>
-					<div class="ContentTitle" id="ErrorMessage">Oops, something is wrong with your Endless OS file.</div>
-					<div class="ImageDataRow" id="ErrorMessageSuggestion">Please try to download it again or contact us so we can help you troubleshoot.</div>
-					<div class="Button ButtonBlue ButtonDisabled"><div id="DownloadButton">Download</div></div>
-					<div class="ImageDataRow"><a id="EndlessSupport">Endless Support</a></div>
+					<div class="ContentTitle" id="ErrorMessage">Oops, something went wrong setting up Endless OS.</div>
+					<div class="ImageDataRow" id="ErrorMessageSuggestion">Please try again or contact us so we can help you troubleshoot.</div>
+					<div class="Button ButtonBlue ButtonDisabled hidden" id="ErrorContinueButtonC"><div id="ErrorContinueButton">Continue</div></div>
+					<div class="ImageDataRow" id="EndlessSupportContainer">If you keep having trouble, you can get help on the <a id="EndlessSupport">Endless community forum</a>.</div>
 				</div>
             </div>
 			
