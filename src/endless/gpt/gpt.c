@@ -223,12 +223,12 @@ int is_eos_gpt_valid(struct ptable *pt)
             return 0;
         }
     }
-    uint64_t flags = 0;
-    memcpy(&flags, pt->partitions[2].attributes, 8);
-    if (!is_nth_flag_set(flags, 55)) {
-        //  55th flag must be 1 for EOS images
-        return 0;
-    }
+    //uint64_t flags = 0;
+    //memcpy(&flags, pt->partitions[2].attributes, 8);
+    //if (!is_nth_flag_set(flags, 55)) {
+    //    //  55th flag must be 1 for EOS images
+    //    return 0;
+    //}
     //  crc32 of header, with 'crc' field zero'ed
     struct gpt_header testcrc_header;
     memset(&testcrc_header, 0, GPT_HEADER_SIZE);
