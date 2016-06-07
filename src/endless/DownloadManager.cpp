@@ -144,8 +144,8 @@ usecurrentjob:
         ULONG seconds = MINIMUM_RETRY_DELAY_SEC;
         if (type == DownloadType_t::DownloadTypeReleseJson) {
             seconds = MINIMUM_RETRY_DELAY_SEC_JSON;
-            currentJob->SetPriority(BG_JOB_PRIORITY_FOREGROUND);
         }
+        currentJob->SetPriority(BG_JOB_PRIORITY_FOREGROUND);
         hr = currentJob->SetMinimumRetryDelay(seconds);
         IFFALSE_PRINTERROR(SUCCEEDED(hr), "Error on SetMinimumRetryDelay");
         hr = currentJob->SetNoProgressTimeout(NO_PROGRESS_TIMEOUT_SEC);
