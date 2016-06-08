@@ -57,7 +57,7 @@
         <div id="SelectFilePage" class="WizardPage hidden">
             <div class="PageHeader">
                 <div class="Button"><div id="SelectFilePreviousButton">Previous</div></div>
-                <div class="Button ButtonBlue ButtonRight ButtonDisabled" id="SelectFileNextButtonC"><div id="SelectFileNextButton">Next</div></div>
+                <div class="Button ButtonBlue ButtonRight" id="SelectFileNextButtonC"><div id="SelectFileNextButton">Next</div></div>
                 <div id="SelectFilePageTitle" class="PageHeaderTitle">Select Your OS</div>
             </div>
 
@@ -73,7 +73,7 @@
                     <div class="ContentTitle" id="ExistingImageFile">Operating system found:</div>
                     <div id="SelectFileButton"></div>
                     <input style="clear:both" type="radio" name="OperatingSystemType" id="OperatingSystemTypeLocal" checked="true" />
-                    <select id="LocalImagesSelect" onclick="selectImageClicked('OperatingSystemTypeLocal');" disabled="disabled">                        
+                    <select id="LocalImagesSelect" onclick="selectImageClicked('OperatingSystemTypeLocal');">
                     </select> 
                     
                     <div class="ContentTitle" id="DownloadNewImage">Download new file:</div>
@@ -250,7 +250,7 @@
 					<div id="ErrorImage"></div>
 					<div class="ContentTitle" id="ErrorMessage">Oops, something went wrong setting up Endless OS.</div>
 					<div class="ImageDataRow" id="ErrorMessageSuggestion">Please try again or contact us so we can help you troubleshoot.</div>
-					<div class="Button ButtonBlue ButtonDisabled hidden" id="ErrorContinueButtonC"><div id="ErrorContinueButton">Continue</div></div>
+					<div class="Button ButtonBlue hidden" id="ErrorContinueButtonC"><div id="ErrorContinueButton">Continue</div></div>
 					<div class="ImageDataRow" id="EndlessSupportContainer">If you keep having trouble, you can get help on the <a id="EndlessSupport">Endless community forum</a>.</div>
 				</div>
             </div>

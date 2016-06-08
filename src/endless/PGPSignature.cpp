@@ -758,6 +758,7 @@ int hash_from_file(HCRYPTHASH hHash, CString filename, signature_packet_t* p_sig
     {
         // Notify the caller
         if (hashingCallback && !hashingCallback(sizeRead, fileSize, hashingContext)) {
+            fclose(pFile);
             return -1;
         }
         sizeRead += read;

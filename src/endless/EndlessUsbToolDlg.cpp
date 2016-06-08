@@ -63,6 +63,9 @@ PF_TYPE_DECL(WINAPI, BOOL, SHChangeNotifyDeregister, (ULONG));
 PF_TYPE_DECL(WINAPI, ULONG, SHChangeNotifyRegister, (HWND, int, LONG, UINT, int, const SHChangeNotifyEntry *));
 
 BOOL FormatDrive(DWORD DriveIndex);
+
+
+extern HANDLE GlobalLoggingMutex;
 };
 
 #include "localization.h"
@@ -304,6 +307,7 @@ static LPCTSTR ErrorCauseToStr(ErrorCause_t errorCause)
     {
         TOSTR(ErrorCauseGeneric);
         TOSTR(ErrorCauseCanceled);
+        TOSTR(ErrorCauseJSONDownloadFailed);
         TOSTR(ErrorCauseDownloadFailed);
         TOSTR(ErrorCauseVerificationFailed);
         TOSTR(ErrorCauseWriteFailed);
@@ -377,6 +381,7 @@ BEGIN_DHTML_EVENT_MAP(CEndlessUsbToolDlg)
     // Error Page handlers
     DHTML_EVENT_ONCLICK(_T(ELEMENT_ERROR_CLOSE_BUTTON), OnCloseAppClicked)
     DHTML_EVENT_ONCLICK(_T(ELEMENT_ENDLESS_SUPPORT), OnLinkClicked)
+    DHTML_EVENT_ONCLICK(_T(ELEMENT_ERROR_BUTTON), OnRecoverErrorButtonClicked)
 
 END_DHTML_EVENT_MAP()
 
@@ -418,8 +423,12 @@ CEndlessUsbToolDlg::CEndlessUsbToolDlg(UINT globalMessage, bool enableLogDebuggi
     m_globalWndMessage(globalMessage),
     m_isConnected(false),
     m_enableLogDebugging(enableLogDebugging),
-    m_lastErrorCause(ErrorCause_t::ErrorCauseNone)
+    m_lastErrorCause(ErrorCause_t::ErrorCauseNone),
+    m_localFilesScanned(false),
+    m_jsonDownloadAttempted(false)
 {
+    GlobalLoggingMutex = CreateMutex(NULL, FALSE, NULL);
+
     FUNCTION_ENTER;
     m_hIcon = AfxGetApp()->LoadIcon(IDR_MAINFRAME);    
 
@@ -441,6 +450,8 @@ CEndlessUsbToolDlg::~CEndlessUsbToolDlg() {
         m_enableLogDebugging = false;
         m_logFile.Close();
     }
+
+    if(GlobalLoggingMutex != NULL) CloseHandle(GlobalLoggingMutex);
 }
 
 void CEndlessUsbToolDlg::DoDataExchange(CDataExchange* pDX)
@@ -473,7 +484,6 @@ void CEndlessUsbToolDlg::OnDocumentComplete(LPDISPATCH pDisp, LPCTSTR szUrl)
 
 	AddLanguagesToUI();
 	ApplyRufusLocalization(); //apply_localization(IDD_ENDLESSUSBTOOL_DIALOG, GetSafeHwnd());
-    UpdateFileEntries(true);
 
     if (nWindowsVersion == WINDOWS_XP) {
         CallJavascript(_T(JS_ENABLE_BUTTON), CComVariant(HTML_BUTTON_ID(_T(ELEMENT_INSTALL_BUTTON))), CComVariant(FALSE));
@@ -481,9 +491,7 @@ void CEndlessUsbToolDlg::OnDocumentComplete(LPDISPATCH pDisp, LPCTSTR szUrl)
 
     SetElementText(_T(ELEMENT_VERSION_CONTAINER), CComBSTR(RELEASE_VER_STR));
 
-    if (m_checkConnectionThread == INVALID_HANDLE_VALUE) {
-        m_checkConnectionThread = CreateThread(NULL, 0, CEndlessUsbToolDlg::CheckInternetConnectionThread, (LPVOID)this, 0, NULL);
-    }
+    StartCheckInternetConnectionThread();
 
 	return;
 error:
@@ -1009,7 +1017,7 @@ LRESULT CEndlessUsbToolDlg::WindowProc(UINT message, WPARAM wParam, LPARAM lPara
             uprintf("Operation %ls(%d) with progress %d", OperationToStr(op), op, percent);
             
             // Ignore exFAT format progress.
-            if (m_currentStep == OP_FILE_COPY && op == OP_FORMAT) break;
+            if (m_currentStep == OP_FILE_COPY && (op == OP_FORMAT || op == OP_CREATE_FS)) break;
 
             // Radu: pass all the files to be verified to verfication thread and do the percent calculation there
             // Not very happy about this but eh, needs refactoring
@@ -1057,7 +1065,7 @@ LRESULT CEndlessUsbToolDlg::WindowProc(UINT message, WPARAM wParam, LPARAM lPara
             if (!IS_ERROR(FormatStatus) && !m_liveInstall) {
                 StartOperationThread(OP_FILE_COPY, CEndlessUsbToolDlg::FileCopyThread);
             } else {
-                if (IS_ERROR(FormatStatus) && m_lastErrorCause != ErrorCause_t::ErrorCauseNone) {
+                if (IS_ERROR(FormatStatus) && m_lastErrorCause == ErrorCause_t::ErrorCauseNone) {
                     m_lastErrorCause = ErrorCause_t::ErrorCauseWriteFailed;
                 }
                 PostMessage(WM_FINISHED_ALL_OPERATIONS, 0, 0);
@@ -1078,13 +1086,27 @@ LRESULT CEndlessUsbToolDlg::WindowProc(UINT message, WPARAM wParam, LPARAM lPara
             bool isReleaseJsonDownload = downloadStatus->jobName == DownloadManager::GetJobName(DownloadType_t::DownloadTypeReleseJson);
             // DO STUFF
             if (downloadStatus->error) {
-                m_lastErrorCause = ErrorCause_t::ErrorCauseDownloadFailed;
-                ErrorOccured(ErrorCause_t::ErrorCauseDownloadFailed);
+                uprintf("Error on download.");
+                if (isReleaseJsonDownload) {
+                    m_jsonDownloadAttempted = true;
+                    if (!CanUseLocalFile()) {
+                        uprintf("Going to error page as no local files were found either.");
+                        m_lastErrorCause = ErrorCause_t::ErrorCauseJSONDownloadFailed;
+                        CancelRunningOperation();
+                    }
+                } else {
+                    m_lastErrorCause = ErrorCause_t::ErrorCauseDownloadFailed;
+                    ErrorOccured(ErrorCause_t::ErrorCauseDownloadFailed);
+                }
             } else if (downloadStatus->done) {
                 uprintf("Download done for %ls", downloadStatus->jobName);
 
                 if (isReleaseJsonDownload) {
-                    UpdateDownloadOptions();
+                    if (!m_jsonDownloadAttempted) {
+                        m_jsonDownloadAttempted = true;
+                        UpdateDownloadOptions();
+                        AddDownloadOptionsToUI();
+                    }
                 } else {
                     StartOperationThread(OP_VERIFYING_SIGNATURE, CEndlessUsbToolDlg::FileVerificationThread);
                 }
@@ -1179,7 +1201,7 @@ LRESULT CEndlessUsbToolDlg::WindowProc(UINT message, WPARAM wParam, LPARAM lPara
             case ErrorCause_t::ErrorCauseNone:
                 PrintInfo(0, MSG_210);
                 m_operationThread = INVALID_HANDLE_VALUE;
-                ChangePage(_T(ELEMENT_INSTALL_PAGE), _T(ELEMENT_SUCCESS_PAGE));
+                ChangePage(_T(ELEMENT_SUCCESS_PAGE));
                 break;
             default:
                 ErrorOccured(m_lastErrorCause);
@@ -1368,11 +1390,6 @@ void CEndlessUsbToolDlg::ApplyRufusLocalization()
 		}
 	}
 
-    if (m_imageFiles.GetCount() != 0) {
-        SetElementText(_T(ELEMENT_SET_FILE_TITLE), UTF8ToBSTR(lmprintf(MSG_321)));
-        SetElementText(_T(ELEMENT_SET_FILE_SUBTITLE), UTF8ToBSTR(lmprintf(MSG_322)));
-    }
-
 	return;
 }
 
@@ -1400,14 +1417,21 @@ void CEndlessUsbToolDlg::AddLanguagesToUI()
 	}
 }
 
-void CEndlessUsbToolDlg::ChangePage(PCTSTR oldPage, PCTSTR newPage)
+void CEndlessUsbToolDlg::ChangePage(PCTSTR newPage)
 {
     FUNCTION_ENTER;
 
-	CComPtr<IHTMLElement> pOldPage = NULL, pNewPage = NULL;
+    static CString currentPage(ELEMENT_FIRST_PAGE);
+    uprintf("ChangePage requested from %ls to %ls", currentPage, newPage);
 
-    CallJavascript(_T(JS_SHOW_ELEMENT), CComVariant(oldPage), CComVariant(FALSE));
-    CallJavascript(_T(JS_SHOW_ELEMENT), CComVariant(newPage), CComVariant(TRUE));
+    if (currentPage == newPage) {
+        uprintf("ERROR: Already on that page.");
+        return;
+    }
+
+    CallJavascript(_T(JS_SHOW_ELEMENT), CComVariant(currentPage), CComVariant(FALSE));
+    currentPage = newPage;
+    CallJavascript(_T(JS_SHOW_ELEMENT), CComVariant(currentPage), CComVariant(TRUE));
 
 	return;
 }
@@ -1416,17 +1440,18 @@ void CEndlessUsbToolDlg::ErrorOccured(ErrorCause_t errorCause)
 {
     uint32_t buttonMsgId = 0, suggestionMsgId = 0;
 
-    //SetElementText(_T(ELEMENT_ERROR_MESSAGE), CComBSTR(errorMessage));
     switch (errorCause) {
     case ErrorCause_t::ErrorCauseDownloadFailed:
         buttonMsgId = MSG_326;
         suggestionMsgId = MSG_323;
         break;
+    case ErrorCause_t::ErrorCauseJSONDownloadFailed:
     case ErrorCause_t::ErrorCauseVerificationFailed:
         buttonMsgId = MSG_327;
         suggestionMsgId = MSG_324;
         break;
     case ErrorCause_t::ErrorCauseCanceled:
+    case ErrorCause_t::ErrorCauseGeneric:
     case ErrorCause_t::ErrorCauseWriteFailed:
         buttonMsgId = MSG_328;
         suggestionMsgId = MSG_325;
@@ -1447,7 +1472,7 @@ void CEndlessUsbToolDlg::ErrorOccured(ErrorCause_t errorCause)
         SetElementText(_T(ELEMENT_ERROR_SUGGESTION), UTF8ToBSTR(lmprintf(suggestionMsgId)));
     }
 
-    ChangePage(_T(ELEMENT_INSTALL_PAGE), _T(ELEMENT_ERROR_PAGE));
+    ChangePage(_T(ELEMENT_ERROR_PAGE));
 }
 
 HRESULT CEndlessUsbToolDlg::GetSelectElement(PCTSTR selectId, CComPtr<IHTMLSelectElement> &selectElem)
@@ -1535,9 +1560,11 @@ bool CEndlessUsbToolDlg::IsButtonDisabled(IHTMLElement *pElement)
 
     CComPtr<IHTMLElement> parentElem;
     CComBSTR className;
-    if (FAILED(pElement->get_parentElement(&parentElem)) || parentElem == NULL) return true;
-    if (pElement == NULL || FAILED(parentElem->get_className(&className)) || className ==  NULL) return true;
-    
+
+    IFFALSE_RETURN_VALUE(pElement != NULL, "IsButtonDisabled pElement is NULL", false);
+    IFFALSE_RETURN_VALUE(SUCCEEDED(pElement->get_parentElement(&parentElem)) && parentElem != NULL, "IsButtonDisabled Error querying for parent element", false);
+    IFFALSE_RETURN_VALUE(SUCCEEDED(parentElem->get_className(&className)) && className != NULL, "IsButtonDisabled Error querying for class name", false);
+
     return wcsstr(className, _T(CLASS_BUTTON_DISABLED)) != NULL;    
 }
 
@@ -1583,24 +1610,51 @@ void CEndlessUsbToolDlg::GoToSelectFilePage()
     CComBSTR sizeText;
     RemoteImageEntry_t r;
 
+    // Check locally available images
+    UpdateFileEntries(true);
+
+    // Update UI based on what was found
+    bool canUseLocal = CanUseLocalFile();
+    CallJavascript(_T(JS_SHOW_ELEMENT), CComVariant(ELEMENT_LOCAL_FILES_FOUND), CComVariant(canUseLocal));
+    CallJavascript(_T(JS_SHOW_ELEMENT), CComVariant(ELEMENT_LOCAL_FILES_NOT_FOUND), CComVariant(!canUseLocal));
+    CallJavascript(_T(JS_SHOW_ELEMENT), CComVariant(HTML_BUTTON_ID(ELEMENT_SELFILE_NEXT_BUTTON)), CComVariant(canUseLocal));
+
+    if (canUseLocal) {
+        SetElementText(_T(ELEMENT_SET_FILE_TITLE), UTF8ToBSTR(lmprintf(MSG_321)));
+        SetElementText(_T(ELEMENT_SET_FILE_SUBTITLE), UTF8ToBSTR(lmprintf(MSG_322)));
+    } else if(CanUseRemoteFile()) {
+        ApplyRufusLocalization();
+    } else {
+        uprintf("No remote images available and no local images available.");
+        m_lastErrorCause = ErrorCause_t::ErrorCauseJSONDownloadFailed;
+        CancelRunningOperation();
+        return;
+    }
+
+    // Update page with no local files found
     POSITION p = m_remoteImages.FindIndex(m_baseImageRemoteIndex);
-    IFFALSE_GOTOERROR(p != NULL, "Index value not valid.");
-    r = m_remoteImages.GetAt(p);
+    if (p != NULL) {
+        r = m_remoteImages.GetAt(p);
 
-    // Update light download size
-    ULONGLONG size = r.compressedSize + (m_liveInstall ? 0 : m_installerImage.compressedSize);
-    sizeText = UTF8ToBSTR(lmprintf(MSG_315, SizeToHumanReadable(size, FALSE, use_fake_units)));
-    SetElementText(_T(ELEMENT_DOWNLOAD_LIGHT_SIZE), sizeText);
+        // Update light download size
+        ULONGLONG size = r.compressedSize + (m_liveInstall ? 0 : m_installerImage.compressedSize);
+        sizeText = UTF8ToBSTR(lmprintf(MSG_315, SizeToHumanReadable(size, FALSE, use_fake_units)));
+        SetElementText(_T(ELEMENT_DOWNLOAD_LIGHT_SIZE), sizeText);
 
-    // Update full download size
-    HRESULT hr = GetElement(_T(ELEMENT_REMOTE_SELECT), &selectElem);
-    IFFALSE_GOTOERROR(SUCCEEDED(hr), "GoToSelectFilePage: querying for local select element.");
-    bool useLocalFile = m_useLocalFile;
-    OnSelectedRemoteFileChanged(selectElem);
-    m_useLocalFile = useLocalFile;
+        // Update full download size
+        HRESULT hr = GetElement(_T(ELEMENT_REMOTE_SELECT), &selectElem);
+        IFFALSE_GOTOERROR(SUCCEEDED(hr), "GoToSelectFilePage: querying for local select element.");
+        bool useLocalFile = m_useLocalFile;
+        OnSelectedRemoteFileChanged(selectElem);
+        m_useLocalFile = useLocalFile;
+    }
+
+    ChangePage(_T(ELEMENT_FILE_PAGE));
+
+    return;
 
 error:
-    ChangePage(_T(ELEMENT_FIRST_PAGE), _T(ELEMENT_FILE_PAGE));
+    ErrorOccured(ErrorCause_t::ErrorCauseGeneric);
 }
 
 HRESULT CEndlessUsbToolDlg::OnLinkClicked(IHTMLElement* pElement)
@@ -1668,7 +1722,7 @@ HRESULT CEndlessUsbToolDlg::OnLanguageChanged(IHTMLElement* pElement)
 	ApplyRufusLocalization();
 
     m_selectedRemoteIndex = -1;
-    UpdateDownloadOptions();
+    AddDownloadOptionsToUI();
 
 	return S_OK;
 
@@ -1692,6 +1746,8 @@ void CEndlessUsbToolDlg::UpdateFileEntries(bool shouldInit)
     CString currentInstallerVersion;
     CString searchPath = GET_LOCAL_PATH(_T("*.*"));
     HANDLE findFilesHandle = FindFirstFile(searchPath, &findFileData);
+
+    m_localFilesScanned = true;
 
     // get needed HTML elements
     hr = GetSelectElement(_T(ELEMENT_FILES_SELECT), selectElement);
@@ -1824,24 +1880,12 @@ checkEntries:
         }
     }
 
-    if (shouldInit) {        
-        // start the change notifications thread
-        if (hasLocalImages && m_fileScanThread == INVALID_HANDLE_VALUE) {
-            m_fileScanThread = CreateThread(NULL, 0, CEndlessUsbToolDlg::FileScanThread, (LPVOID)this, 0, NULL);
-        }
-        
-        CallJavascript(_T(JS_SHOW_ELEMENT), CComVariant(ELEMENT_LOCAL_FILES_FOUND), CComVariant(hasLocalImages));
-        CallJavascript(_T(JS_SHOW_ELEMENT), CComVariant(ELEMENT_LOCAL_FILES_NOT_FOUND), CComVariant(!hasLocalImages));
-        CallJavascript(_T(JS_SHOW_ELEMENT), CComVariant(HTML_BUTTON_ID(ELEMENT_SELFILE_NEXT_BUTTON)), CComVariant(hasLocalImages));
-
-        if (hasLocalImages) {
-            SetElementText(_T(ELEMENT_SET_FILE_TITLE), UTF8ToBSTR(lmprintf(MSG_321)));
-            SetElementText(_T(ELEMENT_SET_FILE_SUBTITLE), UTF8ToBSTR(lmprintf(MSG_322)));
-        }
+    if (shouldInit) {
+        //// start the change notifications thread
+        //if (hasLocalImages && m_fileScanThread == INVALID_HANDLE_VALUE) {
+        //    m_fileScanThread = CreateThread(NULL, 0, CEndlessUsbToolDlg::FileScanThread, (LPVOID)this, 0, NULL);
+        //}
     }
-
-    CallJavascript(_T(JS_ENABLE_ELEMENT), CComVariant(_T(ELEMENT_FILES_SELECT)), CComVariant(hasLocalImages));
-    CallJavascript(_T(JS_ENABLE_ELEMENT), CComVariant(_T(ELEMENT_IMAGE_TYPE_LOCAL)), CComVariant(hasLocalImages));
 }
 
 DWORD WINAPI CEndlessUsbToolDlg::FileScanThread(void* param)
@@ -2065,7 +2109,6 @@ void CEndlessUsbToolDlg::UpdateDownloadOptions()
 {
     FUNCTION_ENTER;
 
-    CString languagePersonalty = PERSONALITY_ENGLISH;
     CString filePath;
 #ifdef ENABLE_JSON_COMPRESSION
     CString filePathGz;
@@ -2073,6 +2116,7 @@ void CEndlessUsbToolDlg::UpdateDownloadOptions()
 
     m_remoteImages.RemoveAll();
 
+    // Parse JSON with normal images
     filePath = GET_LOCAL_PATH(CString(JSON_LIVE_FILE));
 #ifdef ENABLE_JSON_COMPRESSION
     filePathGz = GET_LOCAL_PATH(CString(JSON_PACKED(JSON_LIVE_FILE)));
@@ -2080,17 +2124,28 @@ void CEndlessUsbToolDlg::UpdateDownloadOptions()
 #endif // ENABLE_JSON_COMPRESSION
     IFFALSE_GOTOERROR(ParseJsonFile(filePath, false), "Error parsing eos JSON file.");
 
-    if (!m_liveInstall) {
-        filePath = GET_LOCAL_PATH(CString(JSON_INSTALLER_FILE));
+    // Parse JSON with installer images
+    filePath = GET_LOCAL_PATH(CString(JSON_INSTALLER_FILE));
 #ifdef ENABLE_JSON_COMPRESSION
-        filePathGz = GET_LOCAL_PATH(CString(JSON_PACKED(JSON_INSTALLER_FILE)));
-        IFFALSE_GOTOERROR(UnpackFile(ConvertUnicodeToUTF8(filePathGz), ConvertUnicodeToUTF8(filePath)), "Error uncompressing eosinstaller JSON file.");
+    filePathGz = GET_LOCAL_PATH(CString(JSON_PACKED(JSON_INSTALLER_FILE)));
+    IFFALSE_GOTOERROR(UnpackFile(ConvertUnicodeToUTF8(filePathGz), ConvertUnicodeToUTF8(filePath)), "Error uncompressing eosinstaller JSON file.");
 #endif // ENABLE_JSON_COMPRESSION
-        IFFALSE_GOTOERROR(ParseJsonFile(filePath, true), "Error parsing eosinstaller JSON file.");
-    }
+    IFFALSE_GOTOERROR(ParseJsonFile(filePath, true), "Error parsing eosinstaller JSON file.");
 
-    // Radu: Maybe move this to another method to separate UI from logic
-    // remove all options to UI
+    return;
+
+error:
+    // RADU: disable downloading here I assume? Or retry download/parse?
+    CallJavascript(_T(JS_ENABLE_DOWNLOAD), CComVariant(FALSE), CComVariant(m_isConnected));
+    CallJavascript(_T(JS_ENABLE_BUTTON), CComVariant(HTML_BUTTON_ID(_T(ELEMENT_DOWNLOAD_LIGHT_BUTTON))), CComVariant(FALSE));
+    return;
+}
+
+void CEndlessUsbToolDlg::AddDownloadOptionsToUI()
+{
+    CString languagePersonalty = PERSONALITY_ENGLISH;
+
+    // remove all options from UI
     HRESULT hr = ClearSelectElement(_T(ELEMENT_REMOTE_SELECT));
     IFFALSE_PRINTERROR(SUCCEEDED(hr), "Error clearing remote images select.");
     hr = ClearSelectElement(_T(ELEMENT_SELFILE_DOWN_LANG));
@@ -2121,7 +2176,8 @@ void CEndlessUsbToolDlg::UpdateDownloadOptions()
             CallJavascript(_T(JS_ENABLE_BUTTON), CComVariant(HTML_BUTTON_ID(_T(ELEMENT_DOWNLOAD_LIGHT_BUTTON))), CComVariant(TRUE));
             m_baseImageRemoteIndex = selectIndex;
             htmlElemId = _T(ELEMENT_DOWNLOAD_LIGHT_SIZE);
-        } else {
+        }
+        else {
             CString imageLanguage = UTF8ToCString(lmprintf(m_personalityToLocaleMsg[imageEntry.personality]));
             CString indexStr;
             indexStr.Format(L"%d", selectIndex);
@@ -2144,20 +2200,6 @@ void CEndlessUsbToolDlg::UpdateDownloadOptions()
     if (m_imageFiles.GetCount() == 0) {
         m_selectedRemoteIndex = m_baseImageRemoteIndex;
     }
-
-    if (!foundRemoteImages) {
-        // RADU: do we need this?
-        //hr = AddEntryToSelect(_T(ELEMENT_REMOTE_SELECT), CComBSTR(""), CComBSTR(""), NULL);
-        //hr = AddEntryToSelect(_T(ELEMENT_SELFILE_DOWN_LANG), CComBSTR(""), CComBSTR(""), NULL);
-    }
-
-    return;
-
-error:
-    // RADU: disable downloading here I assume? Or retry download/parse?    
-    CallJavascript(_T(JS_ENABLE_DOWNLOAD), CComVariant(FALSE), CComVariant(m_isConnected));
-    CallJavascript(_T(JS_ENABLE_BUTTON), CComVariant(HTML_BUTTON_ID(_T(ELEMENT_DOWNLOAD_LIGHT_BUTTON))), CComVariant(FALSE));
-    return;
 }
 
 // Select File Page Handlers
@@ -2165,7 +2207,7 @@ HRESULT CEndlessUsbToolDlg::OnSelectFilePreviousClicked(IHTMLElement* pElement)
 {
     FUNCTION_ENTER;
 
-    ChangePage(_T(ELEMENT_FILE_PAGE), _T(ELEMENT_FIRST_PAGE));
+    ChangePage(_T(ELEMENT_FIRST_PAGE));
 
 	return S_OK;
 }
@@ -2206,9 +2248,10 @@ HRESULT CEndlessUsbToolDlg::OnSelectFileNextClicked(IHTMLElement* pElement)
         pFileImageEntry_t localEntry = NULL;
         if (!m_imageFiles.Lookup(selectedImage, localEntry)) {
             uprintf("ERROR: Selected local file not found.");
+        } else {
+            size = m_liveInstall ? GetExtractedSize(selectedImage, FALSE) : localEntry->size;
         }
         selectedImage = CSTRING_GET_LAST(selectedImage, '\\');
-        size = m_liveInstall ? GetExtractedSize(selectedImage, FALSE) : localEntry->size;
 
         m_selectedFileSize = localEntry->size;
     } else {
@@ -2249,7 +2292,7 @@ HRESULT CEndlessUsbToolDlg::OnSelectFileNextClicked(IHTMLElement* pElement)
     SetElementText(_T(ELEMENT_SELUSB_NEW_DISK_NAME), CComBSTR(selectedImage));
     SetElementText(_T(ELEMENT_SELUSB_NEW_DISK_SIZE), CComBSTR(selectedSize));
 
-	ChangePage(_T(ELEMENT_FILE_PAGE), _T(ELEMENT_USB_PAGE));
+	ChangePage(_T(ELEMENT_USB_PAGE));
 
 	return S_OK;
 }
@@ -2385,7 +2428,7 @@ HRESULT CEndlessUsbToolDlg::OnSelectUSBPreviousClicked(IHTMLElement* pElement)
     FUNCTION_ENTER;
 
 	LeavingDevicesPage();
-	ChangePage(_T(ELEMENT_USB_PAGE), _T(ELEMENT_FILE_PAGE));
+	ChangePage(_T(ELEMENT_FILE_PAGE));
 
     return S_OK;
 }
@@ -2439,7 +2482,7 @@ HRESULT CEndlessUsbToolDlg::OnSelectUSBNextClicked(IHTMLElement* pElement)
                 // start the download again
                 status = m_downloadManager.AddDownload(downloadType, urls, files, false, remote.downloadJobName);
                 if (!status) {
-                    ChangePage(_T(ELEMENT_USB_PAGE), _T(ELEMENT_INSTALL_PAGE));
+                    ChangePage(_T(ELEMENT_INSTALL_PAGE));
                     // RADU: add custom error values for each of the errors so we can identify them and show a custom message for each
                     uprintf("Error adding files for download");
                     FormatStatus = FORMAT_STATUS_CANCEL;
@@ -2465,7 +2508,7 @@ HRESULT CEndlessUsbToolDlg::OnSelectUSBNextClicked(IHTMLElement* pElement)
                 // start the download again
                 status = m_downloadManager.AddDownload(downloadType, urls, files, false, remote.downloadJobName);
                 if (!status) {
-                    ChangePage(_T(ELEMENT_USB_PAGE), _T(ELEMENT_INSTALL_PAGE));
+                    ChangePage(_T(ELEMENT_INSTALL_PAGE));
                     // RADU: add custom error values for each of the errors so we can identify them and show a custom message for each
                     uprintf("Error adding files for download");
                     m_lastErrorCause = ErrorCause_t::ErrorCauseDownloadFailed;
@@ -2486,7 +2529,7 @@ HRESULT CEndlessUsbToolDlg::OnSelectUSBNextClicked(IHTMLElement* pElement)
         m_localInstallerImage.size = m_installerImage.compressedSize;
     }
 
-    ChangePage(_T(ELEMENT_USB_PAGE), _T(ELEMENT_INSTALL_PAGE));
+    ChangePage(_T(ELEMENT_INSTALL_PAGE));
 
     // RADU: wait for File scanning thread
     if (m_fileScanThread != INVALID_HANDLE_VALUE) {
@@ -2623,6 +2666,43 @@ HRESULT CEndlessUsbToolDlg::OnCloseAppClicked(IHTMLElement* pElement)
     AfxPostQuitMessage(0);
 
 	return S_OK;
+}
+
+HRESULT CEndlessUsbToolDlg::OnRecoverErrorButtonClicked(IHTMLElement* pElement)
+{
+    ErrorCause_t errorCause = m_lastErrorCause;
+    uprintf("OnRecoverErrorButtonClicked error cause %ls(%d)", ErrorCauseToStr(errorCause), errorCause);
+
+    // reset the state
+    m_lastErrorCause = ErrorCause_t::ErrorCauseNone;
+    m_localFilesScanned = false;
+    m_jsonDownloadAttempted = false;
+    ResetEvent(m_cancelOperationEvent);
+    ResetEvent(m_closeFileScanThreadEvent);
+    StartCheckInternetConnectionThread();
+    CallJavascript(_T(JS_ENABLE_BUTTON), CComVariant(HTML_BUTTON_ID(_T(ELEMENT_INSTALL_CANCEL))), CComVariant(TRUE));
+
+    // continue based on error cause
+    switch (errorCause) {
+    case ErrorCause_t::ErrorCauseDownloadFailed:
+        OnSelectUSBNextClicked(NULL);
+        break;
+    case ErrorCause_t::ErrorCauseWriteFailed:
+        if (!m_liveInstall) {
+            safe_free(image_path);
+            image_path = wchar_to_utf8(m_LiveFile);
+        }
+        OnSelectFileNextClicked(NULL);
+        break;
+    case ErrorCause_t::ErrorCauseVerificationFailed:
+    case ErrorCause_t::ErrorCauseCanceled:
+    case ErrorCause_t::ErrorCauseJSONDownloadFailed:
+    default:
+        ChangePage(_T(ELEMENT_FIRST_PAGE));
+        break;
+    }
+
+    return S_OK;
 }
 
 bool CEndlessUsbToolDlg::CancelInstall()
@@ -2937,8 +3017,10 @@ error:
     safe_free(guid_volume);
 
     uprintf("FileCopyThread exited with error.");
-    FormatStatus = ERROR_SEVERITY_ERROR | FAC(FACILITY_STORAGE) | ERROR_OPEN_FAILED;
-    dlg->m_lastErrorCause = ErrorCause_t::ErrorCauseWriteFailed;dlg->PostMessage(WM_FINISHED_FILE_COPY, 0, 0);
+    if (dlg->m_lastErrorCause == ErrorCause_t::ErrorCauseNone) {
+        dlg->m_lastErrorCause = ErrorCause_t::ErrorCauseWriteFailed;
+    }
+    dlg->PostMessage(WM_FINISHED_FILE_COPY, 0, 0);
     return 0;
 }
 
@@ -3175,6 +3257,7 @@ DWORD WINAPI CEndlessUsbToolDlg::CheckInternetConnectionThread(void* param)
     }
 
 done:
+    dlg->m_checkConnectionThread = INVALID_HANDLE_VALUE;
     return 0;
 }
 
@@ -3257,7 +3340,28 @@ void CEndlessUsbToolDlg::CancelRunningOperation()
 
     FormatStatus = FORMAT_STATUS_CANCEL;
     if (m_currentStep != OP_FLASHING_DEVICE) {
-        m_downloadManager.Uninit();
+        m_downloadManager.ClearExtraDownloadJobs();
         PostMessage(WM_FINISHED_ALL_OPERATIONS, (WPARAM)FALSE, 0);
     }
+}
+
+void CEndlessUsbToolDlg::StartCheckInternetConnectionThread()
+{
+    if (m_checkConnectionThread == INVALID_HANDLE_VALUE) {
+        m_checkConnectionThread = CreateThread(NULL, 0, CEndlessUsbToolDlg::CheckInternetConnectionThread, (LPVOID)this, 0, NULL);
+    }
+}
+
+bool CEndlessUsbToolDlg::CanUseLocalFile()
+{
+    //RADU: check if installer version matches local images version and display only the images that match?
+    bool hasLocalInstaller = m_liveInstall || (m_localInstallerImage.stillPresent == TRUE);
+    bool hasLocalImages = (m_imageFiles.GetCount() != 0);
+
+    return !m_localFilesScanned || (hasLocalInstaller && hasLocalImages);
+}
+
+bool CEndlessUsbToolDlg::CanUseRemoteFile()
+{
+    return !m_jsonDownloadAttempted || m_remoteImages.GetCount() != 0;
 }

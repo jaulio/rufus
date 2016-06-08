@@ -45,7 +45,7 @@ function enableDownload(enable, internetConnected) {
 //	enableButton("DownloadLightButtonC", internetConnected && enable); //disabled by C++
 	enableButton("DownloadFullButtonC", internetConnected && enable);
 
-	enableButton("SelectFileNextButtonC", enable);
+	// enableButton("SelectFileNextButtonC", enable);
 }
 
 function addClassName(id, remove, classname) {

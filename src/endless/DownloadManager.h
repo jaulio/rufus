@@ -57,6 +57,8 @@ public:
     static bool GetDownloadProgress(CComPtr<IBackgroundCopyJob> &currentJob, DownloadStatus_t *downloadStatus, const CString &jobName);
     static HRESULT GetExistingJob(CComPtr<IBackgroundCopyManager> &bcManager, LPCWSTR jobName, CComPtr<IBackgroundCopyJob> &existingJob);
 
+    void ClearExtraDownloadJobs();
+
     // IUnknown implementation
     DECLARE_IUNKNOWN;
 
@@ -78,6 +80,4 @@ private:
     CComPtr<IBackgroundCopyManager> m_bcManager;
     CComPtr<IBackgroundCopyJob> m_bcReleaseJson;
     CString m_latestEosVersion;
-
-    void ClearExtraDownloadJobs();
 };

@@ -34,6 +34,10 @@
 #include "msapi_utf8.h"
 #include "localization.h"
 
+#ifdef ENDLESSUSB_TOOL
+HANDLE GlobalLoggingMutex = NULL;
+#endif
+
 /*
  * Globals
  */
@@ -47,6 +51,10 @@ void _uprintf(const char *format, ...)
 	char* p = buf;
 	va_list args;
 	int n;
+
+#ifdef ENDLESSUSB_TOOL
+    if(GlobalLoggingMutex != NULL) WaitForSingleObject(GlobalLoggingMutex, INFINITE);
+#endif
 
 	va_start(args, format);
 	n = safe_vsnprintf(p, sizeof(buf)-3, format, args); // buf-3 is room for CR/LF/NUL
@@ -65,8 +73,11 @@ void _uprintf(const char *format, ...)
 	OutputDebugStringA(buf);
 	if ((hLog != NULL) && (hLog != INVALID_HANDLE_VALUE)) {
 #ifdef ENDLESSUSB_TOOL
-        char *value = malloc(strlen(buf) + 1);
-        memcpy(value, buf, strlen(buf) + 1);
+
+        size_t byteCount = strlen(buf) + 1;
+        char *value = malloc(byteCount);
+        memset(value, 0, byteCount);
+        memcpy_s(value, byteCount - 1, buf, strlen(buf));
         PostMessage(hLog, EM_SETSEL, 0, (LPARAM)value);
 #else
 		// Send output to our log Window
@@ -77,6 +88,10 @@ void _uprintf(const char *format, ...)
 		SendMessage(hLog, EM_LINESCROLL, 0, SendMessage(hLog, EM_GETLINECOUNT, 0, 0));
 #endif //ENDLESSUSB_TOOL
 	}
+
+#ifdef ENDLESSUSB_TOOL
+    if (GlobalLoggingMutex != NULL) ReleaseMutex(GlobalLoggingMutex);
+#endif
 }
 #endif
 

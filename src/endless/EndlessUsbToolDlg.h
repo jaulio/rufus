@@ -18,6 +18,7 @@ typedef struct FileImageEntry {
 typedef enum ErrorCause {
     ErrorCauseGeneric,
     ErrorCauseCanceled,
+    ErrorCauseJSONDownloadFailed,
     ErrorCauseDownloadFailed,
     ErrorCauseVerificationFailed,
     ErrorCauseWriteFailed,
@@ -82,7 +83,8 @@ protected:
     HRESULT OnInstallCancelClicked(IHTMLElement* pElement);
 
 	// Error/Thank You page handlers
-	HRESULT OnCloseAppClicked(IHTMLElement* pElement);    
+	HRESULT OnCloseAppClicked(IHTMLElement* pElement);
+    HRESULT OnRecoverErrorButtonClicked(IHTMLElement* pElement);
 
 	// Implementation
 protected:
@@ -133,6 +135,8 @@ private:
     bool m_closeRequested;
     int m_currentStep;
     bool m_isConnected;
+    bool m_localFilesScanned;
+    bool m_jsonDownloadAttempted;
     CMap<CString, LPCTSTR, pFileImageEntry_t, pFileImageEntry_t> m_imageFiles;
     CList<CString> m_imageIndexToPath;
     CList<RemoteImageEntry_t> m_remoteImages;
@@ -172,7 +176,7 @@ private:
 	void AddLanguagesToUI();
 	void ApplyRufusLocalization();
 
-	void ChangePage(PCTSTR oldPage, PCTSTR newPage);
+	void ChangePage(PCTSTR newPage);
 
     HRESULT GetSelectElement(PCTSTR selectId, CComPtr<IHTMLSelectElement> &selectElem);
     HRESULT ClearSelectElement(PCTSTR selectId);
@@ -189,6 +193,7 @@ private:
     void UpdateDownloadOptions();
     bool UnpackFile(LPCSTR archive, LPCSTR destination);
     bool ParseJsonFile(LPCTSTR filename, bool isInstallerJson);
+    void AddDownloadOptionsToUI();
 
 	void Uninit();
 
@@ -227,8 +232,9 @@ private:
 
     void GoToSelectFilePage();
     void InitLogging();
-
     void EnableHibernate(bool enable = true);
-
     void CancelRunningOperation();
+    void StartCheckInternetConnectionThread();
+    bool CanUseLocalFile();
+    bool CanUseRemoteFile();
 };
