@@ -69,8 +69,8 @@ PACK(struct ptable {
     struct gpt_partition partitions[4]; // we only care about the first 4 partitions   
 });
 
-uint64_t get_eos_archive_disk_image_size(const char *filepath, int compression_type);
-int is_eos_gpt_valid(struct ptable *pt);
+uint64_t get_eos_archive_disk_image_size(const char *filepath, int compression_type, BOOL isInstallerImage);
+int is_eos_gpt_valid(struct ptable *pt, BOOL isInstallerImage);
 uint8_t is_nth_flag_set(uint64_t flags, uint8_t n);
 
 #ifdef DEBUG_PRINTS

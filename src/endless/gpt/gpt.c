@@ -152,7 +152,7 @@ uint64_t get_disk_size(struct ptable *pt)
         pt->header.last_usable_lba * SECTOR_SIZE; // rest of the usable disk size
 }
 
-uint64_t get_eos_archive_disk_image_size(const char *filepath, int compression_type)
+uint64_t get_eos_archive_disk_image_size(const char *filepath, int compression_type, BOOL isInstallerImage)
 {
     int64_t bytes_read;
     int size;
@@ -171,7 +171,7 @@ uint64_t get_eos_archive_disk_image_size(const char *filepath, int compression_t
         return 0;
     }
 
-    if (!is_eos_gpt_valid(&pt)) {
+    if (!is_eos_gpt_valid(&pt, isInstallerImage)) {
         return 0;
     }
 
@@ -183,7 +183,7 @@ uint64_t get_eos_archive_disk_image_size(const char *filepath, int compression_t
 * Checks the GPT for validity
 * returns 1 if the GPT is valid, 0 otherwise
 **/
-int is_eos_gpt_valid(struct ptable *pt)
+int is_eos_gpt_valid(struct ptable *pt, BOOL isInstallerImage)
 {
     int i = 0;
 
@@ -223,12 +223,12 @@ int is_eos_gpt_valid(struct ptable *pt)
             return 0;
         }
     }
-    //uint64_t flags = 0;
-    //memcpy(&flags, pt->partitions[2].attributes, 8);
-    //if (!is_nth_flag_set(flags, 55)) {
-    //    //  55th flag must be 1 for EOS images
-    //    return 0;
-    //}
+    uint64_t flags = 0;
+    memcpy(&flags, pt->partitions[2].attributes, 8);
+    if (!isInstallerImage && !is_nth_flag_set(flags, 55)) {
+        //  55th flag must be 1 for EOS images
+        return 0;
+    }
     //  crc32 of header, with 'crc' field zero'ed
     struct gpt_header testcrc_header;
     memset(&testcrc_header, 0, GPT_HEADER_SIZE);

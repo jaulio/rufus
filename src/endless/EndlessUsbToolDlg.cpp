@@ -1728,7 +1728,7 @@ void CEndlessUsbToolDlg::UpdateFileEntries(bool shouldInit)
             CString displayName, personality, version;
             bool isInstallerImage = false;
             if (!ParseImgFileName(currentFile, personality, version, isInstallerImage)) continue;
-            if (0 == GetExtractedSize(fullPathFile)) continue;
+            if (0 == GetExtractedSize(fullPathFile, isInstallerImage)) continue;
             CFile file(fullPathFile, CFile::modeRead);
             GetImgDisplayName(displayName, version, personality, file.GetLength());
 
@@ -2208,7 +2208,7 @@ HRESULT CEndlessUsbToolDlg::OnSelectFileNextClicked(IHTMLElement* pElement)
             uprintf("ERROR: Selected local file not found.");
         }
         selectedImage = CSTRING_GET_LAST(selectedImage, '\\');
-        size = m_liveInstall ? GetExtractedSize(selectedImage) : localEntry->size;
+        size = m_liveInstall ? GetExtractedSize(selectedImage, FALSE) : localEntry->size;
 
         m_selectedFileSize = localEntry->size;
     } else {
@@ -2545,7 +2545,7 @@ HRESULT CEndlessUsbToolDlg::OnSelectedUSBDiskChanged(IHTMLElement* pElement)
         pFileImageEntry_t localEntry = NULL;
         CString selectedImage = UTF8ToCString(image_path);
 
-        size = GetExtractedSize(selectedImage);
+        size = GetExtractedSize(selectedImage, FALSE);
         if (!m_liveInstall && m_imageFiles.Lookup(selectedImage, localEntry)) {
             size = localEntry->size;
         }
@@ -3040,7 +3040,7 @@ void CEndlessUsbToolDlg::GetImgDisplayName(CString &displayName, const CString &
     }
 }
 
-ULONGLONG CEndlessUsbToolDlg::GetExtractedSize(const CString& filename)
+ULONGLONG CEndlessUsbToolDlg::GetExtractedSize(const CString& filename, BOOL isInstallerImage)
 {
     FUNCTION_ENTER;
 
@@ -3051,7 +3051,7 @@ ULONGLONG CEndlessUsbToolDlg::GetExtractedSize(const CString& filename)
     else return 0;
 
     CStringA asciiFileName = ConvertUnicodeToUTF8(filename);
-    return get_eos_archive_disk_image_size(asciiFileName, compression_type);
+    return get_eos_archive_disk_image_size(asciiFileName, compression_type, isInstallerImage);
 }
 
 void CEndlessUsbToolDlg::GetIEVersion()
