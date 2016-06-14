@@ -166,6 +166,7 @@ private:
     bool m_enableLogDebugging;
     CFile m_logFile;
     ErrorCause_t m_lastErrorCause;
+    long m_maximumUSBVersion;
 
     void StartOperationThread(int operation, LPTHREAD_START_ROUTINE threadRoutine, LPVOID param = NULL);
 
@@ -237,4 +238,7 @@ private:
     void StartCheckInternetConnectionThread();
     bool CanUseLocalFile();
     bool CanUseRemoteFile();
+    void FindMaxUSBSpeed();
+    void CheckUSBHub(LPCTSTR devicePath);
+    void UpdateUSBSpeedMessage(DWORD deviceIndex);
 };

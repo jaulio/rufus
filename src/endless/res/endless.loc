@@ -219,6 +219,11 @@ t MSG_328 "Try again"
 
 t MSG_329 "https://support.endlessm.com/hc/en-us/articles/210527103"
 
+t MSG_330 "You have selected a slow USB device (USB 1.0). Please use a USB 3.0 device for the best experience."
+t MSG_331 "You have selected a slow USB device (USB 1.0). Please use a USB 2.0 device for the best experience."
+t MSG_332 "You have selected a slower USB device (USB 2.0). Please use a USB 3.0 device for the best experience."
+t MSG_333 "You have a USB 3.0 device but it is inserted into a USB 2.0 port. Please insert it into a USB 3.0 port (usually blue) for the best experience."
+
 t MSG_400 "Light"
 t MSG_401 "English"
 t MSG_402 "Spanish"

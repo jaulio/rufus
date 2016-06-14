@@ -111,6 +111,9 @@
     <ClInclude Include="gpt\crc32.h">
       <Filter>Header Files\gpt</Filter>
     </ClInclude>
+    <ClInclude Include="WindowsUsbDefines.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="EndlessUsbTool.cpp">

@@ -545,7 +545,15 @@ select:disabled {
 	color: black;
 	font-size: 13px;
 	font-family: LatoMedium;
-	margin-top: 40px;
+}
+
+#AgreementContainer div {
+	margin-top: 10px;
+	min-height: 70px;
+	text-align: center;
+	width: 460px;
+	color: red;
+	font-size: 12px;
 }
 
 /* Installing Page */

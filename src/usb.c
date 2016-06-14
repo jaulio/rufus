@@ -45,6 +45,12 @@
 extern StrArray DriveID, DriveLabel;
 extern BOOL enable_HDDs, use_fake_units, enable_vmdk, usb_debug, list_non_usb_removable_drives;
 
+#ifdef ENDLESSUSB_TOOL
+extern DWORD usbDeviceSpeed[128];
+extern BOOL usbDeviceSpeedIsLower[128];
+extern DWORD usbDevicesCount;
+#endif //ENDLESSUSB_TOOL
+
 /*
  * Get the VID, PID and current device speed
  */
@@ -211,6 +217,10 @@ BOOL GetUSBDevices(DWORD devnum)
 	StrArrayCreate(&dev_if_path, 128);
 	// Add a dummy for string index zero, as this is what non matching hashes will point to
 	StrArrayAdd(&dev_if_path, "");
+
+#ifdef ENDLESSUSB_TOOL
+    usbDevicesCount = 0;
+#endif //ENDLESSUSB_TOOL
 
 	device_id = (char*)malloc(MAX_PATH);
 	if (device_id == NULL)
@@ -626,6 +636,14 @@ BOOL GetUSBDevices(DWORD devnum)
 				// Must ensure that the combo box is UNSORTED for indexes to be the same
 				StrArrayAdd(&DriveID, buffer);
 				StrArrayAdd(&DriveLabel, label);
+
+#ifdef ENDLESSUSB_TOOL
+                if (usbDevicesCount < sizeof(usbDeviceSpeed) / sizeof(usbDeviceSpeed[0])) {
+                    usbDeviceSpeed[usbDevicesCount] = props.speed;
+                    usbDeviceSpeedIsLower[usbDevicesCount] = props.is_LowerSpeed;
+                    usbDevicesCount++;
+                }
+#endif //ENDLESSUSB_TOOL
 
 				IGNORE_RETVAL(ComboBox_SetItemData(hDeviceList, ComboBox_AddStringU(hDeviceList, entry), drive_index));
 #ifndef ENDLESSUSB_TOOL

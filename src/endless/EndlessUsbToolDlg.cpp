@@ -13,6 +13,7 @@
 #include "json/json.h"
 #include <fstream>
 #include "Version.h"
+#include "WindowsUsbDefines.h"
 
 // Rufus include files
 extern "C" {
@@ -21,6 +22,8 @@ extern "C" {
 #include "msapi_utf8.h"
 #include "drive.h"
 #include "bled/bled.h"
+
+#include "usb.h"
 
 // RADU: try to remove the need for all of these
 OPENED_LIBRARIES_VARS;
@@ -64,8 +67,13 @@ PF_TYPE_DECL(WINAPI, ULONG, SHChangeNotifyRegister, (HWND, int, LONG, UINT, int,
 
 BOOL FormatDrive(DWORD DriveIndex);
 
-
 extern HANDLE GlobalLoggingMutex;
+
+// Added by us so we don't go through the hastle of getting device speed again
+// Rufus code already does it
+DWORD usbDeviceSpeed[128];
+BOOL usbDeviceSpeedIsLower[128];
+DWORD usbDevicesCount;
 };
 
 #include "localization.h"
@@ -131,6 +139,8 @@ extern HANDLE GlobalLoggingMutex;
 #define ELEMENT_SELUSB_NEW_DISK_NAME    "NewDiskName"
 #define ELEMENT_SELUSB_NEW_DISK_SIZE    "NewDiskSize"
 #define ELEMENT_SELUSB_AGREEMENT        "AgreementCheckbox"
+#define ELEMENT_SELUSB_SPEEDWARNING     "UsbSpeedWarning"
+
 //Installing page elements
 #define ELEMENT_SECUREBOOT_HOWTO        "SecureBootHowTo"
 #define ELEMENT_INSTALL_DESCRIPTION     "InstallStepDescription"
@@ -492,6 +502,7 @@ void CEndlessUsbToolDlg::OnDocumentComplete(LPDISPATCH pDisp, LPCTSTR szUrl)
     SetElementText(_T(ELEMENT_VERSION_CONTAINER), CComBSTR(RELEASE_VER_STR));
 
     StartCheckInternetConnectionThread();
+    FindMaxUSBSpeed();
 
 	return;
 error:
@@ -2580,6 +2591,8 @@ HRESULT CEndlessUsbToolDlg::OnSelectedUSBDiskChanged(IHTMLElement* pElement)
     memset(&SelectedDrive, 0, sizeof(SelectedDrive));
     SelectedDrive.DeviceNumber = (DWORD)ComboBox_GetItemData(hDeviceList, deviceIndex);
     GetDrivePartitionData(SelectedDrive.DeviceNumber, fs_type, sizeof(fs_type), FALSE);
+
+    UpdateUSBSpeedMessage(deviceIndex);
     
     // Radu: same code found in OnSelectFileNextClicked, move to new method
     // check if final image will fit in the disk
@@ -3010,8 +3023,11 @@ DWORD WINAPI CEndlessUsbToolDlg::FileCopyThread(void* param)
     DeleteVolumeMountPointA(drive_name);    
 
     FormatStatus = 0;
+    safe_closehandle(hPhysical);
+    safe_free(guid_volume);
     dlg->PostMessage(WM_FINISHED_FILE_COPY, 0, 0);
     return 0;
+
 error:
     safe_closehandle(hPhysical);
     safe_free(guid_volume);
@@ -3364,4 +3380,129 @@ bool CEndlessUsbToolDlg::CanUseLocalFile()
 bool CEndlessUsbToolDlg::CanUseRemoteFile()
 {
     return !m_jsonDownloadAttempted || m_remoteImages.GetCount() != 0;
+}
+
+void CEndlessUsbToolDlg::FindMaxUSBSpeed()
+{
+    SP_DEVICE_INTERFACE_DATA         DevIntfData;
+    PSP_DEVICE_INTERFACE_DETAIL_DATA DevIntfDetailData;
+    SP_DEVINFO_DATA                  DevData;
+    HDEVINFO hDevInfo;
+    DWORD dwMemberIdx, dwSize;
+
+    m_maximumUSBVersion = USB_SPEED_UNKNOWN;
+
+    hDevInfo = SetupDiGetClassDevs(&GUID_DEVINTERFACE_USB_HUB, NULL, 0, DIGCF_DEVICEINTERFACE | DIGCF_PRESENT);
+    IFFALSE_RETURN(hDevInfo != INVALID_HANDLE_VALUE, "Error on SetupDiGetClassDevs call");
+
+    DevIntfData.cbSize = sizeof(SP_DEVICE_INTERFACE_DATA);
+    dwMemberIdx = 0;
+    SetupDiEnumDeviceInterfaces(hDevInfo, NULL, &GUID_DEVINTERFACE_USB_HUB, dwMemberIdx, &DevIntfData);
+
+    while (GetLastError() != ERROR_NO_MORE_ITEMS) {
+        DevData.cbSize = sizeof(DevData);
+        SetupDiGetDeviceInterfaceDetail(hDevInfo, &DevIntfData, NULL, 0, &dwSize, NULL);
+
+        DevIntfDetailData = (PSP_DEVICE_INTERFACE_DETAIL_DATA)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, dwSize);
+        DevIntfDetailData->cbSize = sizeof(SP_DEVICE_INTERFACE_DETAIL_DATA);
+
+        if (SetupDiGetDeviceInterfaceDetail(hDevInfo, &DevIntfData, DevIntfDetailData, dwSize, &dwSize, &DevData)) {
+            CheckUSBHub(DevIntfDetailData->DevicePath);
+        }
+
+        HeapFree(GetProcessHeap(), 0, DevIntfDetailData);
+        SetupDiEnumDeviceInterfaces(hDevInfo, NULL, &GUID_DEVINTERFACE_USB_HUB, ++dwMemberIdx, &DevIntfData);
+    }
+
+    SetupDiDestroyDeviceInfoList(hDevInfo);
+}
+
+
+void CEndlessUsbToolDlg::CheckUSBHub(LPCTSTR devicePath)
+{
+    HANDLE usbHubHandle = CreateFile(devicePath, GENERIC_WRITE, FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_FLAG_OVERLAPPED, NULL);
+    if (usbHubHandle != INVALID_HANDLE_VALUE) {
+        USB_HUB_CAPABILITIES hubCapabilities;
+        DWORD size = sizeof(hubCapabilities);
+        memset(&hubCapabilities, 0, sizeof(USB_HUB_CAPABILITIES));
+
+        // Windows XP check
+        if (nWindowsVersion == WINDOWS_XP) {
+            if (!DeviceIoControl(usbHubHandle, IOCTL_USB_GET_HUB_CAPABILITIES, &hubCapabilities, size, &hubCapabilities, size, &size, NULL)) {
+                uprintf("Could not get hub capabilites for %ls: %s", devicePath, WindowsErrorString());
+            } else {
+                uprintf("%ls HubIs2xCapable=%d", devicePath, hubCapabilities.HubIs2xCapable);
+                m_maximumUSBVersion = max(m_maximumUSBVersion, hubCapabilities.HubIs2xCapable ? USB_SPEED_HIGH : USB_SPEED_LOW);
+            }
+        }
+
+        // Windows Vista and 7 check
+        if (nWindowsVersion >= WINDOWS_VISTA) {
+            USB_HUB_CAPABILITIES_EX hubCapabilitiesEx;
+            size = sizeof(hubCapabilitiesEx);
+            memset(&hubCapabilitiesEx, 0, sizeof(USB_HUB_CAPABILITIES_EX));
+            if (!DeviceIoControl(usbHubHandle, IOCTL_USB_GET_HUB_CAPABILITIES_EX, &hubCapabilitiesEx, size, &hubCapabilitiesEx, size, &size, NULL)) {
+                uprintf("Could not get hub capabilites for %ls: %s", devicePath, WindowsErrorString());
+            } else {
+                uprintf("Vista+ %ls HubIsHighSpeedCapable=%d, HubIsHighSpeed=%d",
+                    devicePath, hubCapabilitiesEx.CapabilityFlags.HubIsHighSpeedCapable, hubCapabilitiesEx.CapabilityFlags.HubIsHighSpeed);
+                m_maximumUSBVersion = max(m_maximumUSBVersion, hubCapabilitiesEx.CapabilityFlags.HubIsHighSpeed ? USB_SPEED_HIGH : USB_SPEED_LOW);
+            }
+        }
+
+        // Windows 8 and later check
+        if (nWindowsVersion >= WINDOWS_8) {
+            USB_HUB_INFORMATION_EX hubInformation;
+            size = sizeof(hubInformation);
+            memset(&hubInformation, 0, sizeof(USB_HUB_INFORMATION_EX));
+            if (!DeviceIoControl(usbHubHandle, IOCTL_USB_GET_HUB_INFORMATION_EX, &hubInformation, size, &hubInformation, size, &size, NULL)) {
+                uprintf("Could not get hub capabilites for %ls: %s", devicePath, WindowsErrorString());
+            } else {
+                USB_NODE_CONNECTION_INFORMATION_EX_V2 conn_info_v2;
+                for (int index = 1; index <= hubInformation.HighestPortNumber; index++) {
+                    memset(&conn_info_v2, 0, sizeof(conn_info_v2));
+                    size = sizeof(conn_info_v2);
+                    conn_info_v2.ConnectionIndex = (ULONG)index;
+                    conn_info_v2.Length = size;
+                    conn_info_v2.SupportedUsbProtocols.Usb300 = 1;
+                    if (!DeviceIoControl(usbHubHandle, IOCTL_USB_GET_NODE_CONNECTION_INFORMATION_EX_V2, &conn_info_v2, size, &conn_info_v2, size, &size, NULL)) {
+                        uprintf("Could not get node connection information (V2) for hub '%ls' with port '%d': %s", devicePath, index, WindowsErrorString());
+                        continue;
+                    }
+                    uprintf("%d) USB 3.0(%d), 2.0(%d), 1.0(%d), OperatingAtSuperSpeedOrHigher (%d), SuperSpeedCapableOrHigher (%d)", index,
+                        conn_info_v2.SupportedUsbProtocols.Usb300, conn_info_v2.SupportedUsbProtocols.Usb200, conn_info_v2.SupportedUsbProtocols.Usb110,
+                        conn_info_v2.Flags.DeviceIsOperatingAtSuperSpeedOrHigher, conn_info_v2.Flags.DeviceIsSuperSpeedCapableOrHigher);
+                    m_maximumUSBVersion = max(m_maximumUSBVersion, conn_info_v2.SupportedUsbProtocols.Usb300 == 1 ? USB_SPEED_SUPER_OR_LATER : USB_SPEED_HIGH);
+                }
+            }
+        }
+
+    } else {
+        uprintf("Could not open hub %ls: %s", devicePath, WindowsErrorString());
+    }
+
+    safe_closehandle(usbHubHandle);
+}
+
+void CEndlessUsbToolDlg::UpdateUSBSpeedMessage(DWORD deviceIndex)
+{
+    DWORD speed = usbDeviceSpeed[deviceIndex];
+    BOOL isLowerSpeed = usbDeviceSpeedIsLower[deviceIndex];
+    DWORD msgId = 0;
+
+    if (speed < USB_SPEED_HIGH) { // smaller than USB 2.0
+        if (m_maximumUSBVersion == USB_SPEED_SUPER_OR_LATER) { // we have USB 3.0 ports
+            msgId = MSG_330;
+        } else { // we have USB 2.0 ports
+            msgId = MSG_331;
+        }
+    } else if (speed == USB_SPEED_HIGH && m_maximumUSBVersion == USB_SPEED_SUPER_OR_LATER) { // USB 2.0 device (or USB 3.0 device in USB 2.0 port) and we have USB 3.0 ports
+        msgId = isLowerSpeed ? MSG_333 : MSG_332;
+    }
+
+    if (msgId == 0) {
+        SetElementText(_T(ELEMENT_SELUSB_SPEEDWARNING), CComBSTR(""));
+    } else {
+        SetElementText(_T(ELEMENT_SELUSB_SPEEDWARNING), UTF8ToBSTR(lmprintf(msgId)));
+    }
 }
