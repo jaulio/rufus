@@ -374,6 +374,30 @@ msgctxt "MSG_329"
 msgid "https://support.endlessm.com/hc/en-us/articles/210527103"
 msgstr ""
 
+msgctxt "MSG_330"
+msgid "You have selected a slow USB device (USB 1.0). Please use a USB 3.0 device for the best experience."
+msgstr ""
+
+msgctxt "MSG_331"
+msgid "You have selected a slow USB device (USB 1.0). Please use a USB 2.0 device for the best experience."
+msgstr ""
+
+msgctxt "MSG_332"
+msgid "You have selected a slower USB device (USB 2.0). Please use a USB 3.0 device for the best experience."
+msgstr ""
+
+msgctxt "MSG_333"
+msgid "You have a USB 3.0 device but it is inserted into a USB 2.0 port. Please insert it into a USB 3.0 port (usually blue) for the best experience."
+msgstr ""
+
+msgctxt "MSG_334"
+msgid "There isn’t enough disk space for downloading Endless OS. Please free up %s and click \"Resume\" to start downloading."
+msgstr ""
+
+msgctxt "MSG_335"
+msgid "The selected version of Endless OS requires %s of free disk space, but only %s is available. Please free up some space on drive %s to continue."
+msgstr ""
+
 msgctxt "MSG_400"
 msgid "Light"
 msgstr ""
