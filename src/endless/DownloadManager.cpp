@@ -323,10 +323,9 @@ STDMETHODIMP DownloadManager::JobModification(IBackgroundCopyJob *JobModificatio
                     LPWSTR str[1024];
                     memset(str, 0, 1024);
                     error->GetErrorDescription(GetUserDefaultLangID(), str);
+                    error->GetError(&downloadStatus->errorContext, &downloadStatus->errorCode);
                     uprintf("Job %ls ERROR!%ls\n", pszJobName, str);
-                    if (BG_JOB_STATE_ERROR == State) {
-                        downloadStatus->error = true;
-                    }
+                    downloadStatus->error = true;
                 }
                 else if (BG_JOB_STATE_TRANSFERRING == State) {
                     //Call pJob->GetProgress(&Progress); to determine the number of bytes 
@@ -343,9 +342,6 @@ STDMETHODIMP DownloadManager::JobModification(IBackgroundCopyJob *JobModificatio
                 else if (BG_JOB_STATE_SUSPENDED == State) {
                     uprintf("Job %ls SUSPENDED\n", pszJobName);
                     //m_bcJob->Cancel();
-                }
-                else if (BG_JOB_STATE_TRANSIENT_ERROR == State) {
-                    uprintf("Job %ls TRANSIENT ERROR\n", pszJobName);
                 }
                 else if (BG_JOB_STATE_ACKNOWLEDGED == State) {                    
                     uprintf("Job %ls ACKNOWLEDGED\n", pszJobName);
@@ -422,7 +418,7 @@ HRESULT DownloadManager::GetExistingJob(CComPtr<IBackgroundCopyManager> &bcManag
         if (0 == _tcscmp(jobName, displayName)) {            
             hr = job->GetState(&state);
             IFFALSE_GOTOERROR(SUCCEEDED(hr), "Error querying for job state.");
-            if (state != BG_JOB_STATE_CANCELLED && state != BG_JOB_STATE_ERROR && state != BG_JOB_STATE_TRANSIENT_ERROR) {
+            if (state != BG_JOB_STATE_CANCELLED && state != BG_JOB_STATE_ERROR) {
                 existingJob = job;
                 return S_OK;
             } else {
@@ -511,7 +507,9 @@ bool DownloadManager::GetDownloadProgress(CComPtr<IBackgroundCopyJob> &currentJo
         break;
     case BG_JOB_STATE_ERROR:
     case BG_JOB_STATE_CANCELLED:
+    case BG_JOB_STATE_TRANSIENT_ERROR:
         downloadStatus->error = true;
+        downloadStatus->errorContext = BG_ERROR_CONTEXT_NONE;
         break;
     }
     downloadStatus->jobName = jobName;

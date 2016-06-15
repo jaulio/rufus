@@ -20,6 +20,7 @@ typedef enum ErrorCause {
     ErrorCauseCanceled,
     ErrorCauseJSONDownloadFailed,
     ErrorCauseDownloadFailed,
+    ErrorCauseDownloadFailedDiskFull,
     ErrorCauseVerificationFailed,
     ErrorCauseWriteFailed,
     ErrorCauseNone

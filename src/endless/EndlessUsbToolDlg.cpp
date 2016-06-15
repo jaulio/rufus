@@ -319,6 +319,7 @@ static LPCTSTR ErrorCauseToStr(ErrorCause_t errorCause)
         TOSTR(ErrorCauseCanceled);
         TOSTR(ErrorCauseJSONDownloadFailed);
         TOSTR(ErrorCauseDownloadFailed);
+        TOSTR(ErrorCauseDownloadFailedDiskFull);
         TOSTR(ErrorCauseVerificationFailed);
         TOSTR(ErrorCauseWriteFailed);
         TOSTR(ErrorCauseNone);
@@ -1106,8 +1107,11 @@ LRESULT CEndlessUsbToolDlg::WindowProc(UINT message, WPARAM wParam, LPARAM lPara
                         CancelRunningOperation();
                     }
                 } else {
-                    m_lastErrorCause = ErrorCause_t::ErrorCauseDownloadFailed;
-                    ErrorOccured(ErrorCause_t::ErrorCauseDownloadFailed);
+                    bool diskFullError = (downloadStatus->errorContext == BG_ERROR_CONTEXT_LOCAL_FILE);
+                    diskFullError = diskFullError && (downloadStatus->errorCode == HRESULT_FROM_WIN32(ERROR_DISK_FULL));
+                    m_lastErrorCause = diskFullError ? ErrorCause_t::ErrorCauseDownloadFailedDiskFull : ErrorCause_t::ErrorCauseDownloadFailed;
+                    m_downloadManager.ClearExtraDownloadJobs();
+                    ErrorOccured(m_lastErrorCause);
                 }
             } else if (downloadStatus->done) {
                 uprintf("Download done for %ls", downloadStatus->jobName);
@@ -1456,6 +1460,10 @@ void CEndlessUsbToolDlg::ErrorOccured(ErrorCause_t errorCause)
         buttonMsgId = MSG_326;
         suggestionMsgId = MSG_323;
         break;
+    case ErrorCause_t::ErrorCauseDownloadFailedDiskFull:
+        buttonMsgId = MSG_326;
+        suggestionMsgId = MSG_334;
+        break;
     case ErrorCause_t::ErrorCauseJSONDownloadFailed:
     case ErrorCause_t::ErrorCauseVerificationFailed:
         buttonMsgId = MSG_327;
@@ -1480,7 +1488,21 @@ void CEndlessUsbToolDlg::ErrorOccured(ErrorCause_t errorCause)
     }
 
     if (suggestionMsgId != 0) {
-        SetElementText(_T(ELEMENT_ERROR_SUGGESTION), UTF8ToBSTR(lmprintf(suggestionMsgId)));
+        CComBSTR message;
+        if (suggestionMsgId == MSG_334) {
+            POSITION p = m_remoteImages.FindIndex(m_selectedRemoteIndex);
+            ULONGLONG size = 0;
+            if (p != NULL) {
+                RemoteImageEntry_t remote = m_remoteImages.GetAt(p);
+                size = remote.compressedSize;
+            }
+            // we don't take the signature files into account but we are taking about ~2KB compared to >2GB
+            ULONGLONG totalSize = size + (m_liveInstall ? 0 : m_installerImage.compressedSize);
+            message = UTF8ToBSTR(lmprintf(suggestionMsgId, SizeToHumanReadable(totalSize, FALSE, use_fake_units)));
+        } else {
+            message = UTF8ToBSTR(lmprintf(suggestionMsgId));
+        }
+        SetElementText(_T(ELEMENT_ERROR_SUGGESTION), message);
     }
 
     ChangePage(_T(ELEMENT_ERROR_PAGE));
@@ -2698,6 +2720,7 @@ HRESULT CEndlessUsbToolDlg::OnRecoverErrorButtonClicked(IHTMLElement* pElement)
     // continue based on error cause
     switch (errorCause) {
     case ErrorCause_t::ErrorCauseDownloadFailed:
+    case ErrorCause_t::ErrorCauseDownloadFailedDiskFull:
         OnSelectUSBNextClicked(NULL);
         break;
     case ErrorCause_t::ErrorCauseWriteFailed:

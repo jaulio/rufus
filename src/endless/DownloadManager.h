@@ -35,6 +35,8 @@ typedef struct DownloadStatus {
     bool done;
     bool error;
     CString jobName;
+    BG_ERROR_CONTEXT errorContext;
+    HRESULT errorCode;
 } DownloadStatus_t;
 
 typedef std::initializer_list<LPCTSTR> ListOfStrings;
