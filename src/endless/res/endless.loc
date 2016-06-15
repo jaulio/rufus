@@ -227,6 +227,7 @@ t MSG_333 "You have a USB 3.0 device but it is inserted into a USB 2.0 port. Ple
 t MSG_334 "There isn’t enough disk space for downloading Endless OS. Please free up %s and click \"Resume\" to start downloading."
 
 t MSG_335 "The selected version of Endless OS requires %s of free disk space, but only %s is available. Please free up some space on drive %s to continue."
+t MSG_336 "Delete the invalid file (%s)."
 
 t MSG_400 "Light"
 t MSG_401 "English"

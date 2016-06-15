@@ -164,6 +164,8 @@ DWORD usbDevicesCount;
 #define ELEMENT_ENDLESS_SUPPORT         "EndlessSupport"
 #define ELEMENT_ERROR_SUGGESTION        "ErrorMessageSuggestion"
 #define ELEMENT_ERROR_BUTTON            "ErrorContinueButton"
+#define ELEMENT_ERROR_DELETE_CHECKBOX   "DeleteFilesCheckbox"
+#define ELEMENT_ERROR_DELETE_TEXT       "DeleteFilesText"
 
 #define ELEMENT_VERSION_CONTAINER       "VersionContainer"
 
@@ -173,6 +175,7 @@ DWORD usbDevicesCount;
 #define JS_ENABLE_ELEMENT               "enableElement"
 #define JS_ENABLE_BUTTON                "enableButton"
 #define JS_SHOW_ELEMENT                 "showElement"
+#define JS_RESET_CHECK                  "resetCheck"
 
 // Personalities
 
@@ -393,6 +396,7 @@ BEGIN_DHTML_EVENT_MAP(CEndlessUsbToolDlg)
     DHTML_EVENT_ONCLICK(_T(ELEMENT_ERROR_CLOSE_BUTTON), OnCloseAppClicked)
     DHTML_EVENT_ONCLICK(_T(ELEMENT_ENDLESS_SUPPORT), OnLinkClicked)
     DHTML_EVENT_ONCLICK(_T(ELEMENT_ERROR_BUTTON), OnRecoverErrorButtonClicked)
+    DHTML_EVENT_ONCHANGE(_T(ELEMENT_ERROR_DELETE_CHECKBOX), OnDeleteCheckboxChanged)
 
 END_DHTML_EVENT_MAP()
 
@@ -1168,10 +1172,10 @@ LRESULT CEndlessUsbToolDlg::WindowProc(UINT message, WPARAM wParam, LPARAM lPara
         case WM_FINISHED_FILE_VERIFICATION:
         {
             BOOL result = (BOOL)wParam;
+            m_operationThread = INVALID_HANDLE_VALUE;
             if (result) {
                 uprintf("Verification passed.");
-                m_operationThread = INVALID_HANDLE_VALUE;
-                
+
                 bool verifiedInstallerImage = (m_localFile == m_localInstallerImage.filePath);
                 if (!m_liveInstall && !verifiedInstallerImage) {
                     safe_free(image_path);
@@ -1191,8 +1195,10 @@ LRESULT CEndlessUsbToolDlg::WindowProc(UINT message, WPARAM wParam, LPARAM lPara
             }
             else {
                 uprintf("Signature verification failed.");
+                m_currentStep = OP_NO_OPERATION_IN_PROGRESS;
                 if (m_lastErrorCause == ErrorCause_t::ErrorCauseNone) {
-                    ErrorOccured(ErrorCause_t::ErrorCauseVerificationFailed);
+                    m_lastErrorCause = ErrorCause_t::ErrorCauseVerificationFailed;
+                    ErrorOccured(m_lastErrorCause);
                 } else {
                     ErrorOccured(m_lastErrorCause);
                 }
@@ -1480,6 +1486,7 @@ void CEndlessUsbToolDlg::ErrorOccured(ErrorCause_t errorCause)
         break;
     }
 
+    // Update the error button text if it's a "recoverable" error case or hide it otherwise
     if (buttonMsgId != 0) {
         SetElementText(_T(ELEMENT_ERROR_BUTTON), UTF8ToBSTR(lmprintf(buttonMsgId)));
         CallJavascript(_T(JS_SHOW_ELEMENT), CComVariant(HTML_BUTTON_ID(ELEMENT_ERROR_BUTTON)), CComVariant(TRUE));
@@ -1487,6 +1494,22 @@ void CEndlessUsbToolDlg::ErrorOccured(ErrorCause_t errorCause)
         CallJavascript(_T(JS_SHOW_ELEMENT), CComVariant(HTML_BUTTON_ID(ELEMENT_ERROR_BUTTON)), CComVariant(FALSE));
     }
 
+    // Ask user to delete the file that didn't pass signature verification
+    // Trying again with the same file will result in the same verification error
+    bool fileVerificationFailed = (errorCause == ErrorCause_t::ErrorCauseVerificationFailed);
+    CallJavascript(_T(JS_SHOW_ELEMENT), CComVariant(ELEMENT_ERROR_DELETE_CHECKBOX), CComVariant(fileVerificationFailed));
+    CallJavascript(_T(JS_ENABLE_BUTTON), CComVariant(HTML_BUTTON_ID(_T(ELEMENT_ERROR_BUTTON))), CComVariant(!fileVerificationFailed));
+    CComBSTR deleteFilesText("");
+    if (fileVerificationFailed) {
+        bool isInstallerImage = (m_localFile == m_localInstallerImage.filePath);
+        ULONGLONG invalidFileSize = isInstallerImage ? m_localInstallerImage.size : m_selectedFileSize;
+        deleteFilesText = UTF8ToBSTR(lmprintf(MSG_336, SizeToHumanReadable(invalidFileSize, FALSE, use_fake_units)));
+        CallJavascript(_T(JS_RESET_CHECK), CComVariant(_T(ELEMENT_ERROR_DELETE_CHECKBOX)));
+    }
+    CallJavascript(_T(JS_SHOW_ELEMENT), CComVariant(ELEMENT_ERROR_DELETE_CHECKBOX), CComVariant(fileVerificationFailed));
+    SetElementText(_T(ELEMENT_ERROR_DELETE_TEXT), deleteFilesText);
+
+    // Update the error description and "recovery" suggestion
     if (suggestionMsgId != 0) {
         CComBSTR message;
         if (suggestionMsgId == MSG_334) {
@@ -1625,7 +1648,7 @@ HRESULT CEndlessUsbToolDlg::OnTryEndlessSelected(IHTMLElement* pElement)
 
 HRESULT CEndlessUsbToolDlg::OnInstallEndlessSelected(IHTMLElement* pElement)
 {
-    if (IsButtonDisabled(pElement)) return S_OK;
+    IFFALSE_RETURN_VALUE(!IsButtonDisabled(pElement), "OnInstallEndlessSelected: Button is disabled. ", S_OK);
 
     FUNCTION_ENTER;
 
@@ -2252,9 +2275,10 @@ HRESULT CEndlessUsbToolDlg::OnSelectFileNextClicked(IHTMLElement* pElement)
     LPITEMIDLIST pidlDesktop = NULL;
     SHChangeNotifyEntry NotifyEntry;
     
-    if (IsButtonDisabled(pElement)) {
-        return S_OK;
-    }
+    IFFALSE_RETURN_VALUE(!IsButtonDisabled(pElement), "OnSelectFileNextClicked: Button is disabled. ", S_OK);
+
+    CallJavascript(_T(JS_RESET_CHECK), CComVariant(_T(ELEMENT_SELUSB_AGREEMENT)));
+    m_usbDeleteAgreement = false;
 
     // RADU: move this to another thread
     GetUSBDevices(0);
@@ -2468,7 +2492,7 @@ HRESULT CEndlessUsbToolDlg::OnSelectUSBPreviousClicked(IHTMLElement* pElement)
 
 HRESULT CEndlessUsbToolDlg::OnSelectUSBNextClicked(IHTMLElement* pElement)
 {
-    if (IsButtonDisabled(pElement)) return S_OK;
+    IFFALSE_RETURN_VALUE(!IsButtonDisabled(pElement), "OnSelectUSBNextClicked: Button is disabled. ", S_OK);
 
     FUNCTION_ENTER;
 
@@ -2640,6 +2664,11 @@ HRESULT CEndlessUsbToolDlg::OnSelectedUSBDiskChanged(IHTMLElement* pElement)
         size += INSTALLER_DELTA_SIZE + m_installerImage.extractedSize;
     }
 
+    if (pElement != NULL) {
+        CallJavascript(_T(JS_RESET_CHECK), CComVariant(_T(ELEMENT_SELUSB_AGREEMENT)));
+        m_usbDeleteAgreement = false;
+    }
+
     // RADU: should it be >= or should we take some more stuff into account like the partition size 
     BOOL isDiskBigEnough = (ULONGLONG)SelectedDrive.DiskSize > size;
 
@@ -2680,7 +2709,7 @@ void CEndlessUsbToolDlg::LeavingDevicesPage()
 // Install Page Handlers
 HRESULT CEndlessUsbToolDlg::OnInstallCancelClicked(IHTMLElement* pElement)
 {
-    if (IsButtonDisabled(pElement)) return S_OK;
+    IFFALSE_RETURN_VALUE(!IsButtonDisabled(pElement), "OnInstallCancelClicked: Button is disabled. ", S_OK);
 
     FUNCTION_ENTER;
 
@@ -2708,6 +2737,8 @@ HRESULT CEndlessUsbToolDlg::OnRecoverErrorButtonClicked(IHTMLElement* pElement)
     ErrorCause_t errorCause = m_lastErrorCause;
     uprintf("OnRecoverErrorButtonClicked error cause %ls(%d)", ErrorCauseToStr(errorCause), errorCause);
 
+    IFFALSE_RETURN_VALUE(!IsButtonDisabled(pElement), "Button is disabled. User didn't check the 'Delete invalid files' checkbox.", S_OK);
+
     // reset the state
     m_lastErrorCause = ErrorCause_t::ErrorCauseNone;
     m_localFilesScanned = false;
@@ -2731,12 +2762,38 @@ HRESULT CEndlessUsbToolDlg::OnRecoverErrorButtonClicked(IHTMLElement* pElement)
         OnSelectFileNextClicked(NULL);
         break;
     case ErrorCause_t::ErrorCauseVerificationFailed:
+    {
+        BOOL result = DeleteFile(m_localFile);
+        uprintf("%s on deleting file '%ls' - %s", result ? "Success" : "Error", m_localFile, WindowsErrorString());
+        SetLastError(ERROR_SUCCESS);
+        result = DeleteFile(m_localFileSig);
+        uprintf("%s on deleting file '%ls' - %s", result ? "Success" : "Error", m_localFileSig, WindowsErrorString());
+        ChangePage(_T(ELEMENT_FIRST_PAGE));
+        break;
+    }
     case ErrorCause_t::ErrorCauseCanceled:
     case ErrorCause_t::ErrorCauseJSONDownloadFailed:
     default:
         ChangePage(_T(ELEMENT_FIRST_PAGE));
         break;
     }
+
+    return S_OK;
+}
+
+HRESULT CEndlessUsbToolDlg::OnDeleteCheckboxChanged(IHTMLElement *pElement)
+{
+    FUNCTION_ENTER;
+    CComPtr<IHTMLOptionButtonElement> checkboxElem;
+    VARIANT_BOOL checked = VARIANT_FALSE;
+
+    HRESULT hr = pElement->QueryInterface(&checkboxElem);
+    IFFALSE_RETURN_VALUE(SUCCEEDED(hr) && checkboxElem != NULL, "Error querying for IHTMLOptionButtonElement.", S_OK);
+
+    hr = checkboxElem->get_checked(&checked);
+    IFFALSE_RETURN_VALUE(SUCCEEDED(hr), "Error querying for IHTMLOptionButtonElement.", S_OK);
+
+    CallJavascript(_T(JS_ENABLE_BUTTON), CComVariant(HTML_BUTTON_ID(_T(ELEMENT_ERROR_BUTTON))), checked);
 
     return S_OK;
 }

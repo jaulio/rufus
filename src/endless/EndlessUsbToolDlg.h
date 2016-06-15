@@ -86,6 +86,7 @@ protected:
 	// Error/Thank You page handlers
 	HRESULT OnCloseAppClicked(IHTMLElement* pElement);
     HRESULT OnRecoverErrorButtonClicked(IHTMLElement* pElement);
+    HRESULT OnDeleteCheckboxChanged(IHTMLElement* pElement);
 
 	// Implementation
 protected:

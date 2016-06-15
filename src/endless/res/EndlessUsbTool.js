@@ -94,10 +94,19 @@ function remoteSelectionChanged() {
 
 function selectImageClicked(inputId) {
 	var elem = document.getElementById(inputId);
-	if(elem ==null) {
+	if(elem == null) {
 		clog("Element is null " + inputId);
 		return;
 	}
 	elem.checked = true;
 	triggerEvent(elem, "change"); // for c++
+}
+
+function resetCheck(elemId) {
+	var elem = document.getElementById(elemId);
+	if(elem == null) {
+		clog("Element is null " + elemId);
+		return;
+	}
+	elem.checked = false;
 }

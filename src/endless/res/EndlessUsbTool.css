@@ -719,10 +719,11 @@ select:disabled {
 }
 
 #ErrorPage .PageContent .Button {
-	margin: 35px auto;
+	margin: 35px auto 10px;
 }
-#ErrorPage a {
-	margin: 35px auto;
+#DeleteFilesContainer {
+	margin-bottom: 20px;
+	min-height: 20px !important;
 }
 
 
