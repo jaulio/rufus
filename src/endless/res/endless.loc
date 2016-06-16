@@ -559,7 +559,7 @@ t MSG_331 "Vous avez sélectionné un appareil USB lent (USB 1.0). Veuillez util
 t MSG_332 "Vous avez sélectionné un appareil USB plus lent (USB 2.0). Veuillez utiliser un appareil USB 3.0 pour une expérience optimale."
 t MSG_333 "Vous disposez d'un appareil USB 3.0 mais il est inséré dans un port USB 2.0. Veuillez l'insérer dans un port USB 3.0 (généralement bleu) pour une expérience optimale."
 t MSG_334 "L'espace disque est insuffisant pour télécharger Endless OS. Veuillez libérer de l'espace sur %s, puis cliquez sur « Reprendre » pour commencer le téléchargement."
-t MSG_335 "The selected version of Endless OS requires %s of free disk space, but only %s is available. Please free up some space on drive %s to continue."
+t MSG_335 "La version d'Endless OS sélectionnée nécessite %s d'espace disque libre, mais seulement %s est disponible. Veuillez libérer de l'espace sur le disque %s pour continuer."
 t MSG_400 "Light"
 t MSG_401 "Anglais"
 t MSG_402 "Espagnol"
