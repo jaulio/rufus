@@ -780,7 +780,7 @@ t MSG_332 "Você selecionou um pendrive USB mais lento (USB 2.0). Para uma melho
 t MSG_333 "Você possui um pendrive USB 3.0, mas ele foi inserido em uma entrada USB 2.0. Favor inserir o pendrive em uma entrada USB 3.0 (geralmente azul) para uma melhor experiência."
 t MSG_334 "Não há espaço suficiente no HD para baixar o Endless OS. Favor liberar até %s e clicar em \"Continuar\" para começar o download."
 t MSG_335 "A versão selecionada do Endless OS requer %s de espaço liberado no HD, mas só %s está disponível."
-t MSG_336 "Delete the invalid file (%s)."
+t MSG_336 "Remova o arquivo inválido (%s)."
 t MSG_400 "Light"
 t MSG_401 "Inglês"
 t MSG_402 "Espanhol"
