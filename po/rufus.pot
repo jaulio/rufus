@@ -398,6 +398,10 @@ msgctxt "MSG_335"
 msgid "The selected version of Endless OS requires %s of free disk space, but only %s is available. Please free up some space on drive %s to continue."
 msgstr ""
 
+msgctxt "MSG_336"
+msgid "Delete the invalid file (%s)."
+msgstr ""
+
 msgctxt "MSG_400"
 msgid "Light"
 msgstr ""
