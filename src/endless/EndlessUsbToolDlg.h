@@ -243,4 +243,5 @@ private:
     void FindMaxUSBSpeed();
     void CheckUSBHub(LPCTSTR devicePath);
     void UpdateUSBSpeedMessage(DWORD deviceIndex);
+    void JSONDownloadFailed();
 };

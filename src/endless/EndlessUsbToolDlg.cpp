@@ -1104,12 +1104,7 @@ LRESULT CEndlessUsbToolDlg::WindowProc(UINT message, WPARAM wParam, LPARAM lPara
             if (downloadStatus->error) {
                 uprintf("Error on download.");
                 if (isReleaseJsonDownload) {
-                    m_jsonDownloadAttempted = true;
-                    if (!CanUseLocalFile()) {
-                        uprintf("Going to error page as no local files were found either.");
-                        m_lastErrorCause = ErrorCause_t::ErrorCauseJSONDownloadFailed;
-                        CancelRunningOperation();
-                    }
+                    JSONDownloadFailed();
                 } else {
                     bool diskFullError = (downloadStatus->errorContext == BG_ERROR_CONTEXT_LOCAL_FILE);
                     diskFullError = diskFullError && (downloadStatus->errorCode == HRESULT_FROM_WIN32(ERROR_DISK_FULL));
@@ -1993,7 +1988,7 @@ void CEndlessUsbToolDlg::StartJSONDownload()
     FUNCTION_ENTER;
 
     char tmp_path[MAX_PATH] = "";
-    bool status;
+    bool success;
 
     if (!m_isConnected) {
         uprintf("Device not connected to internet");
@@ -2021,8 +2016,11 @@ void CEndlessUsbToolDlg::StartJSONDownload()
     ListOfStrings urls = { JSON_URL(JSON_LIVE_FILE), JSON_URL(JSON_INSTALLER_FILE) };
     ListOfStrings files = { liveJson, installerJson };
 
-    // RADU: add error handling so we at least show the user there was an error starting the download
-    status = m_downloadManager.AddDownload(DownloadType_t::DownloadTypeReleseJson, urls, files, false);
+    success = m_downloadManager.AddDownload(DownloadType_t::DownloadTypeReleseJson, urls, files, false);
+
+    if(!success) {
+        JSONDownloadFailed();
+    }
 }
 
 #define JSON_IMAGES             "images"
@@ -3584,5 +3582,15 @@ void CEndlessUsbToolDlg::UpdateUSBSpeedMessage(DWORD deviceIndex)
         SetElementText(_T(ELEMENT_SELUSB_SPEEDWARNING), CComBSTR(""));
     } else {
         SetElementText(_T(ELEMENT_SELUSB_SPEEDWARNING), UTF8ToBSTR(lmprintf(msgId)));
+    }
+}
+
+void CEndlessUsbToolDlg::JSONDownloadFailed()
+{
+    m_jsonDownloadAttempted = true;
+    if (!CanUseLocalFile()) {
+        uprintf("Going to error page as no local files were found either.");
+        m_lastErrorCause = ErrorCause_t::ErrorCauseJSONDownloadFailed;
+        CancelRunningOperation();
     }
 }
