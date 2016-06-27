@@ -196,6 +196,20 @@ static const wchar_t *globalAvailablePersonalities[] =
     PERSONALITY_FRENCH,
 };
 
+// Rufus language codes
+#define RUFUS_LOCALE_EN     "en-US"
+#define RUFUS_LOCALE_ES     "es-ES"
+#define RUFUS_LOCALE_PT     "pt-BR"
+#define RUFUS_LOCALE_SA     "ar-SA"
+#define RUFUS_LOCALE_FR     "fr-FR"
+
+// INI file language codes
+#define INI_LOCALE_EN       "en_US.utf8"
+#define INI_LOCALE_ES       "es_MX.utf8"
+#define INI_LOCALE_PT       "pt_BR.utf8"
+#define INI_LOCALE_SA       "ar_AE.utf8"
+#define INI_LOCALE_FR       "fr_FR.utf8"
+
 
 #define GET_LOCAL_PATH(__filename__) (m_appDir + "\\" + (__filename__))
 #define CSTRING_GET_LAST(__path__, __separator__) __path__.Right(__path__.GetLength() - __path__.ReverseFind(__separator__) - 1)
@@ -406,6 +420,7 @@ END_DISPATCH_MAP()
 
 CMap<CString, LPCTSTR, uint32_t, uint32_t> CEndlessUsbToolDlg::m_personalityToLocaleMsg;
 CMap<CStringA, LPCSTR, CString, LPCTSTR> CEndlessUsbToolDlg::m_localeToPersonality;
+CMap<CStringA, LPCSTR, CStringA, LPCSTR> CEndlessUsbToolDlg::m_localeToIniLocale;
 
 CEndlessUsbToolDlg::CEndlessUsbToolDlg(UINT globalMessage, bool enableLogDebugging, CWnd* pParent /*=NULL*/)
     : CDHtmlDialog(IDD_ENDLESSUSBTOOL_DIALOG, IDR_HTML_ENDLESSUSBTOOL_DIALOG, pParent),
@@ -452,11 +467,17 @@ CEndlessUsbToolDlg::CEndlessUsbToolDlg(UINT globalMessage, bool enableLogDebuggi
         m_personalityToLocaleMsg.SetAt(globalAvailablePersonalities[index], MSG_400 + index);
     }
 
-    m_localeToPersonality["en-US"] = PERSONALITY_ENGLISH;
-    m_localeToPersonality["es-ES"] = PERSONALITY_SPANISH;
-    m_localeToPersonality["pt-BR"] = PERSONALITY_PORTUGHESE;
-    m_localeToPersonality["ar-SA"] = PERSONALITY_ARABIC;
-    m_localeToPersonality["fr-FR"] = PERSONALITY_FRENCH;
+    m_localeToPersonality[RUFUS_LOCALE_EN] = PERSONALITY_ENGLISH;
+    m_localeToPersonality[RUFUS_LOCALE_ES] = PERSONALITY_SPANISH;
+    m_localeToPersonality[RUFUS_LOCALE_PT] = PERSONALITY_PORTUGHESE;
+    m_localeToPersonality[RUFUS_LOCALE_SA] = PERSONALITY_ARABIC;
+    m_localeToPersonality[RUFUS_LOCALE_FR] = PERSONALITY_FRENCH;
+
+    m_localeToIniLocale[RUFUS_LOCALE_EN] = INI_LOCALE_EN;
+    m_localeToIniLocale[RUFUS_LOCALE_ES] = INI_LOCALE_ES;
+    m_localeToIniLocale[RUFUS_LOCALE_PT] = INI_LOCALE_PT;
+    m_localeToIniLocale[RUFUS_LOCALE_SA] = INI_LOCALE_SA;
+    m_localeToIniLocale[RUFUS_LOCALE_FR] = INI_LOCALE_FR;
 }
 
 CEndlessUsbToolDlg::~CEndlessUsbToolDlg() {
@@ -3007,6 +3028,7 @@ DWORD WINAPI CEndlessUsbToolDlg::FileCopyThread(void* param)
     PDISK_GEOMETRY_EX DiskGeometry = (PDISK_GEOMETRY_EX)(void*)geometry;
     PDRIVE_LAYOUT_INFORMATION_EX DriveLayout = (PDRIVE_LAYOUT_INFORMATION_EX)(void*)layout;
     CString driveDestination, fileDestination;
+    CStringA iniLanguage = INI_LOCALE_EN;
     char *guid_volume = NULL;
     int formatRetries = 5;
 
@@ -3092,6 +3114,22 @@ DWORD WINAPI CEndlessUsbToolDlg::FileCopyThread(void* param)
     fileDestination = driveDestination + CSTRING_GET_LAST(dlg->m_LiveFileSig, L'\\');
     result = CopyFileEx(dlg->m_LiveFileSig, fileDestination, NULL, NULL, NULL, 0);
     IFFALSE_GOTOERROR(result, "Copying live image signature failed.");
+
+    // Create settings file
+    if (!m_localeToIniLocale.Lookup(dlg->m_selectedLocale->txt[0], iniLanguage)) {
+        uprintf("ERROR: Selected language not found %s. Defaulting to English", dlg->m_selectedLocale->txt[0]);
+    }
+    fileDestination = driveDestination + L"install.ini";
+    FILE *iniFile;
+    if (0 == _wfopen_s(&iniFile, fileDestination, L"w")) {
+        CStringA line = "[EndlessOS]\n";
+        fwrite((const char*)line, 1, line.GetLength(), iniFile);
+        line.Format("locale=%s\n", iniLanguage);
+        fwrite((const char*)line, 1, line.GetLength(), iniFile);
+        fclose(iniFile);
+    } else {
+        uprintf("Could not open settings file %ls", fileDestination);
+    }
 
     // Unmount
     if (!DeleteVolumeMountPointA(drive_name)) {
