@@ -59,7 +59,7 @@ char embedded_sl_version_str[2][12] = { "?.??", "?.??" };
 char embedded_sl_version_ext[2][32];
 uint32_t dur_mins, dur_secs;
 StrArray DriveID, DriveLabel;
-BOOL enable_HDDs = FALSE, use_fake_units, enable_vmdk;
+BOOL enable_HDDs = TRUE, use_fake_units, enable_vmdk;
 int dialog_showing = 0;
 
 PF_TYPE_DECL(WINAPI, BOOL, SHChangeNotifyDeregister, (ULONG));
