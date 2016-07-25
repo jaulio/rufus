@@ -9882,13 +9882,27 @@ namespace libtorrent
 		set_need_save_resume();
 	}
 
-	void torrent::add_web_seed(std::string const& url, web_seed_entry::type_t type
-		, std::string const& auth, web_seed_entry::headers_t const& extra_headers)
+	void torrent::add_web_seed(std::string const& url, web_seed_entry::type_t type		
+		, std::string const& auth, web_seed_entry::headers_t const& extra_headers
+		, std::string file_name, int file_index)
 	{
 		web_seed_t ent(url, type, auth, extra_headers);
+		
+		ent.resize(torrent_file().num_files(), false);
+
+		std::list<web_seed_t>::iterator web_seed = std::find(m_web_seeds.begin(), m_web_seeds.end(), ent);		
+		bool web_seed_exists = web_seed != m_web_seeds.end();
+		
+		if (file_index != -1)
+		{
+			web_seed_t &current_seed = web_seed_exists ? *web_seed : ent;
+			
+			current_seed.redirect_path[file_index] = file_name;
+			current_seed.has_file[file_index] = true;
+		}
 		// don't add duplicates
-		if (std::find(m_web_seeds.begin(), m_web_seeds.end(), ent) != m_web_seeds.end()) return;
-		m_web_seeds.push_back(ent);
+		if(!web_seed_exists) m_web_seeds.push_back(ent);
+
 		set_need_save_resume();
 	}
 

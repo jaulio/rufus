@@ -499,6 +499,7 @@ BEGIN_MESSAGE_MAP(CEndlessUsbToolDlg, CDHtmlDialog)
 	ON_WM_CLOSE()
 END_MESSAGE_MAP()
 
+#include "TorrentDownloader.h"
 
 // Browse navigation handling methods
 void CEndlessUsbToolDlg::OnDocumentComplete(LPDISPATCH pDisp, LPCTSTR szUrl)
@@ -529,6 +530,8 @@ void CEndlessUsbToolDlg::OnDocumentComplete(LPDISPATCH pDisp, LPCTSTR szUrl)
 
     StartCheckInternetConnectionThread();
     FindMaxUSBSpeed();
+
+    DownloadTorrent(ConvertUnicodeToUTF8(m_appDir));
 
 	return;
 error:

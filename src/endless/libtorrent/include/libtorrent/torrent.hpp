@@ -138,9 +138,24 @@ namespace libtorrent
 	struct web_seed_t : web_seed_entry
 	{
 		web_seed_t(web_seed_entry const& wse);
-		web_seed_t(std::string const& url_, web_seed_entry::type_t type_
+		web_seed_t(std::string const& url_, web_seed_entry::type_t type_			
 			, std::string const& auth_ = std::string()
 			, web_seed_entry::headers_t const& extra_headers_ = web_seed_entry::headers_t());
+
+		void resize(int nr_files, bool default_has_files)
+		{
+			if (redirect_path.size() != nr_files)
+			{
+				redirect_path.resize(nr_files, "");
+				has_file.resize(nr_files, default_has_files);
+			}
+		}
+
+		bool still_has_files()
+		{
+			return std::find(has_file.begin(), has_file.end(), true) != has_file.end();
+		}
+		
 
 		// if this is > now, we can't reconnect yet
 		time_point retry;
@@ -175,6 +190,9 @@ namespace libtorrent
 		// connection to pick up
 		peer_request restart_request;
 		std::vector<char> restart_piece;
+
+		std::vector<bool> has_file;
+		std::vector<std::string> redirect_path;
 	};
 
 	struct TORRENT_EXTRA_EXPORT torrent_hot_members
@@ -602,7 +620,8 @@ namespace libtorrent
 		// finding the file(s) in this torrent.
 		void add_web_seed(std::string const& url, web_seed_t::type_t type);
 		void add_web_seed(std::string const& url, web_seed_t::type_t type
-			, std::string const& auth, web_seed_t::headers_t const& extra_headers);
+			, std::string const& auth, web_seed_t::headers_t const& extra_headers
+			, std::string file_name, int file_index);
 
 		void remove_web_seed(std::string const& url, web_seed_t::type_t type);
 		void disconnect_web_seed(peer_connection* p);

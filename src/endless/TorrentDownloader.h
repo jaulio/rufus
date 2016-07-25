@@ -1,3 +1,3 @@
 #pragma once
 
-void DownloadTorrent();
+void DownloadTorrent(const CStringA appPath);

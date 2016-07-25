@@ -366,6 +366,9 @@ void web_peer_connection::write_request(peer_request const& r)
 		{
 			file_slice const& f = *i;
 
+			m_web->resize(info.num_files(), true);
+			if (!m_web->has_file[f.file_index]) continue;
+
 			file_request_t file_req;
 			file_req.file_index = f.file_index;
 			file_req.start = f.offset;
@@ -378,38 +381,46 @@ void web_peer_connection::write_request(peer_request const& r)
 				continue;
 			}
 
-			request += "GET ";
+			std::string current_request;
+
+			current_request += "GET ";
 			if (using_proxy)
 			{
 				// m_url is already a properly escaped URL
 				// with the correct slashes. Don't encode it again
-				request += m_url;
+				current_request += m_url;
 				std::string path = info.orig_files().file_path(f.file_index);
 #ifdef TORRENT_WINDOWS
 				convert_path_to_posix(path);
 #endif
-				request += escape_path(path.c_str(), path.length());
+				current_request += escape_path(path.c_str(), path.length());
 			}
 			else
 			{
 				// m_path is already a properly escaped URL
 				// with the correct slashes. Don't encode it again
-				request += m_path;
+				current_request += m_path;
 
 				std::string path = info.orig_files().file_path(f.file_index);
 #ifdef TORRENT_WINDOWS
 				convert_path_to_posix(path);
 #endif
-				request += escape_path(path.c_str(), path.length());
+				if (m_web->redirect_path[f.file_index].length() != 0) {
+					path = m_web->redirect_path[f.file_index];
+				}
+
+				current_request += escape_path(path.c_str(), path.length());
 			}
-			request += " HTTP/1.1\r\n";
-			add_headers(request, m_settings, using_proxy);
-			request += "\r\nRange: bytes=";
-			request += to_string(f.offset).elems;
-			request += "-";
-			request += to_string(f.offset + f.size - 1).elems;
-			request += "\r\n\r\n";
+			current_request += " HTTP/1.1\r\n";
+			add_headers(current_request, m_settings, using_proxy);
+			current_request += "\r\nRange: bytes=";
+			current_request += to_string(f.offset).elems;
+			current_request += "-";
+			current_request += to_string(f.offset + f.size - 1).elems;
+			current_request += "\r\n\r\n";
 			m_first_request = false;
+
+			request += current_request;
 
 #if 0
 			std::cerr << this << " SEND-REQUEST: f: " << f.file_index
@@ -550,6 +561,24 @@ void web_peer_connection::handle_error(int bytes_left)
 	// TODO: 2 just make this peer not have the pieces
 	// associated with the file we just requested. Only
 	// when it doesn't have any of the file do the following
+
+	TORRENT_ASSERT(!m_file_requests.empty());
+	int const file_index = m_file_requests.front().file_index;
+
+	if (!t->need_loaded())
+	{
+		disconnect(errors::torrent_aborted, op_bittorrent);
+		return;
+	}
+
+	torrent_info const& info = t->torrent_file();
+	std::string path = info.orig_files().file_path(file_index);
+	peer_request request = info.map_file(m_file_requests.front().file_index, m_file_requests.front().start, m_file_requests.front().length);
+	
+	m_have_piece.clear_bit(request.piece);
+
+	return;
+
 	int retry_time = atoi(m_parser.header("retry-after").c_str());
 	if (retry_time <= 0) retry_time = m_settings.get_int(settings_pack::urlseed_wait_retry);
 	// temporarily unavailable, retry later
@@ -589,11 +618,12 @@ void web_peer_connection::handle_redirect(int bytes_left)
 	if (!m_path.empty() && m_path[m_path.size() - 1] != '/')
 		single_file_request = true;
 
+	int file_index = -1;
 	// add the redirected url and remove the current one
 	if (!single_file_request)
 	{
 		TORRENT_ASSERT(!m_file_requests.empty());
-		int const file_index = m_file_requests.front().file_index;
+		file_index = m_file_requests.front().file_index;
 
 		if (!t->need_loaded())
 		{
@@ -603,21 +633,31 @@ void web_peer_connection::handle_redirect(int bytes_left)
 		// TODO: 2 create a mapping of file-index to redirection URLs. Use that to form
 		// URLs instead. Support to reconnect to a new server without destructing this
 		// peer_connection
-		torrent_info const& info = t->torrent_file();
-		std::string path = info.orig_files().file_path(file_index);
-#ifdef TORRENT_WINDOWS
-		convert_path_to_posix(path);
-#endif
-		path = escape_path(path.c_str(), path.length());
-		size_t i = location.rfind(path);
-		if (i == std::string::npos)
-		{
-			t->remove_web_seed(this, errors::invalid_redirection, op_bittorrent, 2);
-			m_web = NULL;
-			TORRENT_ASSERT(is_disconnecting());
-			return;
-		}
-		location.resize(i);
+//		torrent_info const& info = t->torrent_file();
+//		std::string path = info.orig_files().file_path(file_index);
+//#ifdef TORRENT_WINDOWS
+//		convert_path_to_posix(path);
+//#endif
+//		path = escape_path(path.c_str(), path.length());
+//		path = path.substr(path.rfind('/') + 1);
+//		size_t i = location.rfind(path);
+//		if (i == std::string::npos)
+//		{
+//			t->remove_web_seed(this, errors::invalid_redirection, op_bittorrent, 2);
+//			m_web = NULL;
+//			TORRENT_ASSERT(is_disconnecting());
+//			return;
+//		}
+		
+		error_code ec;
+		using boost::tuples::ignore;
+		std::string path;
+		boost::tie(ignore, ignore, ignore, ignore, path) = parse_url_components(location, ec);
+
+		size_t i = location.find(path);
+		m_web->redirect_path[file_index] = path.substr(1);
+		m_web->has_file[file_index] = false;
+		location.resize(i + 1);
 	}
 	else
 	{
@@ -627,10 +667,18 @@ void web_peer_connection::handle_redirect(int bytes_left)
 #ifndef TORRENT_DISABLE_LOGGING
 	peer_log(peer_log_alert::info, "LOCATION", "%s", location.c_str());
 #endif
-	t->add_web_seed(location, web_seed_entry::url_seed, m_external_auth, m_extra_headers);
-	t->remove_web_seed(this, errors::redirecting, op_bittorrent, 2);
-	m_web = NULL;
-	TORRENT_ASSERT(is_disconnecting());
+	t->add_web_seed(location, web_seed_entry::url_seed, m_external_auth, m_extra_headers, m_web->redirect_path[file_index], file_index);
+	if (!m_web->still_has_files())
+	{
+		t->remove_web_seed(this, errors::redirecting, op_bittorrent, 2);
+		m_web = NULL;
+		TORRENT_ASSERT(is_disconnecting());
+	}
+	else
+	{
+		t->retry_web_seed(this, 1);
+	}
+	
 	return;
 }
 
@@ -761,9 +809,14 @@ void web_peer_connection::on_receive(error_code const& error
 		{
 			received_bytes(0, recv_buffer.left());
 			// we should not try this server again.
-			t->remove_web_seed(this, ec, op_bittorrent, 2);
-			m_web = NULL;
-			TORRENT_ASSERT(is_disconnecting());
+			//if (m_parser.status_code() != errors::http_errors::moved_permanently || !m_web->still_has_files())
+			{
+				t->remove_web_seed(this, ec, op_bittorrent, 2);
+				m_web = NULL;
+				TORRENT_ASSERT(is_disconnecting());
+			}/* else {
+				t->retry_web_seed(this, 1);
+			}*/
 			return;
 		}
 
