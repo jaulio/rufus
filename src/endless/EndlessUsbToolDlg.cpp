@@ -255,6 +255,7 @@ enum endless_action_type {
 #define EOS_PRODUCT_TEXT            "eos"
 #define EOS_INSTALLER_PRODUCT_TEXT  "eosinstaller"
 #define EOS_NONFREE_PRODUCT_TEXT    "eosnonfree"
+#define EOS_OEM_PRODUCT_TEXT		"eosoem"
 const wchar_t* mainWindowTitle = L"Endless USB Creator";
 
 // Radu: How much do we need to reserve for the exfat partition header?
@@ -3196,7 +3197,7 @@ bool CEndlessUsbToolDlg::ParseImgFileName(const CString& filename, CString &pers
     version.Replace(_T(EOS_PRODUCT_TEXT), _T(""));
     IFFALSE_GOTOERROR(!version.IsEmpty() && !lastPart.IsEmpty(), "");
     installerImage = product == _T(EOS_INSTALLER_PRODUCT_TEXT);
-    IFFALSE_GOTOERROR(product == _T(EOS_PRODUCT_TEXT) || product == _T(EOS_NONFREE_PRODUCT_TEXT) || installerImage, "");
+    IFFALSE_GOTOERROR(product == _T(EOS_PRODUCT_TEXT) || product == _T(EOS_NONFREE_PRODUCT_TEXT) || product == _T(EOS_OEM_PRODUCT_TEXT) || installerImage, "");
 
     pos = 0;
     resToken = lastPart.Tokenize(t2, pos);
