@@ -677,7 +677,7 @@ out:
  * Call on fmifs.dll's FormatEx() to format the drive
  */
 #ifdef ENDLESSUSB_TOOL
-BOOL FormatDrive(DWORD DriveIndex)
+BOOL FormatDrive(DWORD DriveIndex, int fsToUse)
 #else
 static BOOL FormatDrive(DWORD DriveIndex)
 #endif // ENDLESSUSB_TOOL
@@ -695,8 +695,8 @@ static BOOL FormatDrive(DWORD DriveIndex)
 	int fs;
 
 #ifdef ENDLESSUSB_TOOL
-    fs = FS_EXFAT;
-    strcpy_s(FSType, sizeof(FSType), "exFAT");
+    fs = fsToUse;
+    strcpy_s(FSType, sizeof(FSType), fs == FS_EXFAT ? "exFAT" : "FAT32");
     UNREFERENCED_PARAMETER(i);
 #else
 	GetWindowTextU(hFileSystem, FSType, ARRAYSIZE(FSType));
@@ -734,9 +734,10 @@ static BOOL FormatDrive(DWORD DriveIndex)
 	setlocale(LC_ALL, locale);
 
 #ifdef ENDLESSUSB_TOOL
-    wcscpy_s(wFSType, 64, L"exFAT");
-    wcscpy_s(wLabel, 64, L"eosimages");
-    ulClusterSize = 0x8000;
+    wcscpy_s(wFSType, 64, fs == FS_EXFAT ? L"exFAT" : L"FAT32");
+    /*if(fs == FS_EXFAT) wcscpy_s(wLabel, 64, L"eosimages");
+	else */wLabel[0] = L'\0';
+    ulClusterSize = fs == FS_EXFAT ? 0x8000 : 0x200;
 #else
 	GetWindowTextW(hFileSystem, wFSType, ARRAYSIZE(wFSType));
 	// We may have a " (Default)" trail
@@ -1607,6 +1608,8 @@ DWORD WINAPI FormatThread(void* param)
 	char kolibri_dst[] = "?:\\MTLD_F32";
 	char grub4dos_dst[] = "?:\\grldr";
 
+	//goto out;
+
 	PF_TYPE_DECL(WINAPI, LANGID, GetThreadUILanguage, (void));
 	PF_TYPE_DECL(WINAPI, LANGID, SetThreadUILanguage, (LANGID));
 	PF_INIT(GetThreadUILanguage, Kernel32);
@@ -1836,7 +1839,11 @@ DWORD WINAPI FormatThread(void* param)
 
 	// If FAT32 is requested and we have a large drive (>32 GB) use
 	// large FAT32 format, else use MS's FormatEx.
-	ret = use_large_fat32?FormatFAT32(DriveIndex):FormatDrive(DriveIndex);
+#ifdef ENDLESSUSB_TOOL
+	ret = use_large_fat32?FormatFAT32(DriveIndex):FormatDrive(DriveIndex, fs);
+#else
+	ret = use_large_fat32 ? FormatFAT32(DriveIndex) : FormatDrive(DriveIndex);
+#endif // ENDLESSUSB_TOOL
 	if (!ret) {
 		// Error will be set by FormatDrive() in FormatStatus
 		uprintf("Format error: %s\n", StrError(FormatStatus, TRUE));
