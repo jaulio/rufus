@@ -49,10 +49,6 @@ LANGS = collections.OrderedDict([
                'lcids': '0x0804, 0x1004'})])
 
 # Temporarily omit unsupported languages
-del LANGS['bn']
-del LANGS['hi']
-del LANGS['th']
-del LANGS['vi']
 del LANGS['zh_CN']
 
 # Read in the preamble until the marker that starts Endless translations
