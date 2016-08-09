@@ -65,7 +65,7 @@ int dialog_showing = 0;
 PF_TYPE_DECL(WINAPI, BOOL, SHChangeNotifyDeregister, (ULONG));
 PF_TYPE_DECL(WINAPI, ULONG, SHChangeNotifyRegister, (HWND, int, LONG, UINT, int, const SHChangeNotifyEntry *));
 
-BOOL FormatDrive(DWORD DriveIndex, int fsToUse);
+BOOL FormatDrive(DWORD DriveIndex, int fsToUse, const wchar_t *partLabel);
 
 extern HANDLE GlobalLoggingMutex;
 
@@ -3091,9 +3091,9 @@ DWORD WINAPI CEndlessUsbToolDlg::FileCopyThread(void* param)
     // Check if user canceled
     IFFALSE_GOTOERROR(WaitForSingleObject(dlg->m_cancelOperationEvent, 0) == WAIT_TIMEOUT, "User cancel.");
 	// Format the partition
-	IFFALSE_GOTOERROR(FormatFirstPartitionOnDrive(DriveIndex, FS_EXFAT, dlg->m_cancelOperationEvent), "Error on FormatFirstPartitionOnDrive");
+	IFFALSE_GOTOERROR(FormatFirstPartitionOnDrive(DriveIndex, FS_EXFAT, dlg->m_cancelOperationEvent, EXFAT_PARTITION_NAME_IMAGES), "Error on FormatFirstPartitionOnDrive");
     // Mount it
-	IFFALSE_GOTOERROR(MountFirstPartitionOnDrive(DriveIndex, driveDestination), "Error on FormatFirstPartitionOnDrive");
+	IFFALSE_GOTOERROR(MountFirstPartitionOnDrive(DriveIndex, driveDestination), "Error on MountFirstPartitionOnDrive");
 
     // Copy Files
     fileDestination = driveDestination + CSTRING_GET_LAST(dlg->m_LiveFile, L'\\');
@@ -3659,7 +3659,7 @@ DWORD WINAPI CEndlessUsbToolDlg::CreateUSBStick(LPVOID param)
 	IFFALSE_GOTOERROR(CreateFakePartitionLayout(hPhysical, layout, geometry), "Error on CreateFakePartitionLayout");
 	safe_closehandle(hPhysical);
 	// Format and mount ESP
-	IFFALSE_GOTOERROR(FormatFirstPartitionOnDrive(DriveIndex, FS_FAT32, dlg->m_cancelOperationEvent), "Error on FormatFirstPartitionOnDrive");
+	IFFALSE_GOTOERROR(FormatFirstPartitionOnDrive(DriveIndex, FS_FAT32, dlg->m_cancelOperationEvent, L""), "Error on FormatFirstPartitionOnDrive");
 	IFFALSE_GOTOERROR(MountFirstPartitionOnDrive(DriveIndex, driveLetter), "Error on MountFirstPartitionOnDrive");
 
 	// TODO: Copy files to the ESP partition
@@ -3676,7 +3676,7 @@ DWORD WINAPI CEndlessUsbToolDlg::CreateUSBStick(LPVOID param)
 	safe_closehandle(hPhysical);
 
 	// Format and mount exFAT
-	IFFALSE_GOTOERROR(FormatFirstPartitionOnDrive(DriveIndex, FS_EXFAT, dlg->m_cancelOperationEvent), "Error on FormatFirstPartitionOnDrive");
+	IFFALSE_GOTOERROR(FormatFirstPartitionOnDrive(DriveIndex, FS_EXFAT, dlg->m_cancelOperationEvent, EXFAT_PARTITION_NAME_LIVE), "Error on FormatFirstPartitionOnDrive");
 	IFFALSE_GOTOERROR(MountFirstPartitionOnDrive(DriveIndex, driveLetter), "Error on MountFirstPartitionOnDrive");
 
 	// TODO: Copy files to the exFAT partition
@@ -3774,7 +3774,7 @@ error:
 	return returnValue;
 }
 
-bool CEndlessUsbToolDlg::FormatFirstPartitionOnDrive(DWORD DriveIndex, int fsToUse, HANDLE cancelEvent)
+bool CEndlessUsbToolDlg::FormatFirstPartitionOnDrive(DWORD DriveIndex, int fsToUse, HANDLE cancelEvent, const wchar_t *partLabel)
 {
 	BOOL result;
 	int formatRetries = 5;
@@ -3785,7 +3785,7 @@ bool CEndlessUsbToolDlg::FormatFirstPartitionOnDrive(DWORD DriveIndex, int fsToU
 	Sleep(200); // Radu: check if this is needed, that's what rufus does; I hate sync using sleep
 	IFFALSE_PRINTERROR(WaitForLogical(DriveIndex), "Warning: Logical drive was not found!"); // We try to continue even if this fails, just in case
 
-	while (formatRetries-- > 0 && !(result = FormatDrive(DriveIndex, fsToUse))) {
+	while (formatRetries-- > 0 && !(result = FormatDrive(DriveIndex, fsToUse, partLabel))) {
 		Sleep(200); // Radu: check if this is needed, that's what rufus does; I hate sync using sleep
 		// Check if user canceled
 		IFFALSE_GOTOERROR(WaitForSingleObject(cancelEvent, 0) == WAIT_TIMEOUT, "User cancel.");

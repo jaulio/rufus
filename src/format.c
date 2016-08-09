@@ -677,7 +677,7 @@ out:
  * Call on fmifs.dll's FormatEx() to format the drive
  */
 #ifdef ENDLESSUSB_TOOL
-BOOL FormatDrive(DWORD DriveIndex, int fsToUse)
+BOOL FormatDrive(DWORD DriveIndex, int fsToUse, const wchar_t *partLabel)
 #else
 static BOOL FormatDrive(DWORD DriveIndex)
 #endif // ENDLESSUSB_TOOL
@@ -735,8 +735,7 @@ static BOOL FormatDrive(DWORD DriveIndex)
 
 #ifdef ENDLESSUSB_TOOL
     wcscpy_s(wFSType, 64, fs == FS_EXFAT ? L"exFAT" : L"FAT32");
-    /*if(fs == FS_EXFAT) wcscpy_s(wLabel, 64, L"eosimages");
-	else */wLabel[0] = L'\0';
+    wcscpy_s(wLabel, 64, partLabel);
     ulClusterSize = fs == FS_EXFAT ? 0x8000 : 0x200;
 #else
 	GetWindowTextW(hFileSystem, wFSType, ARRAYSIZE(wFSType));
@@ -1840,7 +1839,7 @@ DWORD WINAPI FormatThread(void* param)
 	// If FAT32 is requested and we have a large drive (>32 GB) use
 	// large FAT32 format, else use MS's FormatEx.
 #ifdef ENDLESSUSB_TOOL
-	ret = use_large_fat32?FormatFAT32(DriveIndex):FormatDrive(DriveIndex, fs);
+	ret = use_large_fat32?FormatFAT32(DriveIndex):FormatDrive(DriveIndex, fs, L"");
 #else
 	ret = use_large_fat32 ? FormatFAT32(DriveIndex) : FormatDrive(DriveIndex);
 #endif // ENDLESSUSB_TOOL

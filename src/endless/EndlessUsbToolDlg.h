@@ -248,7 +248,7 @@ private:
 
 	static DWORD WINAPI CreateUSBStick(LPVOID param);
 	static bool CreateFakePartitionLayout(HANDLE hPhysical, PBYTE layout, PBYTE geometry);
-	static bool FormatFirstPartitionOnDrive(DWORD DriveIndex, int fsToUse, HANDLE m_cancelOperationEvent);
+	static bool FormatFirstPartitionOnDrive(DWORD DriveIndex, int fsToUse, HANDLE m_cancelOperationEvent, const wchar_t *partLabel);
 	static bool MountFirstPartitionOnDrive(DWORD DriveIndex, CString &driveLetter);
 	static bool CreateCorrectPartitionLayout(HANDLE hPhysical, PBYTE layout, PBYTE geometry);
 };
