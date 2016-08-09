@@ -328,11 +328,11 @@ msgstr "Gravando"
 
 msgctxt "MSG_312"
 msgid "https://support.endlessm.com/hc/en-us/articles/208895726"
-msgstr "https://support.endlessm.com/hc/pt/articles/208895826"
+msgstr "https://support.endlessm.com/hc/pt/articles/208895726"
 
 msgctxt "MSG_313"
 msgid "https://support.endlessm.com/hc/en-us/articles/210508723"
-msgstr "https://support.endlessm.com/hc/pt/articles/208895846"
+msgstr "https://support.endlessm.com/hc/pt/articles/210508723"
 
 msgctxt "MSG_314"
 msgid "https://groups.google.com/forum/#!forum/endless-community"
@@ -404,7 +404,7 @@ msgstr "Tente novamente"
 
 msgctxt "MSG_329"
 msgid "https://support.endlessm.com/hc/en-us/articles/210527103"
-msgstr "https://support.endlessm.com/hc/pt/articles/210653543"
+msgstr "https://support.endlessm.com/hc/pt/articles/210527103"
 
 msgctxt "MSG_330"
 msgid ""
