@@ -185,6 +185,7 @@ DWORD usbDevicesCount;
 #define PERSONALITY_PORTUGHESE          L"pt_BR"
 #define PERSONALITY_ARABIC              L"ar"
 #define PERSONALITY_FRENCH              L"fr"
+#define PERSONALITY_CHINESE             L"zh_CN"
 
 static const wchar_t *globalAvailablePersonalities[] =
 {
@@ -194,6 +195,7 @@ static const wchar_t *globalAvailablePersonalities[] =
     PERSONALITY_PORTUGHESE,
     PERSONALITY_ARABIC,
     PERSONALITY_FRENCH,
+    PERSONALITY_CHINESE,
 };
 
 // Rufus language codes
@@ -202,6 +204,7 @@ static const wchar_t *globalAvailablePersonalities[] =
 #define RUFUS_LOCALE_PT     "pt-BR"
 #define RUFUS_LOCALE_SA     "ar-SA"
 #define RUFUS_LOCALE_FR     "fr-FR"
+#define RUFUS_LOCALE_ZH_CN  "zh-CN"
 
 // INI file language codes
 #define INI_LOCALE_EN       "en_US.utf8"
@@ -209,6 +212,7 @@ static const wchar_t *globalAvailablePersonalities[] =
 #define INI_LOCALE_PT       "pt_BR.utf8"
 #define INI_LOCALE_SA       "ar_AE.utf8"
 #define INI_LOCALE_FR       "fr_FR.utf8"
+#define INI_LOCALE_ZH       "zh_CN.utf8"
 
 
 #define GET_LOCAL_PATH(__filename__) (m_appDir + "\\" + (__filename__))
@@ -473,12 +477,14 @@ CEndlessUsbToolDlg::CEndlessUsbToolDlg(UINT globalMessage, bool enableLogDebuggi
     m_localeToPersonality[RUFUS_LOCALE_PT] = PERSONALITY_PORTUGHESE;
     m_localeToPersonality[RUFUS_LOCALE_SA] = PERSONALITY_ARABIC;
     m_localeToPersonality[RUFUS_LOCALE_FR] = PERSONALITY_FRENCH;
+    m_localeToPersonality[RUFUS_LOCALE_ZH_CN] = PERSONALITY_CHINESE;
 
     m_localeToIniLocale[RUFUS_LOCALE_EN] = INI_LOCALE_EN;
     m_localeToIniLocale[RUFUS_LOCALE_ES] = INI_LOCALE_ES;
     m_localeToIniLocale[RUFUS_LOCALE_PT] = INI_LOCALE_PT;
     m_localeToIniLocale[RUFUS_LOCALE_SA] = INI_LOCALE_SA;
     m_localeToIniLocale[RUFUS_LOCALE_FR] = INI_LOCALE_FR;
+    m_localeToIniLocale[RUFUS_LOCALE_ZH_CN] = INI_LOCALE_ZH;
 }
 
 CEndlessUsbToolDlg::~CEndlessUsbToolDlg() {
