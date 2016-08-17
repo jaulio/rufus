@@ -243,6 +243,8 @@ enum endless_action_type {
 
 //#define ENABLE_JSON_COMPRESSION 1
 
+#define BOOT_COMPONENTS_FOLDER	"EndlessBoot"
+
 #define RELEASE_JSON_URLPATH    _T("https://d1anzknqnc1kmb.cloudfront.net/")
 #define JSON_LIVE_FILE          "releases-eos.json"
 #define JSON_INSTALLER_FILE     "releases-eosinstaller.json"
@@ -410,7 +412,6 @@ BEGIN_DHTML_EVENT_MAP(CEndlessUsbToolDlg)
 	DHTML_EVENT_ONCLICK(_T(ELEMENT_SECUREBOOT_HOWTO2), OnLinkClicked)
     DHTML_EVENT_ONCLICK(_T(ELEMENT_CLOSE_BUTTON), OnCloseAppClicked)
     DHTML_EVENT_ONCLICK(_T(ELEMENT_USBBOOT_HOWTO), OnLinkClicked)
-
     // Error Page handlers
     DHTML_EVENT_ONCLICK(_T(ELEMENT_ERROR_CLOSE_BUTTON), OnCloseAppClicked)
     DHTML_EVENT_ONCLICK(_T(ELEMENT_ENDLESS_SUPPORT), OnLinkClicked)
@@ -426,6 +427,7 @@ END_DISPATCH_MAP()
 CMap<CString, LPCTSTR, uint32_t, uint32_t> CEndlessUsbToolDlg::m_personalityToLocaleMsg;
 CMap<CStringA, LPCSTR, CString, LPCTSTR> CEndlessUsbToolDlg::m_localeToPersonality;
 CMap<CStringA, LPCSTR, CStringA, LPCSTR> CEndlessUsbToolDlg::m_localeToIniLocale;
+CString CEndlessUsbToolDlg::m_appDir;
 
 CEndlessUsbToolDlg::CEndlessUsbToolDlg(UINT globalMessage, bool enableLogDebugging, CWnd* pParent /*=NULL*/)
     : CDHtmlDialog(IDD_ENDLESSUSBTOOL_DIALOG, IDR_HTML_ENDLESSUSBTOOL_DIALOG, pParent),
@@ -1214,6 +1216,7 @@ LRESULT CEndlessUsbToolDlg::WindowProc(UINT message, WPARAM wParam, LPARAM lPara
                     StartOperationThread(OP_VERIFYING_SIGNATURE, CEndlessUsbToolDlg::FileVerificationThread);
                 } else {
                     StartOperationThread(OP_FLASHING_DEVICE, CEndlessUsbToolDlg::RufusISOScanThread);
+					//m_cancelImageUnpack = 0;
                     //StartOperationThread(OP_FLASHING_DEVICE, CEndlessUsbToolDlg::CreateUSBStick);
                 }
             }
@@ -2075,7 +2078,7 @@ do { \
     uprintf("\t\t %s=%s", tag, parentValue[tag].toStyledString().c_str()); \
 } while(false);
 
-bool CEndlessUsbToolDlg::UnpackFile(LPCSTR archive, LPCSTR destination)
+bool CEndlessUsbToolDlg::UnpackFile(LPCSTR archive, LPCSTR destination, int compressionType, void* progress_function, unsigned long* cancel_request)
 {
     FUNCTION_ENTER;
 
@@ -2084,10 +2087,10 @@ bool CEndlessUsbToolDlg::UnpackFile(LPCSTR archive, LPCSTR destination)
     // RADU: provide a progress function and move this from UI thread
     // For initial release this is ok as the operation should be very fast for the JSON
     // Unpack the file
-    result = bled_init(_uprintf, NULL, NULL);
-    result = bled_uncompress(archive, destination, BLED_COMPRESSION_GZIP);
+    result = bled_init(_uprintf, (progress_t)progress_function, cancel_request);
+    result = bled_uncompress(archive, destination, compressionType);
     bled_exit();
-    return result != -1;
+    return result >= 0;
 }
 
 bool CEndlessUsbToolDlg::ParseJsonFile(LPCTSTR filename, bool isInstallerJson)
@@ -2203,7 +2206,7 @@ void CEndlessUsbToolDlg::UpdateDownloadOptions()
     filePath = GET_LOCAL_PATH(CString(JSON_LIVE_FILE));
 #ifdef ENABLE_JSON_COMPRESSION
     filePathGz = GET_LOCAL_PATH(CString(JSON_PACKED(JSON_LIVE_FILE)));
-    IFFALSE_GOTOERROR(UnpackFile(ConvertUnicodeToUTF8(filePathGz), ConvertUnicodeToUTF8(filePath)), "Error uncompressing eos JSON file.");
+    IFFALSE_GOTOERROR(UnpackFile(ConvertUnicodeToUTF8(filePathGz), ConvertUnicodeToUTF8(filePath), BLED_COMPRESSION_GZIP), "Error uncompressing eos JSON file.");
 #endif // ENABLE_JSON_COMPRESSION
     IFFALSE_GOTOERROR(ParseJsonFile(filePath, false), "Error parsing eos JSON file.");
 
@@ -2211,7 +2214,7 @@ void CEndlessUsbToolDlg::UpdateDownloadOptions()
     filePath = GET_LOCAL_PATH(CString(JSON_INSTALLER_FILE));
 #ifdef ENABLE_JSON_COMPRESSION
     filePathGz = GET_LOCAL_PATH(CString(JSON_PACKED(JSON_INSTALLER_FILE)));
-    IFFALSE_GOTOERROR(UnpackFile(ConvertUnicodeToUTF8(filePathGz), ConvertUnicodeToUTF8(filePath)), "Error uncompressing eosinstaller JSON file.");
+    IFFALSE_GOTOERROR(UnpackFile(ConvertUnicodeToUTF8(filePathGz), ConvertUnicodeToUTF8(filePath), BLED_COMPRESSION_GZIP), "Error uncompressing eosinstaller JSON file.");
 #endif // ENABLE_JSON_COMPRESSION
     IFFALSE_GOTOERROR(ParseJsonFile(filePath, true), "Error parsing eosinstaller JSON file.");
 
@@ -2625,6 +2628,11 @@ HRESULT CEndlessUsbToolDlg::OnSelectUSBNextClicked(IHTMLElement* pElement)
         m_closeFileScanThreadEvent = INVALID_HANDLE_VALUE;
     }
 
+	// TODO: change hardcoded value
+	//m_bootArchive = L"eos-master-amd64-amd64.160808-015403.base.boot.zip";
+	m_bootArchive = L"EndlessBoot1.zip";
+	m_bootArchiveSig = L"eos-master-amd64-amd64.160808-015403.base.boot.asc.zip";
+
 	return S_OK;
 }
 
@@ -2837,6 +2845,7 @@ bool CEndlessUsbToolDlg::CancelInstall()
                 uprintf("Cancel operation confirmed.");
                 CallJavascript(_T(JS_ENABLE_BUTTON), CComVariant(HTML_BUTTON_ID(_T(ELEMENT_INSTALL_CANCEL))), CComVariant(FALSE));
                 FormatStatus = FORMAT_STATUS_CANCEL;
+				m_cancelImageUnpack = 1;
                 m_lastErrorCause = ErrorCause_t::ErrorCauseCanceled;
                 uprintf("Cancelling current operation.");
                 CString str = UTF8ToCString(lmprintf(MSG_201));
@@ -2979,6 +2988,9 @@ DWORD WINAPI CEndlessUsbToolDlg::FileVerificationThread(void* param)
     public_key_t p_pkey = { 0 };
     HCRYPTPROV hCryptProv = NULL;
     HCRYPTHASH hHash = NULL;
+
+	/*verificationResult = TRUE;
+	goto error;*/
 
     IFFALSE_GOTOERROR(0 == LoadSignature(signatureFilename, &p_sig), "Error on LoadSignature");
     IFFALSE_GOTOERROR(0 == parse_public_key(endless_public_key, sizeof(endless_public_key), &p_pkey, nullptr), "Error on parse_public_key");
@@ -3460,6 +3472,7 @@ void CEndlessUsbToolDlg::CancelRunningOperation()
     FUNCTION_ENTER;
 
     SetEvent(m_cancelOperationEvent);
+	m_cancelImageUnpack = 1;
 
     FormatStatus = FORMAT_STATUS_CANCEL;
     if (m_currentStep != OP_FLASHING_DEVICE) {
@@ -3631,6 +3644,12 @@ void CEndlessUsbToolDlg::JSONDownloadFailed()
 #define MBR_PART_LENGTH_BYTES		1048576
 #define EXFAT_PART_STARTING_SECTOR	131072
 
+#define EFI_BOOT_SUBDIRECTORY			L"EFI\\BOOT"
+#define EXFAT_ENDLESS_SUBDIRECTORY		L"endless\\"
+#define EXFAT_ENDLESS_IMG_NAME			L"endless.img"
+#define EXFAT_ENDLESS_LIVE_FILE_NAME	L"live"
+#define GRUB_BOOT_SUBDIRECTORY			L"grub"
+
 DWORD WINAPI CEndlessUsbToolDlg::CreateUSBStick(LPVOID param)
 {
 	FUNCTION_ENTER;
@@ -3643,7 +3662,11 @@ DWORD WINAPI CEndlessUsbToolDlg::CreateUSBStick(LPVOID param)
 	BYTE geometry[256] = { 0 }, layout[4096] = { 0 };
 	CREATE_DISK createDiskData;
 	CString driveLetter;
+	CString bootFilesPathGz = GET_LOCAL_PATH(dlg->m_bootArchive);
+	CString bootFilesPath = GET_LOCAL_PATH(CString(BOOT_COMPONENTS_FOLDER)) + L"\\";
+	CString usbFilesPath;
 
+	// initialize create disk data
 	memset(&createDiskData, 0, sizeof(createDiskData));
 	createDiskData.PartitionStyle = PARTITION_STYLE_GPT;
 	createDiskData.Gpt.MaxPartitionCount = GPT_MAX_PARTITION_COUNT;
@@ -3664,11 +3687,19 @@ DWORD WINAPI CEndlessUsbToolDlg::CreateUSBStick(LPVOID param)
 	memset(layout, 0, sizeof(layout));
 	IFFALSE_GOTOERROR(CreateFakePartitionLayout(hPhysical, layout, geometry), "Error on CreateFakePartitionLayout");
 	safe_closehandle(hPhysical);
+
 	// Format and mount ESP
 	IFFALSE_GOTOERROR(FormatFirstPartitionOnDrive(DriveIndex, FS_FAT32, dlg->m_cancelOperationEvent, L""), "Error on FormatFirstPartitionOnDrive");
 	IFFALSE_GOTOERROR(MountFirstPartitionOnDrive(DriveIndex, driveLetter), "Error on MountFirstPartitionOnDrive");
 
-	// TODO: Copy files to the ESP partition
+	// Unpack boot components
+	RemoveNonEmptyDirectory(bootFilesPath);
+	int createDirResult = SHCreateDirectoryExW(NULL, bootFilesPath, NULL);
+	IFFALSE_GOTOERROR(createDirResult == ERROR_SUCCESS || createDirResult == ERROR_FILE_EXISTS, "Error creating local directory to unpack boot components.");
+	IFFALSE_GOTOERROR(UnpackZip(CComBSTR(bootFilesPathGz), CComBSTR(bootFilesPath)), "Error unpacking archive to local folder.");
+
+	// Copy files to the ESP partition
+	IFFALSE_GOTOERROR(CopyFilesToESP(bootFilesPath, driveLetter), "Error when trying to copy files to ESP partition.");
 
 	// Unmount ESP
 	if (!DeleteVolumeMountPoint(driveLetter)) uprintf("Failed to unmount volume: %s", WindowsErrorString());
@@ -3685,7 +3716,8 @@ DWORD WINAPI CEndlessUsbToolDlg::CreateUSBStick(LPVOID param)
 	IFFALSE_GOTOERROR(FormatFirstPartitionOnDrive(DriveIndex, FS_EXFAT, dlg->m_cancelOperationEvent, EXFAT_PARTITION_NAME_LIVE), "Error on FormatFirstPartitionOnDrive");
 	IFFALSE_GOTOERROR(MountFirstPartitionOnDrive(DriveIndex, driveLetter), "Error on MountFirstPartitionOnDrive");
 
-	// TODO: Copy files to the exFAT partition
+	// Copy files to the exFAT partition
+	CopyFilesToexFAT(dlg, bootFilesPath, driveLetter);
 
 	// Unmount exFAT
 	if (!DeleteVolumeMountPoint(driveLetter)) uprintf("Failed to unmount volume: %s", WindowsErrorString());
@@ -3701,6 +3733,7 @@ error:
 	}
 
 done:
+	RemoveNonEmptyDirectory(bootFilesPath);
 	safe_closehandle(hPhysical);
 	dlg->PostMessage(WM_FINISHED_ALL_OPERATIONS, 0, 0);
 	return 0;
@@ -3828,4 +3861,119 @@ bool CEndlessUsbToolDlg::MountFirstPartitionOnDrive(DWORD DriveIndex, CString &d
 error:
 	safe_free(guid_volume);
 	return returnValue;
+}
+
+bool CEndlessUsbToolDlg::UnpackZip(const CComBSTR source, const CComBSTR dest)
+{
+	HRESULT					hResult;
+	CComPtr<IShellDispatch>	pISD;
+	CComPtr<Folder>			pToFolder, pFromFolder;
+	CComPtr<FolderItems>	folderItems;
+	bool					returnValue = false;
+
+	IFFALSE_GOTOERROR(SUCCEEDED(CoInitialize(NULL)), "Error on CoInitialize");
+	hResult = CoCreateInstance(CLSID_Shell, NULL, CLSCTX_INPROC_SERVER, IID_IShellDispatch, (void **)&pISD);
+	IFFALSE_GOTOERROR(SUCCEEDED(hResult), "Error on CoCreateInstance with IID_IShellDispatch");
+	IFFALSE_GOTOERROR(SUCCEEDED(pISD->NameSpace(CComVariant(dest), &pToFolder)), "Error on pISD->NameSpace for destination.");
+	IFFALSE_GOTOERROR(SUCCEEDED(pISD->NameSpace(CComVariant(source), &pFromFolder)), "Error on pISD->NameSpace for source.");
+
+	IFFALSE_GOTOERROR(SUCCEEDED(pFromFolder->Items(&folderItems)), "Error on pFromFolder->Items.");
+	IFFALSE_GOTOERROR(SUCCEEDED(pToFolder->CopyHere(CComVariant(folderItems), CComVariant(FOF_NO_UI))), "Error on pToFolder->CopyHere");
+	Sleep(1000); // not sure what this is for, may be needed
+
+	returnValue = true;
+error:
+	CoUninitialize();
+	return returnValue;
+}
+
+void CEndlessUsbToolDlg::RemoveNonEmptyDirectory(const CString directoryPath)
+{
+	SHFILEOPSTRUCT fileOperation;
+	wchar_t dir[MAX_PATH + 1];
+	memset(dir, 0, sizeof(dir));
+	wsprintf(dir, L"%ls", directoryPath);
+
+	fileOperation.fFlags = FOF_SILENT | FOF_NOCONFIRMATION | FOF_NOERRORUI | FOF_NOCONFIRMMKDIR;
+	fileOperation.pFrom = dir;
+	fileOperation.pTo = NULL;
+	fileOperation.hwnd = NULL;
+	fileOperation.wFunc = FO_DELETE;
+
+	int result = SHFileOperation(&fileOperation);
+	uprintf("Removing directory '%ls' result=%d", directoryPath, result);
+}
+
+bool CEndlessUsbToolDlg::CopyFilesToESP(const CString &fromFolder, const CString &driveLetter)
+{
+	CString espFolder = driveLetter + EFI_BOOT_SUBDIRECTORY;
+	SHFILEOPSTRUCT fileOperation;
+	wchar_t fromPath[MAX_PATH + 1], toPath[MAX_PATH + 1];
+	bool retResult = false;
+
+	int createDirResult = SHCreateDirectoryExW(NULL, espFolder, NULL);
+	IFFALSE_GOTOERROR(createDirResult == ERROR_SUCCESS || createDirResult == ERROR_FILE_EXISTS, "Error creating EFI directory in ESP partition.");
+
+	memset(fromPath, 0, sizeof(fromPath));
+	wsprintf(fromPath, L"%ls%ls\\*.*", fromFolder, EFI_BOOT_SUBDIRECTORY);
+	memset(toPath, 0, sizeof(fromPath));
+	wsprintf(toPath, L"%ls", espFolder);
+
+	fileOperation.fFlags = FOF_SILENT | FOF_NOCONFIRMATION | FOF_NOERRORUI | FOF_NOCONFIRMMKDIR;
+	fileOperation.pFrom = fromPath;
+	fileOperation.pTo = toPath;
+	fileOperation.hwnd = NULL;
+	fileOperation.wFunc = FO_COPY;
+
+	int result = SHFileOperation(&fileOperation);
+
+	retResult = result == ERROR_SUCCESS;
+
+error:
+	return retResult;
+}
+
+void CEndlessUsbToolDlg::ImageUnpackCallback(const uint64_t read_bytes)
+{
+	uprintf("Unpacked %s", SizeToHumanReadable(read_bytes, FALSE, use_fake_units));
+}
+
+bool CEndlessUsbToolDlg::CopyFilesToexFAT(CEndlessUsbToolDlg *dlg, const CString &fromFolder, const CString &driveLetter)
+{
+	SHFILEOPSTRUCT fileOperation;
+	bool retResult = false;
+
+	wchar_t fromPath[MAX_PATH + 1], toPath[MAX_PATH + 1];
+	CString usbFilesPath = driveLetter + EXFAT_ENDLESS_SUBDIRECTORY;
+
+	int createDirResult = SHCreateDirectoryExW(NULL, usbFilesPath, NULL);
+	IFFALSE_GOTOERROR(createDirResult == ERROR_SUCCESS || createDirResult == ERROR_FILE_EXISTS, "Error creating local directory to unpack boot components.");
+
+	bool unpackResult = dlg->UnpackFile(ConvertUnicodeToUTF8(dlg->m_localFile), ConvertUnicodeToUTF8(usbFilesPath + EXFAT_ENDLESS_IMG_NAME), BLED_COMPRESSION_GZIP, ImageUnpackCallback, &dlg->m_cancelImageUnpack);
+	IFFALSE_GOTOERROR(unpackResult, "Error unpacking image to USB drive");
+
+	IFFALSE_GOTOERROR(0 != CopyFile(dlg->m_localFileSig, usbFilesPath + CSTRING_GET_LAST(dlg->m_localFileSig, '\\'), FALSE), "Error copying image signature file to drive.");
+
+	FILE *iniFile;
+	IFFALSE_GOTOERROR(0 == _wfopen_s(&iniFile, usbFilesPath + EXFAT_ENDLESS_LIVE_FILE_NAME, L"w"), "Error creating empty live file.");
+	fclose(iniFile);
+
+	// copy grub to USB drive
+	memset(fromPath, 0, sizeof(fromPath));
+	wsprintf(fromPath, L"%ls%ls", fromFolder, GRUB_BOOT_SUBDIRECTORY);
+	memset(toPath, 0, sizeof(fromPath));
+	wsprintf(toPath, L"%ls", usbFilesPath);
+
+	fileOperation.fFlags = FOF_SILENT | FOF_NOCONFIRMATION | FOF_NOERRORUI | FOF_NOCONFIRMMKDIR;
+	fileOperation.pFrom = fromPath;
+	fileOperation.pTo = toPath;
+	fileOperation.hwnd = NULL;
+	fileOperation.wFunc = FO_COPY;
+
+	int result = SHFileOperation(&fileOperation);
+
+	retResult = result == ERROR_SUCCESS;
+
+error:
+	return retResult;
 }

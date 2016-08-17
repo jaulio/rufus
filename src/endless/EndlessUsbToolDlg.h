@@ -154,7 +154,10 @@ private:
 
     CString m_LiveFile;
     CString m_LiveFileSig;
-    CString m_appDir;
+    static CString m_appDir;
+
+	CString m_bootArchive;
+	CString m_bootArchiveSig;
 
 	CComPtr<IHTMLDocument3> m_spHtmlDoc3;
     CComPtr<IHTMLElement> m_spStatusElem;
@@ -170,6 +173,7 @@ private:
     CFile m_logFile;
     ErrorCause_t m_lastErrorCause;
     long m_maximumUSBVersion;
+	unsigned long m_cancelImageUnpack;
 
     void StartOperationThread(int operation, LPTHREAD_START_ROUTINE threadRoutine, LPVOID param = NULL);
 
@@ -195,7 +199,7 @@ private:
 
     void StartJSONDownload();
     void UpdateDownloadOptions();
-    bool UnpackFile(LPCSTR archive, LPCSTR destination);
+    bool UnpackFile(LPCSTR archive, LPCSTR destination, int compressionType, void* progress_function = NULL, unsigned long* cancel_request = NULL);
     bool ParseJsonFile(LPCTSTR filename, bool isInstallerJson);
     void AddDownloadOptionsToUI();
 
@@ -251,4 +255,10 @@ private:
 	static bool FormatFirstPartitionOnDrive(DWORD DriveIndex, int fsToUse, HANDLE m_cancelOperationEvent, const wchar_t *partLabel);
 	static bool MountFirstPartitionOnDrive(DWORD DriveIndex, CString &driveLetter);
 	static bool CreateCorrectPartitionLayout(HANDLE hPhysical, PBYTE layout, PBYTE geometry);
+
+	static bool UnpackZip(const CComBSTR source, const CComBSTR dest);
+	static void RemoveNonEmptyDirectory(const CString directoryPath);
+	static bool CopyFilesToESP(const CString &fromFolder, const CString &driveLetter);
+	static void ImageUnpackCallback(const uint64_t read_bytes);
+	static bool CopyFilesToexFAT(CEndlessUsbToolDlg *dlg, const CString &fromFolder, const CString &driveLetter);
 };
