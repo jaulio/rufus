@@ -22,6 +22,8 @@ extern "C" {
 #include "msapi_utf8.h"
 #include "drive.h"
 #include "bled/bled.h"
+#include "file.h"
+#include "ms-sys/inc/br.h"
 
 #include "usb.h"
 
@@ -3649,6 +3651,9 @@ void CEndlessUsbToolDlg::JSONDownloadFailed()
 #define EXFAT_ENDLESS_IMG_NAME			L"endless.img"
 #define EXFAT_ENDLESS_LIVE_FILE_NAME	L"live"
 #define GRUB_BOOT_SUBDIRECTORY			L"grub"
+#define LIVE_BOOT_IMG_FILE				L"live\\boot.img"
+#define LIVE_CORE_IMG_FILE				L"live\\core.img"
+#define LIVE_BOOT_IMG_FILE_SIZE			446
 
 DWORD WINAPI CEndlessUsbToolDlg::CreateUSBStick(LPVOID param)
 {
@@ -3665,6 +3670,13 @@ DWORD WINAPI CEndlessUsbToolDlg::CreateUSBStick(LPVOID param)
 	CString bootFilesPathGz = GET_LOCAL_PATH(dlg->m_bootArchive);
 	CString bootFilesPath = GET_LOCAL_PATH(CString(BOOT_COMPONENTS_FOLDER)) + L"\\";
 	CString usbFilesPath;
+	PDISK_GEOMETRY_EX DiskGeometry = (PDISK_GEOMETRY_EX)(void*)geometry;
+
+	// Unpack boot components
+	RemoveNonEmptyDirectory(bootFilesPath);
+	int createDirResult = SHCreateDirectoryExW(NULL, bootFilesPath, NULL);
+	IFFALSE_GOTOERROR(createDirResult == ERROR_SUCCESS || createDirResult == ERROR_FILE_EXISTS, "Error creating local directory to unpack boot components.");
+	IFFALSE_GOTOERROR(UnpackZip(CComBSTR(bootFilesPathGz), CComBSTR(bootFilesPath)), "Error unpacking archive to local folder.");
 
 	// initialize create disk data
 	memset(&createDiskData, 0, sizeof(createDiskData));
@@ -3686,17 +3698,15 @@ DWORD WINAPI CEndlessUsbToolDlg::CreateUSBStick(LPVOID param)
 	// set initial drive layout data
 	memset(layout, 0, sizeof(layout));
 	IFFALSE_GOTOERROR(CreateFakePartitionLayout(hPhysical, layout, geometry), "Error on CreateFakePartitionLayout");
+
+	// Write MBR and SBR to disk
+	IFFALSE_GOTOERROR(WriteMBRAndSBR(hPhysical, bootFilesPath, DiskGeometry->Geometry.BytesPerSector), "Error on WriteMBRAndSBR");
+
 	safe_closehandle(hPhysical);
 
 	// Format and mount ESP
 	IFFALSE_GOTOERROR(FormatFirstPartitionOnDrive(DriveIndex, FS_FAT32, dlg->m_cancelOperationEvent, L""), "Error on FormatFirstPartitionOnDrive");
-	IFFALSE_GOTOERROR(MountFirstPartitionOnDrive(DriveIndex, driveLetter), "Error on MountFirstPartitionOnDrive");
-
-	// Unpack boot components
-	RemoveNonEmptyDirectory(bootFilesPath);
-	int createDirResult = SHCreateDirectoryExW(NULL, bootFilesPath, NULL);
-	IFFALSE_GOTOERROR(createDirResult == ERROR_SUCCESS || createDirResult == ERROR_FILE_EXISTS, "Error creating local directory to unpack boot components.");
-	IFFALSE_GOTOERROR(UnpackZip(CComBSTR(bootFilesPathGz), CComBSTR(bootFilesPath)), "Error unpacking archive to local folder.");
+	IFFALSE_GOTOERROR(MountFirstPartitionOnDrive(DriveIndex, driveLetter), "Error on MountFirstPartitionOnDrive");	
 
 	// Copy files to the ESP partition
 	IFFALSE_GOTOERROR(CopyFilesToESP(bootFilesPath, driveLetter), "Error when trying to copy files to ESP partition.");
@@ -3721,8 +3731,6 @@ DWORD WINAPI CEndlessUsbToolDlg::CreateUSBStick(LPVOID param)
 
 	// Unmount exFAT
 	if (!DeleteVolumeMountPoint(driveLetter)) uprintf("Failed to unmount volume: %s", WindowsErrorString());
-
-	// TODO: Write MBR and SBR to disk
 
 	goto done;
 
@@ -3975,5 +3983,67 @@ bool CEndlessUsbToolDlg::CopyFilesToexFAT(CEndlessUsbToolDlg *dlg, const CString
 	retResult = result == ERROR_SUCCESS;
 
 error:
+	return retResult;
+}
+
+bool CEndlessUsbToolDlg::WriteMBRAndSBR(HANDLE hPhysical, const CString &bootFilesPath, DWORD bytesPerSector)
+{
+	FAKE_FD fake_fd = { 0 };
+	FILE* fp = (FILE*)&fake_fd;
+	FILE *bootImgFile = NULL, *coreImgFile = NULL;
+	CString bootImgFilePath = bootFilesPath + LIVE_BOOT_IMG_FILE;
+	CString coreImgFilePath = bootFilesPath + LIVE_CORE_IMG_FILE;
+	unsigned char endlesMBRData[LIVE_BOOT_IMG_FILE_SIZE + 1];
+	unsigned char *endlesSBRData = NULL;
+	bool retResult = false;
+	size_t countRead, totalCoreImgSize;
+	size_t mbrPartitionStart = bytesPerSector * MBR_PART_STARTING_SECTOR;
+
+	// Load boot.img from file
+	IFFALSE_GOTOERROR(0 == _wfopen_s(&bootImgFile, bootImgFilePath, L"rb"), "Error opening boot.img file");
+	countRead = fread(endlesMBRData, 1, sizeof(endlesMBRData), bootImgFile);
+	IFFALSE_GOTOERROR(countRead == LIVE_BOOT_IMG_FILE_SIZE, "Size of boot.img is not what is expected.");
+
+	// write boot.img to USB drive
+	fake_fd._handle = (char*)hPhysical;
+	set_bytes_per_sector(SelectedDrive.Geometry.BytesPerSector);
+	IFFALSE_GOTOERROR(write_data(fp, 0x0, endlesMBRData, LIVE_BOOT_IMG_FILE_SIZE) != 0, "Error on write_data with boot.img contents.");
+
+	// Add boot record signature
+	// copied from ms-sys/br.c
+	unsigned char aucRef[] = { 0x55, 0xAA };
+	unsigned long pos = 0x1FE;
+	for (pos = 0x1FE; pos < bytesPerSector; pos += 0x200) {
+		IFFALSE_GOTOERROR(write_data(fp, pos, aucRef, sizeof(aucRef)) != 0, "Error on writing boot record signature to MBR.")
+	}
+
+	// Read core.img data and write it to USB drive
+	IFFALSE_GOTOERROR(0 == _wfopen_s(&coreImgFile, coreImgFilePath, L"rb"), "Error opening core.img file");
+	endlesSBRData = (unsigned char*)malloc(bytesPerSector);
+	totalCoreImgSize = 0;
+	while (!feof(coreImgFile) && (totalCoreImgSize < MBR_PART_LENGTH_BYTES - bytesPerSector)) {
+		countRead = fread(endlesSBRData, 1, bytesPerSector, coreImgFile);
+		IFFALSE_GOTOERROR(write_data(fp, mbrPartitionStart + totalCoreImgSize, endlesSBRData, countRead) != 0, "Error on write data with core.img contents.");
+		totalCoreImgSize += countRead;
+	}
+	uprintf("Wrote a total of %d bytes from %ls", totalCoreImgSize, coreImgFilePath);
+
+	retResult = true;
+
+error:
+	if (bootImgFile != NULL) {
+		fclose(bootImgFile);
+		bootImgFile = NULL;
+	}
+
+	if (coreImgFile != NULL) {
+		fclose(coreImgFile);
+		coreImgFile = NULL;
+	}
+
+	if (endlesSBRData != NULL) {
+		safe_free(endlesSBRData);
+	}
+
 	return retResult;
 }
