@@ -220,9 +220,6 @@
     <None Include="res\EndlessFonts.css">
       <Filter>Resource Files</Filter>
     </None>
-    <None Include="..\..\res\uefi\uefi-ntfs.img">
-      <Filter>Resource Files</Filter>
-    </None>
     <None Include="res\endless.loc">
       <Filter>Resource Files</Filter>
     </None>

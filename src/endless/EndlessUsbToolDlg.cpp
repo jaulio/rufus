@@ -1219,7 +1219,8 @@ LRESULT CEndlessUsbToolDlg::WindowProc(UINT message, WPARAM wParam, LPARAM lPara
                 } else {
                     StartOperationThread(OP_FLASHING_DEVICE, CEndlessUsbToolDlg::RufusISOScanThread);
 					//m_cancelImageUnpack = 0;
-                    //StartOperationThread(OP_FLASHING_DEVICE, CEndlessUsbToolDlg::CreateUSBStick);
+					//StartOperationThread(OP_FLASHING_DEVICE, CEndlessUsbToolDlg::CreateUSBStick);
+					//StartOperationThread(OP_FLASHING_DEVICE, CEndlessUsbToolDlg::SetupDualBoot);
                 }
             }
             else {
@@ -2632,7 +2633,7 @@ HRESULT CEndlessUsbToolDlg::OnSelectUSBNextClicked(IHTMLElement* pElement)
 
 	// TODO: change hardcoded value
 	//m_bootArchive = L"eos-master-amd64-amd64.160808-015403.base.boot.zip";
-	m_bootArchive = L"EndlessBoot1.zip";
+	m_bootArchive = L"boot.zip";
 	m_bootArchiveSig = L"eos-master-amd64-amd64.160808-015403.base.boot.asc.zip";
 
 	return S_OK;
@@ -3647,13 +3648,14 @@ void CEndlessUsbToolDlg::JSONDownloadFailed()
 #define EXFAT_PART_STARTING_SECTOR	131072
 
 #define EFI_BOOT_SUBDIRECTORY			L"EFI\\BOOT"
-#define EXFAT_ENDLESS_SUBDIRECTORY		L"endless\\"
-#define EXFAT_ENDLESS_IMG_NAME			L"endless.img"
+#define PATH_ENDLESS_SUBDIRECTORY		L"endless\\"
+#define ENDLESS_IMG_FILE_NAME			L"endless.img"
 #define EXFAT_ENDLESS_LIVE_FILE_NAME	L"live"
 #define GRUB_BOOT_SUBDIRECTORY			L"grub"
 #define LIVE_BOOT_IMG_FILE				L"live\\boot.img"
 #define LIVE_CORE_IMG_FILE				L"live\\core.img"
 #define LIVE_BOOT_IMG_FILE_SIZE			446
+#define NTFS_CORE_IMG_FILE				L"ntfs\\core.img"
 
 DWORD WINAPI CEndlessUsbToolDlg::CreateUSBStick(LPVOID param)
 {
@@ -3673,10 +3675,7 @@ DWORD WINAPI CEndlessUsbToolDlg::CreateUSBStick(LPVOID param)
 	PDISK_GEOMETRY_EX DiskGeometry = (PDISK_GEOMETRY_EX)(void*)geometry;
 
 	// Unpack boot components
-	RemoveNonEmptyDirectory(bootFilesPath);
-	int createDirResult = SHCreateDirectoryExW(NULL, bootFilesPath, NULL);
-	IFFALSE_GOTOERROR(createDirResult == ERROR_SUCCESS || createDirResult == ERROR_FILE_EXISTS, "Error creating local directory to unpack boot components.");
-	IFFALSE_GOTOERROR(UnpackZip(CComBSTR(bootFilesPathGz), CComBSTR(bootFilesPath)), "Error unpacking archive to local folder.");
+	IFFALSE_GOTOERROR(UnpackBootComponents(bootFilesPathGz, bootFilesPath), "Error unpacking boot components.");
 
 	// initialize create disk data
 	memset(&createDiskData, 0, sizeof(createDiskData));
@@ -3700,7 +3699,7 @@ DWORD WINAPI CEndlessUsbToolDlg::CreateUSBStick(LPVOID param)
 	IFFALSE_GOTOERROR(CreateFakePartitionLayout(hPhysical, layout, geometry), "Error on CreateFakePartitionLayout");
 
 	// Write MBR and SBR to disk
-	IFFALSE_GOTOERROR(WriteMBRAndSBR(hPhysical, bootFilesPath, DiskGeometry->Geometry.BytesPerSector), "Error on WriteMBRAndSBR");
+	IFFALSE_GOTOERROR(WriteMBRAndSBRToUSB(hPhysical, bootFilesPath, DiskGeometry->Geometry.BytesPerSector), "Error on WriteMBRAndSBRToUSB");
 
 	safe_closehandle(hPhysical);
 
@@ -3727,7 +3726,7 @@ DWORD WINAPI CEndlessUsbToolDlg::CreateUSBStick(LPVOID param)
 	IFFALSE_GOTOERROR(MountFirstPartitionOnDrive(DriveIndex, driveLetter), "Error on MountFirstPartitionOnDrive");
 
 	// Copy files to the exFAT partition
-	CopyFilesToexFAT(dlg, bootFilesPath, driveLetter);
+	IFFALSE_GOTOERROR(CopyFilesToexFAT(dlg, bootFilesPath, driveLetter), "Error on CopyFilesToexFAT");
 
 	// Unmount exFAT
 	if (!DeleteVolumeMountPoint(driveLetter)) uprintf("Failed to unmount volume: %s", WindowsErrorString());
@@ -3948,29 +3947,40 @@ void CEndlessUsbToolDlg::ImageUnpackCallback(const uint64_t read_bytes)
 
 bool CEndlessUsbToolDlg::CopyFilesToexFAT(CEndlessUsbToolDlg *dlg, const CString &fromFolder, const CString &driveLetter)
 {
-	SHFILEOPSTRUCT fileOperation;
 	bool retResult = false;
 
-	wchar_t fromPath[MAX_PATH + 1], toPath[MAX_PATH + 1];
-	CString usbFilesPath = driveLetter + EXFAT_ENDLESS_SUBDIRECTORY;
+	CString usbFilesPath = driveLetter + PATH_ENDLESS_SUBDIRECTORY;
 
 	int createDirResult = SHCreateDirectoryExW(NULL, usbFilesPath, NULL);
-	IFFALSE_GOTOERROR(createDirResult == ERROR_SUCCESS || createDirResult == ERROR_FILE_EXISTS, "Error creating local directory to unpack boot components.");
+	IFFALSE_GOTOERROR(createDirResult == ERROR_SUCCESS || createDirResult == ERROR_FILE_EXISTS, "Error creating directory on USB drive.");
 
-	bool unpackResult = dlg->UnpackFile(ConvertUnicodeToUTF8(dlg->m_localFile), ConvertUnicodeToUTF8(usbFilesPath + EXFAT_ENDLESS_IMG_NAME), BLED_COMPRESSION_GZIP, ImageUnpackCallback, &dlg->m_cancelImageUnpack);
+	bool unpackResult = dlg->UnpackFile(ConvertUnicodeToUTF8(dlg->m_localFile), ConvertUnicodeToUTF8(usbFilesPath + ENDLESS_IMG_FILE_NAME), BLED_COMPRESSION_GZIP, ImageUnpackCallback, &dlg->m_cancelImageUnpack);
 	IFFALSE_GOTOERROR(unpackResult, "Error unpacking image to USB drive");
 
 	IFFALSE_GOTOERROR(0 != CopyFile(dlg->m_localFileSig, usbFilesPath + CSTRING_GET_LAST(dlg->m_localFileSig, '\\'), FALSE), "Error copying image signature file to drive.");
 
-	FILE *iniFile;
-	IFFALSE_GOTOERROR(0 == _wfopen_s(&iniFile, usbFilesPath + EXFAT_ENDLESS_LIVE_FILE_NAME, L"w"), "Error creating empty live file.");
-	fclose(iniFile);
+	FILE *liveFile;
+	IFFALSE_GOTOERROR(0 == _wfopen_s(&liveFile, usbFilesPath + EXFAT_ENDLESS_LIVE_FILE_NAME, L"w"), "Error creating empty live file.");
+	fclose(liveFile);
 
 	// copy grub to USB drive
+	IFFALSE_GOTOERROR(CopyMultipleItems(fromFolder + GRUB_BOOT_SUBDIRECTORY, usbFilesPath), "Error copying grub folder to USB drive.");
+
+	retResult = true;
+
+error:
+	return retResult;
+}
+
+bool CEndlessUsbToolDlg::CopyMultipleItems(const CString &from, const CString &to)
+{
+	SHFILEOPSTRUCT fileOperation;
+	wchar_t fromPath[MAX_PATH + 1], toPath[MAX_PATH + 1];
+
 	memset(fromPath, 0, sizeof(fromPath));
-	wsprintf(fromPath, L"%ls%ls", fromFolder, GRUB_BOOT_SUBDIRECTORY);
-	memset(toPath, 0, sizeof(fromPath));
-	wsprintf(toPath, L"%ls", usbFilesPath);
+	wsprintf(fromPath, L"%ls", from);
+	memset(toPath, 0, sizeof(toPath));
+	wsprintf(toPath, L"%ls", to);
 
 	fileOperation.fFlags = FOF_SILENT | FOF_NOCONFIRMATION | FOF_NOERRORUI | FOF_NOCONFIRMMKDIR;
 	fileOperation.pFrom = fromPath;
@@ -3980,34 +3990,31 @@ bool CEndlessUsbToolDlg::CopyFilesToexFAT(CEndlessUsbToolDlg *dlg, const CString
 
 	int result = SHFileOperation(&fileOperation);
 
-	retResult = result == ERROR_SUCCESS;
-
-error:
-	return retResult;
+	return result == 0;
 }
 
-bool CEndlessUsbToolDlg::WriteMBRAndSBR(HANDLE hPhysical, const CString &bootFilesPath, DWORD bytesPerSector)
+bool CEndlessUsbToolDlg::WriteMBRAndSBRToUSB(HANDLE hPhysical, const CString &bootFilesPath, DWORD bytesPerSector)
 {
 	FAKE_FD fake_fd = { 0 };
 	FILE* fp = (FILE*)&fake_fd;
 	FILE *bootImgFile = NULL, *coreImgFile = NULL;
 	CString bootImgFilePath = bootFilesPath + LIVE_BOOT_IMG_FILE;
 	CString coreImgFilePath = bootFilesPath + LIVE_CORE_IMG_FILE;
-	unsigned char endlesMBRData[LIVE_BOOT_IMG_FILE_SIZE + 1];
-	unsigned char *endlesSBRData = NULL;
+	unsigned char endlessMBRData[LIVE_BOOT_IMG_FILE_SIZE + 1];
+	unsigned char *endlessSBRData = NULL;
 	bool retResult = false;
-	size_t countRead, totalCoreImgSize;
+	size_t countRead, coreImgSize;
 	size_t mbrPartitionStart = bytesPerSector * MBR_PART_STARTING_SECTOR;
 
 	// Load boot.img from file
 	IFFALSE_GOTOERROR(0 == _wfopen_s(&bootImgFile, bootImgFilePath, L"rb"), "Error opening boot.img file");
-	countRead = fread(endlesMBRData, 1, sizeof(endlesMBRData), bootImgFile);
+	countRead = fread(endlessMBRData, 1, sizeof(endlessMBRData), bootImgFile);
 	IFFALSE_GOTOERROR(countRead == LIVE_BOOT_IMG_FILE_SIZE, "Size of boot.img is not what is expected.");
 
 	// write boot.img to USB drive
 	fake_fd._handle = (char*)hPhysical;
 	set_bytes_per_sector(SelectedDrive.Geometry.BytesPerSector);
-	IFFALSE_GOTOERROR(write_data(fp, 0x0, endlesMBRData, LIVE_BOOT_IMG_FILE_SIZE) != 0, "Error on write_data with boot.img contents.");
+	IFFALSE_GOTOERROR(write_data(fp, 0x0, endlessMBRData, LIVE_BOOT_IMG_FILE_SIZE) != 0, "Error on write_data with boot.img contents.");
 
 	// Add boot record signature
 	// copied from ms-sys/br.c
@@ -4019,16 +4026,27 @@ bool CEndlessUsbToolDlg::WriteMBRAndSBR(HANDLE hPhysical, const CString &bootFil
 
 	// Read core.img data and write it to USB drive
 	IFFALSE_GOTOERROR(0 == _wfopen_s(&coreImgFile, coreImgFilePath, L"rb"), "Error opening core.img file");
-	endlesSBRData = (unsigned char*)malloc(bytesPerSector);
-	totalCoreImgSize = 0;
-	while (!feof(coreImgFile) && (totalCoreImgSize < MBR_PART_LENGTH_BYTES - bytesPerSector)) {
-		countRead = fread(endlesSBRData, 1, bytesPerSector, coreImgFile);
-		IFFALSE_GOTOERROR(write_data(fp, mbrPartitionStart + totalCoreImgSize, endlesSBRData, countRead) != 0, "Error on write data with core.img contents.");
-		totalCoreImgSize += countRead;
+	fseek(coreImgFile, 0L, SEEK_END);
+	coreImgSize = ftell(coreImgFile);
+	rewind(coreImgFile);
+	uprintf("Size of SBR is %d bytes from %ls", coreImgSize, coreImgFilePath);
+	IFFALSE_GOTOERROR(coreImgSize <= MBR_PART_LENGTH_BYTES, "Error: SBR found in core.img is too big.");
+
+	endlessSBRData = (unsigned char*)malloc(bytesPerSector);
+	coreImgSize = 0;
+	while (!feof(coreImgFile) && coreImgSize < MBR_PART_LENGTH_BYTES) {
+		countRead = fread(endlessSBRData, 1, bytesPerSector, coreImgFile);
+		IFFALSE_GOTOERROR(write_data(fp, mbrPartitionStart + coreImgSize, endlessSBRData, countRead) != 0, "Error on write data with core.img contents.");
+		coreImgSize += countRead;
+		uprintf("Wrote %d bytes", coreImgSize);
 	}
-	uprintf("Wrote a total of %d bytes from %ls", totalCoreImgSize, coreImgFilePath);
 
 	retResult = true;
+
+	DWORD size;
+	// Tell the system we've updated the disk properties
+	if (!DeviceIoControl(hPhysical, IOCTL_DISK_UPDATE_PROPERTIES, NULL, 0, NULL, 0, &size, NULL))
+		uprintf("Failed to notify system about disk properties update: %s\n", WindowsErrorString());
 
 error:
 	if (bootImgFile != NULL) {
@@ -4041,8 +4059,166 @@ error:
 		coreImgFile = NULL;
 	}
 
-	if (endlesSBRData != NULL) {
-		safe_free(endlesSBRData);
+	if (endlessSBRData != NULL) {
+		safe_free(endlessSBRData);
+	}
+
+	return retResult;
+}
+
+DWORD WINAPI CEndlessUsbToolDlg::SetupDualBoot(LPVOID param)
+{
+	CEndlessUsbToolDlg *dlg = (CEndlessUsbToolDlg*)param;
+	CString systemDriveLetter;
+	CString endlessFilesPath;
+	CString bootFilesPathGz = GET_LOCAL_PATH(dlg->m_bootArchive);
+	CString bootFilesPath = GET_LOCAL_PATH(CString(BOOT_COMPONENTS_FOLDER)) + L"\\";
+	wchar_t fileSystemType[MAX_PATH + 1];
+
+	// TODO: Should we detect what the system partition is or just assume it's on C:\?
+	systemDriveLetter = L"C:\\";
+	endlessFilesPath = systemDriveLetter + PATH_ENDLESS_SUBDIRECTORY;
+
+	// Unpack boot components
+	IFFALSE_GOTOERROR(UnpackBootComponents(bootFilesPathGz, bootFilesPath), "Error unpacking boot components.");
+
+	// Verify that this is an NTFS C:\ partition
+	IFFALSE_GOTOERROR(GetVolumeInformation(systemDriveLetter, NULL, 0, NULL, NULL, NULL, fileSystemType, MAX_PATH + 1) != 0, "Error on GetVolumeInformation.");
+	uprintf("File system type '%ls'", fileSystemType);
+	IFFALSE_GOTOERROR(0 == wcscmp(fileSystemType, L"NTFS"), "File system type is not NTFS");
+
+	// TODO: Verify that the C:\ drive is not encrypted with BitLocker or similar
+
+	// Create endless folder
+	int createDirResult = SHCreateDirectoryExW(NULL, endlessFilesPath, NULL);
+	IFFALSE_GOTOERROR(createDirResult == ERROR_SUCCESS || createDirResult == ERROR_ALREADY_EXISTS, "Error creating directory on USB drive.");
+
+	// Unpack img file and copy signature file
+	bool unpackResult = dlg->UnpackFile(ConvertUnicodeToUTF8(dlg->m_localFile), ConvertUnicodeToUTF8(endlessFilesPath + ENDLESS_IMG_FILE_NAME), BLED_COMPRESSION_GZIP, ImageUnpackCallback, &dlg->m_cancelImageUnpack);
+	IFFALSE_GOTOERROR(unpackResult, "Error unpacking image to endless folder.");
+
+	// TODO: extend this file with 0s so it reaches the required size
+
+	IFFALSE_GOTOERROR(0 != CopyFile(dlg->m_localFileSig, endlessFilesPath + CSTRING_GET_LAST(dlg->m_localFileSig, '\\'), FALSE), "Error copying image signature to endless folder.");
+
+	// Copy grub
+	IFFALSE_GOTOERROR(CopyMultipleItems(bootFilesPath + GRUB_BOOT_SUBDIRECTORY, endlessFilesPath), "Error copying grub folder to USB drive.");
+
+	if (IsLegacyBIOSBoot()) {
+		IFFALSE_GOTOERROR(WriteMBRAndSBRToWinDrive(systemDriveLetter, bootFilesPath), "Error on WriteMBRAndSBRToWinDrive");
+	} else {
+		// TODO: install Endless in UEFI case
+	}
+
+	goto done;
+
+error:
+	uprintf("SetupDualBoot exited with error.");
+	if (dlg->m_lastErrorCause == ErrorCause_t::ErrorCauseNone) {
+		dlg->m_lastErrorCause = ErrorCause_t::ErrorCauseWriteFailed;
+	}
+
+	RemoveNonEmptyDirectory(endlessFilesPath);
+
+done:
+	RemoveNonEmptyDirectory(bootFilesPath);
+	dlg->PostMessage(WM_FINISHED_ALL_OPERATIONS, 0, 0);
+	return 0;
+}
+
+bool CEndlessUsbToolDlg::UnpackBootComponents(const CString &bootFilesPathGz, const CString &bootFilesPath)
+{
+	bool retResult = false;
+
+	RemoveNonEmptyDirectory(bootFilesPath);
+	int createDirResult = SHCreateDirectoryExW(NULL, bootFilesPath, NULL);
+	IFFALSE_GOTOERROR(createDirResult == ERROR_SUCCESS || createDirResult == ERROR_ALREADY_EXISTS, "Error creating local directory to unpack boot components.");
+	IFFALSE_GOTOERROR(UnpackZip(CComBSTR(bootFilesPathGz), CComBSTR(bootFilesPath)), "Error unpacking archive to local folder.");
+
+	retResult = true;
+error:
+	return retResult;
+}
+
+bool CEndlessUsbToolDlg::IsLegacyBIOSBoot()
+{
+	// From https://msdn.microsoft.com/en-us/library/windows/desktop/ms724325(v=vs.85).aspx
+	// On a legacy BIOS-based system, or on a system that supports both legacy BIOS and UEFI where Windows was installed using legacy BIOS,
+	// the function will fail with ERROR_INVALID_FUNCTION. On a UEFI-based system, the function will fail with an error specific to the firmware,
+	// such as ERROR_NOACCESS, to indicate that the dummy GUID namespace does not exist.
+	DWORD result = GetFirmwareEnvironmentVariable(L"", L"{00000000-0000-0000-0000-000000000000}", NULL, 0);
+	return result == 0 && GetLastError() == ERROR_INVALID_FUNCTION;
+}
+
+bool CEndlessUsbToolDlg::WriteMBRAndSBRToWinDrive(const CString &systemDriveLetter, const CString &bootFilesPath)
+{
+	bool retResult = false;
+	CStringA logical_drive;
+	HANDLE hPhysical = INVALID_HANDLE_VALUE;
+	BYTE geometry[256] = { 0 };
+	PDISK_GEOMETRY_EX DiskGeometry = (PDISK_GEOMETRY_EX)(void*)geometry;
+	DWORD size;
+	BOOL result;
+	CString coreImgFilePath = bootFilesPath + NTFS_CORE_IMG_FILE);
+	FILE *coreImgFile = NULL;
+	FAKE_FD fake_fd = { 0 };
+	FILE* fp = (FILE*)&fake_fd;
+	size_t countRead, coreImgSize;
+	unsigned char *endlessSBRData = NULL;
+
+	// TODO: we assume that the system disk is the C drive; we need to detect it somehow
+	// Get system disk handle
+	logical_drive.Format("\\\\.\\%lc:", systemDriveLetter[0]);
+	hPhysical = CreateFileA(logical_drive, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+	IFFALSE_GOTOERROR(hPhysical != INVALID_HANDLE_VALUE, "CreateFileA call returned invalid handle.");
+
+	int drive_number = GetDriveNumber(hPhysical, logical_drive.GetBuffer());
+	drive_number += DRIVE_INDEX_MIN;
+	safe_closehandle(hPhysical);
+
+	hPhysical = GetPhysicalHandle(drive_number, TRUE, TRUE);
+	IFFALSE_GOTOERROR(hPhysical != INVALID_HANDLE_VALUE, "Error on acquiring disk handle.");
+
+	// Make sure there already is a MBR on this disk
+	IFFALSE_GOTOERROR(AnalyzeMBR(hPhysical, "Drive"), "Error: no MBR detected on drive. Returning so we don't break something else.");
+
+	// get disk geometry information
+	result = DeviceIoControl(hPhysical, IOCTL_DISK_GET_DRIVE_GEOMETRY_EX, NULL, 0, geometry, sizeof(geometry), &size, NULL);
+	IFFALSE_GOTOERROR(result == TRUE && size > 0, "Error on querying disk geometry.");
+	set_bytes_per_sector(DiskGeometry->Geometry.BytesPerSector);
+
+	// TODO: add some more core.img size validation
+
+	// Write Rufus Grub2 MBR to disk
+	fake_fd._handle = (char*)hPhysical;
+	IFFALSE_GOTOERROR(write_grub2_mbr(fp) != 0, "Error on write_grub2_mbr.");
+
+	IFFALSE_GOTOERROR(0 == _wfopen_s(&coreImgFile, coreImgFilePath, L"rb"), "Error opening core.img file");
+	fseek(coreImgFile, 0L, SEEK_END);
+	coreImgSize = ftell(coreImgFile);
+	rewind(coreImgFile);
+	uprintf("Size of SBR is %d bytes from %ls", coreImgSize, coreImgFilePath);
+	IFFALSE_GOTOERROR(coreImgSize <= MBR_PART_LENGTH_BYTES, "Error: SBR found in core.img is too big.");
+
+	uprintf("Writing core.img at position %d", DiskGeometry->Geometry.BytesPerSector);
+
+	endlessSBRData = (unsigned char*)malloc(DiskGeometry->Geometry.BytesPerSector);
+	coreImgSize = 0;
+	while (!feof(coreImgFile) && coreImgSize < MBR_PART_LENGTH_BYTES) {
+		countRead = fread(endlessSBRData, 1, DiskGeometry->Geometry.BytesPerSector, coreImgFile);
+		IFFALSE_GOTOERROR(write_data(fp, DiskGeometry->Geometry.BytesPerSector + coreImgSize, endlessSBRData, countRead) != 0, "Error on write data with core.img contents.");
+		coreImgSize += countRead;
+		uprintf("Wrote %d bytes", coreImgSize);
+	}
+
+	retResult = true;
+
+error:
+	safe_closehandle(hPhysical);
+
+	if (coreImgFile != NULL) {
+		fclose(coreImgFile);
+		coreImgFile = NULL;
 	}
 
 	return retResult;
