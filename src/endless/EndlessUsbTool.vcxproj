@@ -458,7 +458,6 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <None Include="..\..\res\uefi\uefi-ntfs.img" />
     <None Include="res\endless.loc" />
     <None Include="res\EndlessFonts.css" />
     <None Include="res\EndlessUsbTool.css" />

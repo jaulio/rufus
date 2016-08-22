@@ -261,4 +261,12 @@ private:
 	static bool CopyFilesToESP(const CString &fromFolder, const CString &driveLetter);
 	static void ImageUnpackCallback(const uint64_t read_bytes);
 	static bool CopyFilesToexFAT(CEndlessUsbToolDlg *dlg, const CString &fromFolder, const CString &driveLetter);
+	static bool WriteMBRAndSBRToUSB(HANDLE hPhysical, const CString &bootFilesPath, DWORD bytesPerSector);
+
+	static DWORD WINAPI SetupDualBoot(LPVOID param);
+
+	static bool UnpackBootComponents(const CString &bootFilesPathGz, const CString &bootFilesPath);
+	static bool CopyMultipleItems(const CString &fromPath, const CString &toPath);
+	static bool IsLegacyBIOSBoot();
+	static bool WriteMBRAndSBRToWinDrive(const CString &systemDriveLetter, const CString &bootFilesPath);
 };
