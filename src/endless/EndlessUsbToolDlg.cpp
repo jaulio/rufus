@@ -4020,14 +4020,6 @@ bool CEndlessUsbToolDlg::WriteMBRAndSBRToUSB(HANDLE hPhysical, const CString &bo
 	set_bytes_per_sector(SelectedDrive.Geometry.BytesPerSector);
 	IFFALSE_GOTOERROR(write_data(fp, 0x0, endlessMBRData, LIVE_BOOT_IMG_FILE_SIZE) != 0, "Error on write_data with boot.img contents.");
 
-	// Add boot record signature
-	// copied from ms-sys/br.c
-	unsigned char aucRef[] = { 0x55, 0xAA };
-	unsigned long pos = 0x1FE;
-	for (pos = 0x1FE; pos < bytesPerSector; pos += 0x200) {
-		IFFALSE_GOTOERROR(write_data(fp, pos, aucRef, sizeof(aucRef)) != 0, "Error on writing boot record signature to MBR.")
-	}
-
 	// Read core.img data and write it to USB drive
 	IFFALSE_GOTOERROR(0 == _wfopen_s(&coreImgFile, coreImgFilePath, L"rb"), "Error opening core.img file");
 	fseek(coreImgFile, 0L, SEEK_END);
@@ -4163,7 +4155,7 @@ bool CEndlessUsbToolDlg::WriteMBRAndSBRToWinDrive(const CString &systemDriveLett
 	PDISK_GEOMETRY_EX DiskGeometry = (PDISK_GEOMETRY_EX)(void*)geometry;
 	DWORD size;
 	BOOL result;
-	CString coreImgFilePath = bootFilesPath + NTFS_CORE_IMG_FILE);
+	CString coreImgFilePath = bootFilesPath + NTFS_CORE_IMG_FILE;
 	FILE *coreImgFile = NULL;
 	FAKE_FD fake_fd = { 0 };
 	FILE* fp = (FILE*)&fake_fd;
