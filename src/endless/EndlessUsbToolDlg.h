@@ -269,4 +269,6 @@ private:
 	static bool CopyMultipleItems(const CString &fromPath, const CString &toPath);
 	static bool IsLegacyBIOSBoot();
 	static bool WriteMBRAndSBRToWinDrive(const CString &systemDriveLetter, const CString &bootFilesPath);
+	static bool SetupEndlessEFI(const CString &systemDriveLetter, const CString &bootFilesPath);
+	static HANDLE GetPhysicalFromDriveLetter(const CString &driveLetter);
 };

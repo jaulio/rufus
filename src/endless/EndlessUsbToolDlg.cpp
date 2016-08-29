@@ -266,6 +266,8 @@ enum endless_action_type {
 #define EOS_OEM_PRODUCT_TEXT		"eosoem"
 const wchar_t* mainWindowTitle = L"Endless USB Creator";
 
+#define ALL_FILES					L"*.*"
+
 // Radu: How much do we need to reserve for the exfat partition header?
 // reserve 10 mb for now; this will also include the signature file
 #define INSTALLER_DELTA_SIZE (10*1024*1024)
@@ -1830,7 +1832,7 @@ void CEndlessUsbToolDlg::UpdateFileEntries(bool shouldInit)
     CString currentPath;
     BOOL fileAccessException = false;
     CString currentInstallerVersion;
-    CString searchPath = GET_LOCAL_PATH(_T("*.*"));
+    CString searchPath = GET_LOCAL_PATH(ALL_FILES);
     HANDLE findFilesHandle = FindFirstFile(searchPath, &findFileData);
 
     m_localFilesScanned = true;
@@ -3071,10 +3073,10 @@ DWORD WINAPI CEndlessUsbToolDlg::FileCopyThread(void* param)
     IFFALSE_GOTOERROR(hPhysical != INVALID_HANDLE_VALUE, "Error on acquiring disk handle.");
     
     result = DeviceIoControl(hPhysical, IOCTL_DISK_GET_DRIVE_GEOMETRY_EX, NULL, 0, geometry, sizeof(geometry), &size, NULL);
-    IFFALSE_GOTOERROR(result == TRUE && size > 0, "Error on querying disk geometry.");    
+    IFFALSE_GOTOERROR(result != 0 && size > 0, "Error on querying disk geometry.");
 
     result = DeviceIoControl(hPhysical, IOCTL_DISK_GET_DRIVE_LAYOUT_EX, NULL, 0, layout, sizeof(layout), &size, NULL);
-    IFFALSE_GOTOERROR(result == TRUE && size > 0, "Error on querying disk layout.");
+    IFFALSE_GOTOERROR(result != 0 && size > 0, "Error on querying disk layout.");
     
     IFFALSE_GOTOERROR(DriveLayout->PartitionStyle == PARTITION_STYLE_GPT, "Unexpected partition type.");
     IFFALSE_GOTOERROR(DriveLayout->PartitionCount == EXPECTED_NUMBER_OF_PARTITIONS, "Error: Unexpected number of partitions.");
@@ -3648,6 +3650,7 @@ void CEndlessUsbToolDlg::JSONDownloadFailed()
 #define EXFAT_PART_STARTING_SECTOR	131072
 
 #define EFI_BOOT_SUBDIRECTORY			L"EFI\\BOOT"
+#define ENDLESS_BOOT_SUBDIRECTORY		L"EFI\\Endless"
 #define PATH_ENDLESS_SUBDIRECTORY		L"endless\\"
 #define ENDLESS_IMG_FILE_NAME			L"endless.img"
 #define EXFAT_ENDLESS_LIVE_FILE_NAME	L"live"
@@ -3656,6 +3659,7 @@ void CEndlessUsbToolDlg::JSONDownloadFailed()
 #define LIVE_CORE_IMG_FILE				L"live\\core.img"
 #define LIVE_BOOT_IMG_FILE_SIZE			446
 #define NTFS_CORE_IMG_FILE				L"ntfs\\core.img"
+#define ENDLESS_BOOT_EFI_FILE			"bootx64.efi"
 
 DWORD WINAPI CEndlessUsbToolDlg::CreateUSBStick(LPVOID param)
 {
@@ -3692,7 +3696,7 @@ DWORD WINAPI CEndlessUsbToolDlg::CreateUSBStick(LPVOID param)
 
 	// get disk geometry information
 	result = DeviceIoControl(hPhysical, IOCTL_DISK_GET_DRIVE_GEOMETRY_EX, NULL, 0, geometry, sizeof(geometry), &size, NULL);
-	IFFALSE_GOTOERROR(result == TRUE && size > 0, "Error on querying disk geometry.");
+	IFFALSE_GOTOERROR(result != 0 && size > 0, "Error on querying disk geometry.");
 
 	// set initial drive layout data
 	memset(layout, 0, sizeof(layout));
@@ -3922,7 +3926,7 @@ bool CEndlessUsbToolDlg::CopyFilesToESP(const CString &fromFolder, const CString
 	IFFALSE_GOTOERROR(createDirResult == ERROR_SUCCESS || createDirResult == ERROR_FILE_EXISTS, "Error creating EFI directory in ESP partition.");
 
 	memset(fromPath, 0, sizeof(fromPath));
-	wsprintf(fromPath, L"%ls%ls\\*.*", fromFolder, EFI_BOOT_SUBDIRECTORY);
+	wsprintf(fromPath, L"%ls%ls\\%ls", fromFolder, EFI_BOOT_SUBDIRECTORY, ALL_FILES);
 	memset(toPath, 0, sizeof(fromPath));
 	wsprintf(toPath, L"%ls", espFolder);
 
@@ -3976,6 +3980,8 @@ bool CEndlessUsbToolDlg::CopyMultipleItems(const CString &from, const CString &t
 {
 	SHFILEOPSTRUCT fileOperation;
 	wchar_t fromPath[MAX_PATH + 1], toPath[MAX_PATH + 1];
+
+	uprintf("Copying '%ls' to '%ls'", from, to);
 
 	memset(fromPath, 0, sizeof(fromPath));
 	wsprintf(fromPath, L"%ls", from);
@@ -4099,7 +4105,7 @@ DWORD WINAPI CEndlessUsbToolDlg::SetupDualBoot(LPVOID param)
 	if (IsLegacyBIOSBoot()) {
 		IFFALSE_GOTOERROR(WriteMBRAndSBRToWinDrive(systemDriveLetter, bootFilesPath), "Error on WriteMBRAndSBRToWinDrive");
 	} else {
-		// TODO: install Endless in UEFI case
+		IFFALSE_GOTOERROR(SetupEndlessEFI(systemDriveLetter, bootFilesPath), "Error on SetupEndlessEFI");
 	}
 
 	goto done;
@@ -4145,7 +4151,6 @@ bool CEndlessUsbToolDlg::IsLegacyBIOSBoot()
 bool CEndlessUsbToolDlg::WriteMBRAndSBRToWinDrive(const CString &systemDriveLetter, const CString &bootFilesPath)
 {
 	bool retResult = false;
-	CStringA logical_drive;
 	HANDLE hPhysical = INVALID_HANDLE_VALUE;
 	BYTE geometry[256] = { 0 };
 	PDISK_GEOMETRY_EX DiskGeometry = (PDISK_GEOMETRY_EX)(void*)geometry;
@@ -4158,17 +4163,8 @@ bool CEndlessUsbToolDlg::WriteMBRAndSBRToWinDrive(const CString &systemDriveLett
 	size_t countRead, coreImgSize;
 	unsigned char *endlessSBRData = NULL;
 
-	// TODO: we assume that the system disk is the C drive; we need to detect it somehow
 	// Get system disk handle
-	logical_drive.Format("\\\\.\\%lc:", systemDriveLetter[0]);
-	hPhysical = CreateFileA(logical_drive, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-	IFFALSE_GOTOERROR(hPhysical != INVALID_HANDLE_VALUE, "CreateFileA call returned invalid handle.");
-
-	int drive_number = GetDriveNumber(hPhysical, logical_drive.GetBuffer());
-	drive_number += DRIVE_INDEX_MIN;
-	safe_closehandle(hPhysical);
-
-	hPhysical = GetPhysicalHandle(drive_number, TRUE, TRUE);
+	hPhysical = GetPhysicalFromDriveLetter(systemDriveLetter);
 	IFFALSE_GOTOERROR(hPhysical != INVALID_HANDLE_VALUE, "Error on acquiring disk handle.");
 
 	// Make sure there already is a MBR on this disk
@@ -4176,7 +4172,7 @@ bool CEndlessUsbToolDlg::WriteMBRAndSBRToWinDrive(const CString &systemDriveLett
 
 	// get disk geometry information
 	result = DeviceIoControl(hPhysical, IOCTL_DISK_GET_DRIVE_GEOMETRY_EX, NULL, 0, geometry, sizeof(geometry), &size, NULL);
-	IFFALSE_GOTOERROR(result == TRUE && size > 0, "Error on querying disk geometry.");
+	IFFALSE_GOTOERROR(result != 0 && size > 0, "Error on querying disk geometry.");
 	set_bytes_per_sector(DiskGeometry->Geometry.BytesPerSector);
 
 	// TODO: add some more core.img size validation
@@ -4215,3 +4211,78 @@ error:
 
 	return retResult;
 }
+
+bool CEndlessUsbToolDlg::SetupEndlessEFI(const CString &systemDriveLetter, const CString &bootFilesPath)
+{
+	HANDLE hPhysical;
+	bool retResult = false;
+	BYTE layout[4096] = { 0 };
+	PDRIVE_LAYOUT_INFORMATION_EX DriveLayout = (PDRIVE_LAYOUT_INFORMATION_EX)(void*)layout;
+	DWORD size;
+	BOOL result;
+	CStringA systemDriveA;
+	CString windowsEspDriveLetter;
+
+	hPhysical = GetPhysicalFromDriveLetter(systemDriveLetter);
+	IFFALSE_GOTOERROR(hPhysical != INVALID_HANDLE_VALUE, "Error on acquiring disk handle.");
+
+	// get partition layout
+	result = DeviceIoControl(hPhysical, IOCTL_DISK_GET_DRIVE_LAYOUT_EX, NULL, 0, layout, sizeof(layout), &size, NULL);
+	IFFALSE_GOTOERROR(result != 0 && size > 0, "Error on querying disk layout.");
+	IFFALSE_GOTOERROR(DriveLayout->PartitionStyle == PARTITION_STYLE_GPT, "Unexpected partition type. Partition style is not GPT");
+
+	DWORD efiPartitionNumber = -1;
+	PARTITION_INFORMATION_EX *partition = NULL;
+	for (DWORD index = 0; index < DriveLayout->PartitionCount; index++) {
+		partition = &(DriveLayout->PartitionEntry[index]);
+
+		if (partition->Gpt.PartitionType == PARTITION_SYSTEM_GUID) {
+			uprintf("Found ESP\r\nPartition %d:\r\n  Type: %s\r\n  Name: '%ls'\r\n ID: %s",
+				index + 1, GuidToString(&partition->Gpt.PartitionType), partition->Gpt.Name, GuidToString(&partition->Gpt.PartitionId));
+			efiPartitionNumber = partition->PartitionNumber;
+			break;
+		}
+	}
+	IFFALSE_GOTOERROR(efiPartitionNumber != -1, "ESP not found.");
+	// Fail if EFI partition number is bigger than we can fit in the
+	// uin8_t that AltMountVolume receives as parameter for partition number
+	IFFALSE_GOTOERROR(efiPartitionNumber <= 0xFF, "EFI partition number is bigger than 255.");
+
+	const char *espMountLetter = AltMountVolume(ConvertUnicodeToUTF8(systemDriveLetter.Left(2)), (uint8_t)efiPartitionNumber);
+	IFFALSE_GOTOERROR(espMountLetter != NULL, "Error assigning a letter to the ESP.");
+	windowsEspDriveLetter = UTF8ToCString(espMountLetter);
+
+	//IFFALSE_GOTOERROR(CopyMultipleItems(bootFilesPath + EFI_BOOT_SUBDIRECTORY + L"\\" + ALL_FILES, windowsEspDriveLetter + ENDLESS_BOOT_SUBDIRECTORY), "Error copying EFI folder to Windows ESP partition.");
+
+	IFFALSE_PRINTERROR(EFIRequireNeededPrivileges(), "Error on EFIRequireNeededPrivileges.")
+	IFFALSE_GOTOERROR(EFICreateNewEntry(windowsEspDriveLetter.Left(2), CString(L"\\") + ENDLESS_BOOT_SUBDIRECTORY + L"\\" + ENDLESS_BOOT_EFI_FILE, L"Endless OS"), "Error on EFICreateNewEntry");
+
+	retResult = true;
+
+error:
+	safe_closehandle(hPhysical);
+	if (espMountLetter != NULL) AltUnmountVolume(espMountLetter);
+
+	return retResult;
+}
+
+HANDLE CEndlessUsbToolDlg::GetPhysicalFromDriveLetter(const CString &driveLetter)
+{
+	HANDLE hPhysical = INVALID_HANDLE_VALUE;
+	CStringA logical_drive;
+
+	logical_drive.Format("\\\\.\\%lc:", driveLetter[0]);
+	hPhysical = CreateFileA(logical_drive, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+	IFFALSE_GOTOERROR(hPhysical != INVALID_HANDLE_VALUE, "CreateFileA call returned invalid handle.");
+
+	int drive_number = GetDriveNumber(hPhysical, logical_drive.GetBuffer());
+	drive_number += DRIVE_INDEX_MIN;
+	safe_closehandle(hPhysical);
+
+	hPhysical = GetPhysicalHandle(drive_number, TRUE, TRUE);
+	IFFALSE_GOTOERROR(hPhysical != INVALID_HANDLE_VALUE, "Error on acquiring disk handle.");
+
+error:
+	return hPhysical;
+}
+

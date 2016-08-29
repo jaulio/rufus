@@ -188,6 +188,9 @@
     <ClCompile Include="gpt\crc32.c">
       <Filter>Source Files\gpt</Filter>
     </ClCompile>
+    <ClCompile Include="UEFIBootSetup.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="res\EndlessUsbTool.rc2">
