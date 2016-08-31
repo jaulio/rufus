@@ -87,7 +87,8 @@ BOOL CEndlessUsbToolApp::InitInstance()
     HANDLE singleInstanceMutex = CreateMutex(NULL, TRUE, _T("Global\\EndlessUsbTool"));
 
     if (singleInstanceMutex != NULL && GetLastError() != ERROR_ALREADY_EXISTS) {
-        CEndlessUsbToolDlg dlg(wndMsg, commandLineInfo.logDebugInfo);
+        //CEndlessUsbToolDlg dlg(wndMsg, commandLineInfo.logDebugInfo);
+		CEndlessUsbToolDlg dlg(wndMsg, true);
         m_pMainWnd = &dlg;
         INT_PTR nResponse = dlg.DoModal();
         if (nResponse == IDOK)
