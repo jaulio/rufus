@@ -433,7 +433,7 @@ bool EFICreateNewEntry(const wchar_t *drive, wchar_t *path, wchar_t *desc) {
 	/* Add our entry to the boot order */
 	size = GetFirmwareEnvironmentVariable(UEFI_VAR_BOOTORDER, UEFI_BOOT_NAMESPACE, vardata, sizeof(vardata));
 	IFFALSE_GOTOERROR(size > 0, "Error on querying for BootOrder with GetFirmwareEnvironmentVariable");
-	
+
 	bootorder = (WORD *)vardata;
 	int position = (int)(size / 2);
 	int extraBytes = 2;

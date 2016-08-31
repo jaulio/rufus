@@ -16,6 +16,7 @@ typedef enum DownloadType {
     DownloadTypeReleseJson,
     DownloadTypeLiveImage,
     DownloadTypeInstallerImage,
+	DownloadTypeDualBootFiles,
     DownloadTypeMax
 } DownloadType_t;
 
@@ -26,6 +27,7 @@ static LPCTSTR DownloadTypeToString(DownloadType_t type)
         TOSTR(DownloadTypeReleseJson);
         TOSTR(DownloadTypeLiveImage);
         TOSTR(DownloadTypeInstallerImage);
+		TOSTR(DownloadTypeDualBootFiles);
         default: return _T("UNKNOWN_DOWNLOAD_TYPE");
     }
 }
@@ -39,7 +41,7 @@ typedef struct DownloadStatus {
     HRESULT errorCode;
 } DownloadStatus_t;
 
-typedef std::initializer_list<LPCTSTR> ListOfStrings;
+typedef std::initializer_list<CString> ListOfStrings;
 
 static const DownloadStatus_t DownloadStatusNull = { {0, 0, 0, 0}, false, false, L"" };
 
