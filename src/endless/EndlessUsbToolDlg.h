@@ -7,12 +7,19 @@
 #include "localization.h"
 #include "DownloadManager.h"
 
+// Remove this define to disable hardcoded stuff added for internal release on August 31st
+#define TEST_RELEASE_HARDCODED_STUFF 1
+
 typedef struct FileImageEntry {
     CString filePath;
     ULONGLONG size;
     BOOL autoAdded;
     LONG htmlIndex;
     BOOL stillPresent;
+	CString personality;
+	BOOL hasBootArchive;
+	BOOL hasBootArchiveSig;
+	BOOL hasUnpackedImgSig;
 } FileImageEntry_t, *pFileImageEntry_t;
 
 typedef enum ErrorCause {
@@ -58,11 +65,16 @@ protected:
 	//// Disable text selection
 	//HRESULT OnHtmlSelectStart(IHTMLElement* pElement);
 
+	// Dual Boot Page Handlers
+	HRESULT OnAdvancedOptionsClicked(IHTMLElement* pElement);
+	HRESULT OnInstallDualBootClicked(IHTMLElement* pElement);
+
 	// First Page Handlers
 	HRESULT OnTryEndlessSelected(IHTMLElement* pElement);
 	HRESULT OnInstallEndlessSelected(IHTMLElement* pElement);
 	HRESULT OnLinkClicked(IHTMLElement* pElement);
 	HRESULT OnLanguageChanged(IHTMLElement* pElement);
+	HRESULT OnFirstPagePreviousClicked(IHTMLElement* pElement);
 
 	// Select File Page Handlers
 	HRESULT OnSelectFilePreviousClicked(IHTMLElement* pElement);
@@ -79,6 +91,12 @@ protected:
 	HRESULT OnSelectUSBNextClicked(IHTMLElement* pElement);
     HRESULT OnSelectedUSBDiskChanged(IHTMLElement* pElement);
     HRESULT OnAgreementCheckboxChanged(IHTMLElement* pElement);
+
+	// Select Storage Page handlers
+	HRESULT OnSelectStoragePreviousClicked(IHTMLElement* pElement);
+	HRESULT OnSelectStorageNextClicked(IHTMLElement* pElement);
+	HRESULT OnStorageAgreementCheckboxChanged(IHTMLElement* pElement);
+	HRESULT OnSelectedStorageSizeChanged(IHTMLElement* pElement);
 
     // Install Page handlers
     HRESULT OnInstallCancelClicked(IHTMLElement* pElement);
@@ -115,6 +133,8 @@ protected:
 	void OnDocumentComplete(LPDISPATCH pDisp, LPCTSTR szUrl);
 
 private:
+	bool m_dualBootSelected;
+	int m_nrGigsSelected;
 	bool m_liveInstall;
 	loc_cmd* m_selectedLocale;
 	char m_localizationFile[MAX_PATH];
@@ -158,6 +178,7 @@ private:
 
 	CString m_bootArchive;
 	CString m_bootArchiveSig;
+	CString m_unpackedImageSig;
 
 	CComPtr<IHTMLDocument3> m_spHtmlDoc3;
     CComPtr<IHTMLElement> m_spStatusElem;
@@ -176,6 +197,8 @@ private:
 	unsigned long m_cancelImageUnpack;
 
     void StartOperationThread(int operation, LPTHREAD_START_ROUTINE threadRoutine, LPVOID param = NULL);
+
+	void StartInstallationProcess();
 
 	void InitRufus();
     static DWORD WINAPI RufusISOScanThread(LPVOID param);
@@ -250,6 +273,9 @@ private:
     void UpdateUSBSpeedMessage(DWORD deviceIndex);
     void JSONDownloadFailed();
 
+	void GoToSelectStoragePage();
+	BOOL AddStorageEntryToSelect(CComPtr<IHTMLSelectElement> &selectElement, int noOfGigs, uint8_t extraData);
+
 	static DWORD WINAPI CreateUSBStick(LPVOID param);
 	static bool CreateFakePartitionLayout(HANDLE hPhysical, PBYTE layout, PBYTE geometry);
 	static bool FormatFirstPartitionOnDrive(DWORD DriveIndex, int fsToUse, HANDLE m_cancelOperationEvent, const wchar_t *partLabel);
@@ -271,4 +297,11 @@ private:
 	static bool WriteMBRAndSBRToWinDrive(const CString &systemDriveLetter, const CString &bootFilesPath);
 	static bool SetupEndlessEFI(const CString &systemDriveLetter, const CString &bootFilesPath);
 	static HANDLE GetPhysicalFromDriveLetter(const CString &driveLetter);
+
+	// used by ImageUnpackCallback
+	// bled doesn't allow us to set a context variable for the callback
+	static int ImageUnpackOperation;
+	static int ImageUnpackPercentStart;
+	static int ImageUnpackPercentEnd;
+	static ULONGLONG ImageUnpackFileSize;
 };

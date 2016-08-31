@@ -146,6 +146,19 @@ t CloseAppButton1 "Finish"
 t ErrorMessage "Oops, something went wrong setting up Endless OS."
 t EndlessSupportContainer "If you keep having trouble, you can get help on the <a id='EndlessSupport'>Endless community forum</a>."
 
+t DualBootPageTitle "Endless OS"
+t DualBootContentTitle "Download and Install Endless on this PC"
+t DualBootContentDescription "You will be able to choose between Endless and Windows when you start yout PC.<br />Under Windows, the apps and documents will not be altered."
+t DualBootInstallButon "Install Endless"
+t DualBootRecommendation "At least 32 GB free on the C:\\ drive is recommended."
+t AdvancedOptionsText "To make an <b>Endless USB Stick</b> and see other install options <a id='AdvancedOptionsLink'>click here</a>"
+t SelectStorageNextButton "Next"
+t SelectStoragePreviousButton "Previous"
+t SelectStoragePageTitle "Storage Space for Endless OS"
+t SelectStorageSubtitle "Select how much of your C:\\ drive to dedicate to Endless OS."
+t StorageAgreementCheckboxText "I understand that this process could <b>delete some or all of my files</b>."
+
+
 # *Short* size names. These can be used as suffixes
 t MSG_020 "bytes"
 t MSG_021 "Kb"
@@ -228,6 +241,12 @@ t MSG_334 "There isn’t enough disk space for downloading Endless OS. Please fr
 
 t MSG_335 "The selected version of Endless OS requires %s of free disk space, but only %s is available. Please free up some space on drive %s to continue."
 t MSG_336 "Delete the invalid file (%s)."
+
+t MSG_337 "For Endless OS %s, we recommend selecting at least %s of storage space."
+t MSG_338 "%s (Minimum)"
+t MSG_339 "%s (Recommended)"
+t MSG_340 "%s (Maximum)"
+t MSG_341 "You currently have %s free on your %s C:\\ drive."
 
 t MSG_400 "Light"
 t MSG_401 "English"
