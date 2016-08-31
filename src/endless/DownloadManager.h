@@ -6,6 +6,8 @@
 
 #include "GeneralCode.h"
 
+#include <vector>
+
 /// IUnknown methods declaration macro
 #define DECLARE_IUNKNOWN \
     STDMETHOD_(ULONG, AddRef)(void); \
@@ -41,7 +43,7 @@ typedef struct DownloadStatus {
     HRESULT errorCode;
 } DownloadStatus_t;
 
-typedef std::initializer_list<CString> ListOfStrings;
+typedef std::vector<CString> ListOfStrings;
 
 static const DownloadStatus_t DownloadStatusNull = { {0, 0, 0, 0}, false, false, L"" };
 
