@@ -4678,6 +4678,7 @@ bool CEndlessUsbToolDlg::SetupEndlessEFI(const CString &systemDriveLetter, const
 	BOOL result;
 	CStringA systemDriveA;
 	CString windowsEspDriveLetter;
+	const char *espMountLetter = NULL;
 
 	hPhysical = GetPhysicalFromDriveLetter(systemDriveLetter);
 	IFFALSE_GOTOERROR(hPhysical != INVALID_HANDLE_VALUE, "Error on acquiring disk handle.");
@@ -4704,7 +4705,7 @@ bool CEndlessUsbToolDlg::SetupEndlessEFI(const CString &systemDriveLetter, const
 	// uin8_t that AltMountVolume receives as parameter for partition number
 	IFFALSE_GOTOERROR(efiPartitionNumber <= 0xFF, "EFI partition number is bigger than 255.");
 
-	const char *espMountLetter = AltMountVolume(ConvertUnicodeToUTF8(systemDriveLetter.Left(2)), (uint8_t)efiPartitionNumber);
+	espMountLetter = AltMountVolume(ConvertUnicodeToUTF8(systemDriveLetter.Left(2)), (uint8_t)efiPartitionNumber);
 	IFFALSE_GOTOERROR(espMountLetter != NULL, "Error assigning a letter to the ESP.");
 	windowsEspDriveLetter = UTF8ToCString(espMountLetter);
 
