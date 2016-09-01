@@ -1892,6 +1892,8 @@ void CEndlessUsbToolDlg::UpdateFileEntries(bool shouldInit)
                 currentEntry->stillPresent = TRUE;
             }
 
+			uprintf("Found local image '%ls'", file.GetFilePath());
+
             // RADU: do we need to care about the size?
 
         } catch (CFileException *ex) {
@@ -2979,6 +2981,8 @@ DWORD WINAPI CEndlessUsbToolDlg::FileVerificationThread(void* param)
     public_key_t p_pkey = { 0 };
     HCRYPTPROV hCryptProv = NULL;
     HCRYPTHASH hHash = NULL;
+
+	uprintf("Verifying file '%ls' with signature '%ls'", dlg->m_localFile, dlg->m_localFileSig);
 
     IFFALSE_GOTOERROR(0 == LoadSignature(signatureFilename, &p_sig), "Error on LoadSignature");
     IFFALSE_GOTOERROR(0 == parse_public_key(endless_public_key, sizeof(endless_public_key), &p_pkey, nullptr), "Error on parse_public_key");
