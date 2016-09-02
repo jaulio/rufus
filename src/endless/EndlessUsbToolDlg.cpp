@@ -640,26 +640,40 @@ void CEndlessUsbToolDlg::InitRufus()
     //    uprintf("Could not load RichEdit library - some dialogs may not display: %s\n", WindowsErrorString());
     //}
 
-    // We use local group policies rather than direct registry manipulation
-    // 0x9e disables removable and fixed drive notifications
-    m_lgpSet = SetLGP(FALSE, &m_lgpExistingKey, "Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\Explorer", "NoDriveTypeAutorun", 0x9e);
-
-    if (nWindowsVersion > WINDOWS_XP) {
-        // Re-enable AutoMount if needed
-        if (!GetAutoMount(&m_automount)) {
-            uprintf("Could not get AutoMount status");
-            m_automount = TRUE;	// So that we don't try to change its status on exit
-        } else if (!m_automount) {
-            uprintf("AutoMount was detected as disabled - temporary re-enabling it");
-            if (!SetAutoMount(TRUE)) {
-                uprintf("Failed to enable AutoMount");
-            }
-        }
-    }
-
     PF_INIT(GetTickCount64, kernel32);    
 
     srand((unsigned int)_GetTickCount64());    
+}
+
+void CEndlessUsbToolDlg::ChangeDriveAutoRunAndMount(bool setEndlessValues)
+{
+	if (setEndlessValues) {
+		// We use local group policies rather than direct registry manipulation
+		// 0x9e disables removable and fixed drive notifications
+		m_lgpSet = SetLGP(FALSE, &m_lgpExistingKey, "Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\Explorer", "NoDriveTypeAutorun", 0x9e);
+
+		if (nWindowsVersion > WINDOWS_XP) {
+			// Re-enable AutoMount if needed
+			if (!GetAutoMount(&m_automount)) {
+				uprintf("Could not get AutoMount status");
+				m_automount = TRUE;	// So that we don't try to change its status on exit
+			}
+			else if (!m_automount) {
+				uprintf("AutoMount was detected as disabled - temporary re-enabling it");
+				if (!SetAutoMount(TRUE)) {
+					uprintf("Failed to enable AutoMount");
+				}
+			}
+		}
+	} else {
+		// revert settings we changed
+		if (m_lgpSet) {
+			SetLGP(TRUE, &m_lgpExistingKey, "Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\Explorer", "NoDriveTypeAutorun", 0);
+		}
+		if ((nWindowsVersion > WINDOWS_XP) && (!m_automount) && (!SetAutoMount(FALSE))) {
+			uprintf("Failed to restore AutoMount to disabled");
+		}
+	}
 }
 
 // The scanning process can be blocking for message processing => use a thread
@@ -807,14 +821,6 @@ void CEndlessUsbToolDlg::Uninit()
 
     StrArrayDestroy(&DriveID);
     StrArrayDestroy(&DriveLabel);
-
-    // revert settings we changed
-    if (m_lgpSet) {
-        SetLGP(TRUE, &m_lgpExistingKey, "Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\Explorer", "NoDriveTypeAutorun", 0);
-    }
-    if ((nWindowsVersion > WINDOWS_XP) && (!m_automount) && (!SetAutoMount(FALSE))) {
-        uprintf("Failed to restore AutoMount to disabled");
-    }
 
     // delete image file entries related memory
     CString currentPath;
@@ -1315,6 +1321,8 @@ LRESULT CEndlessUsbToolDlg::WindowProc(UINT message, WPARAM wParam, LPARAM lPara
             m_currentStep = OP_NO_OPERATION_IN_PROGRESS;
 
             EnableHibernate();
+
+			if (!m_dualBootSelected) ChangeDriveAutoRunAndMount(false);
 
             switch (m_lastErrorCause) {
             case ErrorCause_t::ErrorCauseNone:
@@ -1849,10 +1857,10 @@ HRESULT CEndlessUsbToolDlg::OnLinkClicked(IHTMLElement* pElement)
     uint32_t msg_id = 0;
     char *url = NULL;
 
-    IFFALSE_RETURN_VALUE(pElement != NULL, "OnSelectedImageTypeChanged: Error getting element id", S_OK);
+    IFFALSE_RETURN_VALUE(pElement != NULL, "OnLinkClicked: Error getting element id", S_OK);
 
     hr = pElement->get_id(&id);
-    IFFALSE_RETURN_VALUE(SUCCEEDED(hr), "OnSelectedImageTypeChanged: Error getting element id", S_OK);
+    IFFALSE_RETURN_VALUE(SUCCEEDED(hr), "OnLinkClicked: Error getting element id", S_OK);
 
     if (id == _T(ELEMENT_COMPARE_OPTIONS)) {
         msg_id = MSG_312;
@@ -2673,6 +2681,8 @@ void CEndlessUsbToolDlg::StartInstallationProcess()
 	SetElementText(_T(ELEMENT_INSTALL_DESCRIPTION), CComBSTR(""));
 
 	EnableHibernate(false);
+
+	if(!m_dualBootSelected) ChangeDriveAutoRunAndMount(true);
 
 	// TODO: remove these once we parse proper JSON or discover local files
 	m_bootArchive = GET_LOCAL_PATH(CSTRING_GET_LAST(hardcoded_BootPath, '/'));
@@ -3846,7 +3856,7 @@ bool CEndlessUsbToolDlg::CanUseLocalFile()
 		CString path;
 		for (POSITION position = m_imageFiles.GetStartPosition(); position != NULL; ) {
 			m_imageFiles.GetNextAssoc(position, path, currentEntry);
-			if (currentEntry->hasBootArchive && currentEntry->hasBootArchiveSig && currentEntry->hasUnpackedImgSig) {
+			if (currentEntry->hasBootArchive && currentEntry->hasBootArchiveSig) {
 				hasFilesForDualBoot = true;
 				break;
 			}
@@ -4487,7 +4497,6 @@ error:
 #define DB_PROGRESS_UNPACK_BOOT_ZIP		1
 #define DB_PROGRESS_CHECK_PARTITION		1
 #define DB_PROGRESS_FINISHED_UNPACK		95
-#define DB_PROGRESS_COPY_SIG_FILE		96
 #define DB_PROGRESS_COPY_GRUB_FOLDER	98
 #define DB_PROGRESS_MBR_OR_EFI_SETUP	100
 
@@ -4543,10 +4552,6 @@ DWORD WINAPI CEndlessUsbToolDlg::SetupDualBoot(LPVOID param)
 	IFFALSE_PRINTERROR(SetEndOfFile(endlessImage), "Error on SetEndOfFile");
 	IFFALSE_PRINTERROR(CloseHandle(endlessImage), "Error on CloseHandle.");
 	UpdateProgress(OP_SETUP_DUALBOOT, DB_PROGRESS_FINISHED_UNPACK);
-
-	// copy signature file
-	IFFALSE_GOTOERROR(0 != CopyFile(dlg->m_unpackedImageSig, endlessFilesPath + CSTRING_GET_LAST(dlg->m_unpackedImageSig, '\\'), FALSE), "Error copying image signature to endless folder.");
-	UpdateProgress(OP_SETUP_DUALBOOT, DB_PROGRESS_COPY_SIG_FILE);
 	CHECK_IF_CANCELED;
 
 	// Copy grub

@@ -276,6 +276,8 @@ private:
 	void GoToSelectStoragePage();
 	BOOL AddStorageEntryToSelect(CComPtr<IHTMLSelectElement> &selectElement, int noOfGigs, uint8_t extraData);
 
+	void ChangeDriveAutoRunAndMount(bool setEndlessValues);
+
 	static DWORD WINAPI CreateUSBStick(LPVOID param);
 	static bool CreateFakePartitionLayout(HANDLE hPhysical, PBYTE layout, PBYTE geometry);
 	static bool FormatFirstPartitionOnDrive(DWORD DriveIndex, int fsToUse, HANDLE m_cancelOperationEvent, const wchar_t *partLabel);
