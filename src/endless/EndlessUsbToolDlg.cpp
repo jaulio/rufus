@@ -179,23 +179,27 @@ DWORD usbDevicesCount;
 
 // Personalities
 
+#define PERSONALITY_ARABIC              L"ar"
 #define PERSONALITY_BASE                L"base"
+#define PERSONALITY_BENGALI             L"bn"
 #define PERSONALITY_ENGLISH             L"en"
 #define PERSONALITY_SPANISH             L"es"
-#define PERSONALITY_PORTUGHESE          L"pt_BR"
-#define PERSONALITY_ARABIC              L"ar"
+#define PERSONALITY_SPANISH_GT          L"es_GT"
 #define PERSONALITY_FRENCH              L"fr"
-#define PERSONALITY_CHINESE             L"zh_CN"
+#define PERSONALITY_PORTUGUESE_BR       L"pt_BR"
+#define PERSONALITY_CHINESE_CN          L"zh_CN"
 
 static const wchar_t *globalAvailablePersonalities[] =
 {
+    PERSONALITY_ARABIC,
     PERSONALITY_BASE,
+    PERSONALITY_BENGALI,
     PERSONALITY_ENGLISH,
     PERSONALITY_SPANISH,
-    PERSONALITY_PORTUGHESE,
-    PERSONALITY_ARABIC,
+    PERSONALITY_SPANISH_GT,
     PERSONALITY_FRENCH,
-    PERSONALITY_CHINESE,
+    PERSONALITY_PORTUGUESE_BR,
+    PERSONALITY_CHINESE_CN,
 };
 
 // Rufus language codes
@@ -474,7 +478,7 @@ CEndlessUsbToolDlg::CEndlessUsbToolDlg(UINT globalMessage, bool enableLogDebuggi
 
     m_localeToPersonality[RUFUS_LOCALE_EN] = PERSONALITY_ENGLISH;
     m_localeToPersonality[RUFUS_LOCALE_ES] = PERSONALITY_SPANISH;
-    m_localeToPersonality[RUFUS_LOCALE_PT] = PERSONALITY_PORTUGHESE;
+    m_localeToPersonality[RUFUS_LOCALE_PT] = PERSONALITY_PORTUGUESE;
     m_localeToPersonality[RUFUS_LOCALE_SA] = PERSONALITY_ARABIC;
     m_localeToPersonality[RUFUS_LOCALE_FR] = PERSONALITY_FRENCH;
     m_localeToPersonality[RUFUS_LOCALE_ZH_CN] = PERSONALITY_CHINESE;
