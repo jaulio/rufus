@@ -9,6 +9,7 @@
 #include <windowsx.h>
 #include <dbt.h>
 #include <atlpath.h>
+#include <intrin.h>
 
 #include "json/json.h"
 #include <fstream>
@@ -589,6 +590,10 @@ void CEndlessUsbToolDlg::OnDocumentComplete(LPDISPATCH pDisp, LPCTSTR szUrl)
 
     StartCheckInternetConnectionThread();
     FindMaxUSBSpeed();
+
+	BOOL x64BitSupported = Has64BitSupport() ? TRUE :  FALSE;
+	uprintf("HW processor has 64 bit support: %s", x64BitSupported ? "YES" : "NO");
+	CallJavascript(_T(JS_ENABLE_BUTTON), CComVariant(HTML_BUTTON_ID(_T(ELEMENT_DUALBOOT_INSTALL_BUTTON))), CComVariant(x64BitSupported));
 
 	return;
 error:
@@ -1762,6 +1767,8 @@ HRESULT CEndlessUsbToolDlg::OnAdvancedOptionsClicked(IHTMLElement* pElement)
 
 HRESULT CEndlessUsbToolDlg::OnInstallDualBootClicked(IHTMLElement* pElement)
 {
+	IFFALSE_RETURN_VALUE(!IsButtonDisabled(pElement), "OnInstallDualBootClicked: Button is disabled. ", S_OK);
+
 	FUNCTION_ENTER;
 
 	m_dualBootSelected = true;
@@ -4754,3 +4761,20 @@ error:
 	return hPhysical;
 }
 
+bool CEndlessUsbToolDlg::Has64BitSupport()
+{
+	// MSDN: https://msdn.microsoft.com/en-us/library/hskdteyh%28v=vs.100%29.aspx?f=255&MSPPError=-2147217396
+	// In the example: "b64Available = (CPUInfo[3] & 0x20000000) || false;"
+	// Tested it on Windows 8.1 64 bit and it still says 64 bit is not supported
+	//int CPUInfo[4];
+	//__cpuid(CPUInfo, 0);
+	//return (CPUInfo[3] & 0x20000000) || false;
+
+	// Tested on Windows 8 64 bit and Windows XP 32 bit
+	// Haven't tested it on a 64 bit system running a 32 bit OS
+	SYSTEM_INFO systemInfo;
+	GetNativeSystemInfo(&systemInfo);
+	uprintf("GetNativeSystemInfo: dwProcessorType=%d, wProcessorArchitecture=%hu", systemInfo.dwProcessorType, systemInfo.wProcessorArchitecture);
+
+	return systemInfo.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_AMD64;
+}

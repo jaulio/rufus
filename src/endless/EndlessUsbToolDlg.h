@@ -306,4 +306,7 @@ private:
 	static int ImageUnpackPercentStart;
 	static int ImageUnpackPercentEnd;
 	static ULONGLONG ImageUnpackFileSize;
+
+
+	static bool Has64BitSupport();
 };
