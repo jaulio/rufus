@@ -132,7 +132,7 @@
     <ClCompile>
       <PrecompiledHeader>Use</PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
-      <Optimization>MaxSpeed</Optimization>
+      <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>ENDLESSUSB_TOOL;_OFF_T_DEFINED;_off_t=__int64;off_t=_off_t;_CRTDBG_MAP_ALLOC;_WINDOWS;_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>true</SDLCheck>
       <AdditionalIncludeDirectories>..\endless;..\msvc-missing;..\ms-sys\inc;..\syslinux\libinstaller;..\syslinux\libfat;..\syslinux\win;..\libcdio;..\getopt;..\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
