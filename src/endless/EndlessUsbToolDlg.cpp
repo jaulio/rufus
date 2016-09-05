@@ -27,6 +27,7 @@ extern "C" {
 #include "ms-sys/inc/br.h"
 
 #include "usb.h"
+#include "mbr_grub2.h"
 
 // RADU: try to remove the need for all of these
 OPENED_LIBRARIES_VARS;
@@ -4028,7 +4029,7 @@ void CEndlessUsbToolDlg::JSONDownloadFailed()
 #define GRUB_BOOT_SUBDIRECTORY			L"grub"
 #define LIVE_BOOT_IMG_FILE				L"live\\boot.img"
 #define LIVE_CORE_IMG_FILE				L"live\\core.img"
-#define LIVE_BOOT_IMG_FILE_SIZE			446
+#define MAX_BOOT_IMG_FILE_SIZE			446
 #define NTFS_CORE_IMG_FILE				L"ntfs\\core.img"
 #define ENDLESS_BOOT_EFI_FILE			"bootx64.efi"
 
@@ -4442,7 +4443,7 @@ bool CEndlessUsbToolDlg::WriteMBRAndSBRToUSB(HANDLE hPhysical, const CString &bo
 	FILE *bootImgFile = NULL, *coreImgFile = NULL;
 	CString bootImgFilePath = bootFilesPath + LIVE_BOOT_IMG_FILE;
 	CString coreImgFilePath = bootFilesPath + LIVE_CORE_IMG_FILE;
-	unsigned char endlessMBRData[LIVE_BOOT_IMG_FILE_SIZE + 1];
+	unsigned char endlessMBRData[MAX_BOOT_IMG_FILE_SIZE + 1];
 	unsigned char *endlessSBRData = NULL;
 	bool retResult = false;
 	size_t countRead, coreImgSize;
@@ -4451,12 +4452,12 @@ bool CEndlessUsbToolDlg::WriteMBRAndSBRToUSB(HANDLE hPhysical, const CString &bo
 	// Load boot.img from file
 	IFFALSE_GOTOERROR(0 == _wfopen_s(&bootImgFile, bootImgFilePath, L"rb"), "Error opening boot.img file");
 	countRead = fread(endlessMBRData, 1, sizeof(endlessMBRData), bootImgFile);
-	IFFALSE_GOTOERROR(countRead == LIVE_BOOT_IMG_FILE_SIZE, "Size of boot.img is not what is expected.");
+	IFFALSE_GOTOERROR(countRead == MAX_BOOT_IMG_FILE_SIZE, "Size of boot.img is not what is expected.");
 
 	// write boot.img to USB drive
 	fake_fd._handle = (char*)hPhysical;
 	set_bytes_per_sector(SelectedDrive.Geometry.BytesPerSector);
-	IFFALSE_GOTOERROR(write_data(fp, 0x0, endlessMBRData, LIVE_BOOT_IMG_FILE_SIZE) != 0, "Error on write_data with boot.img contents.");
+	IFFALSE_GOTOERROR(write_data(fp, 0x0, endlessMBRData, MAX_BOOT_IMG_FILE_SIZE) != 0, "Error on write_data with boot.img contents.");
 
 	// Read core.img data and write it to USB drive
 	IFFALSE_GOTOERROR(0 == _wfopen_s(&coreImgFile, coreImgFilePath, L"rb"), "Error opening core.img file");
@@ -4624,6 +4625,8 @@ bool CEndlessUsbToolDlg::WriteMBRAndSBRToWinDrive(const CString &systemDriveLett
 	HANDLE hPhysical = INVALID_HANDLE_VALUE;
 	BYTE geometry[256] = { 0 };
 	PDISK_GEOMETRY_EX DiskGeometry = (PDISK_GEOMETRY_EX)(void*)geometry;
+	BYTE layout[4096] = { 0 };
+	PDRIVE_LAYOUT_INFORMATION_EX DriveLayout = (PDRIVE_LAYOUT_INFORMATION_EX)(void*)layout;
 	DWORD size;
 	BOOL result;
 	CString coreImgFilePath = bootFilesPath + NTFS_CORE_IMG_FILE;
@@ -4645,21 +4648,31 @@ bool CEndlessUsbToolDlg::WriteMBRAndSBRToWinDrive(const CString &systemDriveLett
 	IFFALSE_GOTOERROR(result != 0 && size > 0, "Error on querying disk geometry.");
 	set_bytes_per_sector(DiskGeometry->Geometry.BytesPerSector);
 
-	// TODO: add some more core.img size validation
-
-	// Write Rufus Grub2 MBR to disk
-	fake_fd._handle = (char*)hPhysical;
-	IFFALSE_GOTOERROR(write_grub2_mbr(fp) != 0, "Error on write_grub2_mbr.");
-
+	// get size of core.img
 	IFFALSE_GOTOERROR(0 == _wfopen_s(&coreImgFile, coreImgFilePath, L"rb"), "Error opening core.img file");
 	fseek(coreImgFile, 0L, SEEK_END);
 	coreImgSize = ftell(coreImgFile);
 	rewind(coreImgFile);
 	uprintf("Size of SBR is %d bytes from %ls", coreImgSize, coreImgFilePath);
-	IFFALSE_GOTOERROR(coreImgSize <= MBR_PART_LENGTH_BYTES, "Error: SBR found in core.img is too big.");
 
+	// Check that SBR will "fit" before writing to disk
+	// Jira issue: https://movial.atlassian.net/browse/EOIFT-158
+	result = DeviceIoControl(hPhysical, IOCTL_DISK_GET_DRIVE_LAYOUT_EX, NULL, 0, layout, sizeof(layout), &size, NULL);
+	IFFALSE_GOTOERROR(result != 0 && size > 0, "Error on querying disk layout.");
+	IFFALSE_GOTOERROR(DriveLayout->PartitionCount > 0, "We don't have any partitions?");
+	uprintf("BytesPerSector=%d, coreImgSize=%d, PartitionEntry[0].StartingOffset=%I64i",
+		DiskGeometry->Geometry.BytesPerSector, coreImgSize, DriveLayout->PartitionEntry[0].StartingOffset.QuadPart);
+	IFFALSE_GOTOERROR(DiskGeometry->Geometry.BytesPerSector + coreImgSize < DriveLayout->PartitionEntry[0].StartingOffset.QuadPart, "Error: SBR found in core.img is too big.");
+
+	// I know it's hardcoded data but better safe than sorry
+	IFFALSE_GOTOERROR(sizeof(mbr_grub2_0x0) <= MAX_BOOT_IMG_FILE_SIZE, "Size of grub2 boot.img is not what is expected.");
+
+	// Write Rufus Grub2 MBR to disk
+	fake_fd._handle = (char*)hPhysical;
+	IFFALSE_GOTOERROR(write_grub2_mbr(fp) != 0, "Error on write_grub2_mbr.");
+
+	// Write Endless SBR to disk
 	uprintf("Writing core.img at position %d", DiskGeometry->Geometry.BytesPerSector);
-
 	endlessSBRData = (unsigned char*)malloc(DiskGeometry->Geometry.BytesPerSector);
 	coreImgSize = 0;
 	while (!feof(coreImgFile) && coreImgSize < MBR_PART_LENGTH_BYTES) {
