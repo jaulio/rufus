@@ -4,6 +4,8 @@ artifacts:
 matrix:
   fast_finish: true
 
+build:
+  project: endless.sln
 
 platform:
   - Win32
