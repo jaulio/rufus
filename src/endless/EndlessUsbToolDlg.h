@@ -309,4 +309,9 @@ private:
 
 
 	static bool Has64BitSupport();
+
+	static BOOL SetAttributesForFilesInFolder(CString path, bool addAttributes);
+	static BOOL SetPrivilege(HANDLE hToken, LPCTSTR lpszPrivilege, BOOL bEnablePrivilege);
+	static BOOL ChangeAccessPermissions(CString path, bool restrictAccess);
+
 };

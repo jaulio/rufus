@@ -10,6 +10,7 @@
 #include <dbt.h>
 #include <atlpath.h>
 #include <intrin.h>
+#include <Aclapi.h>
 
 #include "json/json.h"
 #include <fstream>
@@ -4522,6 +4523,8 @@ DWORD WINAPI CEndlessUsbToolDlg::SetupDualBoot(LPVOID param)
 	systemDriveLetter = L"C:\\";
 	endlessFilesPath = systemDriveLetter + PATH_ENDLESS_SUBDIRECTORY;
 
+	IFFALSE_PRINTERROR(ChangeAccessPermissions(endlessFilesPath, false), "Error on granting Endless files permissions.");
+
 	// Unpack boot components
 	IFFALSE_GOTOERROR(UnpackBootComponents(dlg->m_bootArchive, bootFilesPath), "Error unpacking boot components.");
 
@@ -4572,6 +4575,9 @@ DWORD WINAPI CEndlessUsbToolDlg::SetupDualBoot(LPVOID param)
 	} else {
 		IFFALSE_GOTOERROR(SetupEndlessEFI(systemDriveLetter, bootFilesPath), "Error on SetupEndlessEFI");
 	}
+
+	// set Endless file permissions
+	IFFALSE_PRINTERROR(ChangeAccessPermissions(endlessFilesPath, true), "Error on setting Endless files permissions.");
 
 	UpdateProgress(OP_SETUP_DUALBOOT, DB_PROGRESS_MBR_OR_EFI_SETUP);
 
@@ -4790,4 +4796,163 @@ bool CEndlessUsbToolDlg::Has64BitSupport()
 	uprintf("GetNativeSystemInfo: dwProcessorType=%d, wProcessorArchitecture=%hu", systemInfo.dwProcessorType, systemInfo.wProcessorArchitecture);
 
 	return systemInfo.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_AMD64;
+}
+
+BOOL CEndlessUsbToolDlg::SetAttributesForFilesInFolder(CString path, bool addAttributes)
+{
+	WIN32_FIND_DATA findFileData;
+	HANDLE findFilesHandle = FindFirstFile(path + ALL_FILES, &findFileData);
+	BOOL retValue = TRUE;
+	BOOL result;
+
+	uprintf("RestrictAccessToFilesInFolder called with '%ls'", path);
+
+	IFFALSE_PRINTERROR(SetFileAttributes(path + findFileData.cFileName, addAttributes ? FILE_ATTRIBUTE_SYSTEM | FILE_ATTRIBUTE_READONLY : FILE_ATTRIBUTE_NORMAL) != 0, "Error on SetFileAttributes");
+
+	if (findFilesHandle == INVALID_HANDLE_VALUE) {
+		uprintf("UpdateFileEntries: No files found in current directory [%ls]", path);
+	} else {
+		do {
+			if (findFileData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
+				if ((0 == wcscmp(findFileData.cFileName, L".") || 0 == wcscmp(findFileData.cFileName, L".."))) continue;
+
+				CString newFolder = path + findFileData.cFileName + L"\\";
+				IFFALSE_PRINTERROR(result = SetAttributesForFilesInFolder(newFolder, addAttributes), "Error on setting attributes.");
+				retValue = retValue && result;
+			} else {
+				IFFALSE_PRINTERROR(SetFileAttributes(path + findFileData.cFileName, addAttributes ? FILE_ATTRIBUTE_SYSTEM | FILE_ATTRIBUTE_READONLY | FILE_ATTRIBUTE_HIDDEN : FILE_ATTRIBUTE_NORMAL) != 0, "Error on SetFileAttributes");
+			}
+		} while (FindNextFile(findFilesHandle, &findFileData) != 0);
+
+		FindClose(findFilesHandle);
+	}
+
+	return retValue;
+}
+
+BOOL CEndlessUsbToolDlg::SetPrivilege(HANDLE hToken, LPCTSTR lpszPrivilege, BOOL bEnablePrivilege)
+{
+	TOKEN_PRIVILEGES tp;
+	LUID luid;
+	BOOL retResult = FALSE;
+
+	IFFALSE_GOTOERROR(LookupPrivilegeValue(NULL, lpszPrivilege, &luid) != 0, "LookupPrivilegeValue error");
+
+	tp.PrivilegeCount = 1;
+	tp.Privileges[0].Luid = luid;
+	tp.Privileges[0].Attributes = bEnablePrivilege ? SE_PRIVILEGE_ENABLED : 0;
+
+	// Enable the privilege or disable all privileges.
+	IFFALSE_GOTOERROR(AdjustTokenPrivileges(hToken, FALSE, &tp, sizeof(TOKEN_PRIVILEGES), (PTOKEN_PRIVILEGES)NULL, (PDWORD)NULL) != 0, "AdjustTokenPrivileges error");
+	IFTRUE_GOTOERROR(GetLastError() == ERROR_NOT_ALL_ASSIGNED, "The token does not have the specified privilege.");
+
+	retResult = TRUE;
+error:
+	return retResult;
+}
+
+
+BOOL CEndlessUsbToolDlg::ChangeAccessPermissions(CString path, bool restrictAccess)
+{
+	LPWSTR pFilename = path.GetBuffer();
+	BOOL retResult = FALSE;
+	PSID pSIDEveryone = NULL;
+	PSID pSIDAdmin = NULL;
+	SID_IDENTIFIER_AUTHORITY SIDAuthWorld = SECURITY_WORLD_SID_AUTHORITY;
+	SID_IDENTIFIER_AUTHORITY SIDAuthNT = SECURITY_NT_AUTHORITY;
+	const int NUM_ACES = 2;
+	EXPLICIT_ACCESS ea[NUM_ACES];
+	PACL pACL = NULL;
+	HANDLE hToken = NULL;
+
+	uprintf("RestrictFileAccess called with '%ls'", path);
+
+	// Mark files as system and read-only
+	if(restrictAccess) IFFALSE_PRINTERROR(SetAttributesForFilesInFolder(path, restrictAccess), "Error on SetFileAttributes");
+
+	// Specify the DACL to use.
+	// Create a SID for the Everyone group.
+	IFFALSE_GOTOERROR(AllocateAndInitializeSid(&SIDAuthWorld, 1, SECURITY_WORLD_RID, 0, 0, 0, 0, 0, 0, 0, &pSIDEveryone), "AllocateAndInitializeSid (Everyone) error");
+	// Create a SID for the BUILTIN\Administrators group.
+	IFFALSE_GOTOERROR(AllocateAndInitializeSid(&SIDAuthNT, 2, SECURITY_BUILTIN_DOMAIN_RID, DOMAIN_ALIAS_RID_ADMINS, 0, 0, 0, 0, 0, 0, &pSIDAdmin), "AllocateAndInitializeSid (Admin) error");
+
+	ZeroMemory(&ea, NUM_ACES * sizeof(EXPLICIT_ACCESS));
+
+	// Deny access for Everyone.
+	ea[0].grfAccessPermissions = restrictAccess ? DELETE | FILE_DELETE_CHILD | FILE_WRITE_ATTRIBUTES : STANDARD_RIGHTS_ALL;
+	ea[0].grfAccessMode = restrictAccess ? DENY_ACCESS : SET_ACCESS;
+	ea[0].grfInheritance = SUB_CONTAINERS_AND_OBJECTS_INHERIT;
+	ea[0].Trustee.TrusteeForm = TRUSTEE_IS_SID;
+	ea[0].Trustee.TrusteeType = TRUSTEE_IS_WELL_KNOWN_GROUP;
+	ea[0].Trustee.ptstrName = (LPTSTR)pSIDEveryone;
+
+	// Set full control for Administrators.
+	ea[1].grfAccessPermissions = GENERIC_ALL;
+	ea[1].grfAccessMode = SET_ACCESS;
+	ea[1].grfInheritance = NO_INHERITANCE;
+	ea[1].Trustee.TrusteeForm = TRUSTEE_IS_SID;
+	ea[1].Trustee.TrusteeType = TRUSTEE_IS_GROUP;
+	ea[1].Trustee.ptstrName = (LPTSTR)pSIDAdmin;
+
+	IFFALSE_GOTOERROR(ERROR_SUCCESS == SetEntriesInAcl(NUM_ACES, ea, NULL, &pACL), "Failed SetEntriesInAcl");
+
+	// Try to modify the object's DACL.
+	DWORD dwRes = SetNamedSecurityInfo(
+		pFilename,					// name of the object
+		SE_FILE_OBJECT,              // type of object
+		DACL_SECURITY_INFORMATION,   // change only the object's DACL
+		NULL, NULL,                  // do not change owner or group
+		pACL,                        // DACL specified
+		NULL);                       // do not change SACL
+	uprintf("Return value for first SetNamedSecurityInfo call %u", dwRes);
+	IFTRUE_GOTO(ERROR_SUCCESS == dwRes, "Successfully changed DACL", done);
+	IFFALSE_GOTOERROR(dwRes == ERROR_ACCESS_DENIED, "First SetNamedSecurityInfo call failed");
+
+	// If the preceding call failed because access was denied,
+	// enable the SE_TAKE_OWNERSHIP_NAME privilege, create a SID for
+	// the Administrators group, take ownership of the object, and
+	// disable the privilege. Then try again to set the object's DACL.
+
+	// Open a handle to the access token for the calling process.
+	IFFALSE_GOTOERROR(OpenProcessToken(GetCurrentProcess(), TOKEN_ADJUST_PRIVILEGES, &hToken) != 0, "OpenProcessToken failed");
+	// Enable the SE_TAKE_OWNERSHIP_NAME privilege.
+	IFFALSE_GOTOERROR(SetPrivilege(hToken, SE_TAKE_OWNERSHIP_NAME, TRUE), "You must be logged on as Administrator.");
+	// Set the owner in the object's security descriptor.
+	dwRes = SetNamedSecurityInfo(
+		pFilename,					// name of the object
+		SE_FILE_OBJECT,              // type of object
+		OWNER_SECURITY_INFORMATION,  // change only the object's owner
+		pSIDAdmin,                   // SID of Administrator group
+		NULL,
+		NULL,
+		NULL);
+	uprintf("Return value for second SetNamedSecurityInfo call %u", dwRes);
+	IFFALSE_GOTOERROR(ERROR_SUCCESS == dwRes, "Could not set owner.");
+
+	// Disable the SE_TAKE_OWNERSHIP_NAME privilege.
+	IFFALSE_GOTOERROR(SetPrivilege(hToken, SE_TAKE_OWNERSHIP_NAME, FALSE), "Failed SetPrivilege call unexpectedly.");
+
+	// Try again to modify the object's DACL, now that we are the owner.
+	dwRes = SetNamedSecurityInfo(
+		pFilename,					 // name of the object
+		SE_FILE_OBJECT,              // type of object
+		DACL_SECURITY_INFORMATION,   // change only the object's DACL
+		NULL, NULL,                  // do not change owner or group
+		pACL,                        // DACL specified
+		NULL);                       // do not change SACL
+	uprintf("Return value for third SetNamedSecurityInfo call %u", dwRes);
+	IFFALSE_GOTOERROR(ERROR_SUCCESS == dwRes, "Third SetNamedSecurityInfo call failed.");
+
+done:
+	// Remove system and read-only from files
+	if (!restrictAccess) IFFALSE_PRINTERROR(SetAttributesForFilesInFolder(path, restrictAccess), "Error on SetFileAttributes");
+
+	retResult = TRUE;
+error:
+	if (pSIDAdmin) FreeSid(pSIDAdmin);
+	if (pSIDEveryone) FreeSid(pSIDEveryone);
+	if (pACL) LocalFree(pACL);
+	if (hToken) CloseHandle(hToken);
+
+	return retResult;
 }
