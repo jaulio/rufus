@@ -1,0 +1,13 @@
+artifacts:
+  - path: x86_32\$(configuration)\EndlessUsbTool.exe
+
+matrix:
+  fast_finish: true
+
+
+platform:
+  - Win32
+
+configuration:
+  - Debug
+  - Release
