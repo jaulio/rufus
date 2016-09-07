@@ -1,0 +1,15 @@
+artifacts:
+  - path: $(platform)\$(configuration)\EndlessUsbTool.exe
+
+matrix:
+  fast_finish: true
+
+build:
+  project: endless.sln
+
+platform:
+  - x86_32
+
+configuration:
+  - Debug
+  - Release

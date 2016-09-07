@@ -202,7 +202,9 @@ Global
 		{E00D20B3-6EBF-4706-BE56-84F510316330}.Release|x86.ActiveCfg = Release|Win32
 		{E00D20B3-6EBF-4706-BE56-84F510316330}.Release|x86.Build.0 = Release|Win32
 		{E00D20B3-6EBF-4706-BE56-84F510316330}.Release|x86_32.ActiveCfg = Release|Win32
+		{E00D20B3-6EBF-4706-BE56-84F510316330}.Release|x86_32.Build.0 = Release|Win32
 		{E00D20B3-6EBF-4706-BE56-84F510316330}.Release|x86_64.ActiveCfg = Release|Win32
+		{E00D20B3-6EBF-4706-BE56-84F510316330}.Release|x86_64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
