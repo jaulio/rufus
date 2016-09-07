@@ -304,6 +304,14 @@ select:disabled {
 	overflow: hidden;
 }
 
+.LanguageContainer {
+    margin-top: 20px;
+}
+
+.LanguageLabel {
+    margin-right: 10px;
+}
+
 /* Dual boot page */
 
 #DualBootInstallPage .ContentContainer {
@@ -315,7 +323,7 @@ select:disabled {
 #DualBootInstallPage .RoundedCornersContainer {
     background: transparent; /*older than IE6 */
     height: 230px;
-	margin-top: 35px;
+	margin-top: 25px;
 }
 
 #DualBootInstallPage .PageContent .FullWidthContent {
@@ -360,8 +368,8 @@ select:disabled {
 #DualBootRecommendation {
     font-family: LatoBold;
     font-size: 11px;
-    padding-top: 70px;
-    width: 70%;
+    padding-top: 50px;
+    width: 85%;
     text-align: center;
 }
 
@@ -373,16 +381,24 @@ select:disabled {
 /* First page */
 
 #FirstPage .ContentContainer {
-	height: 328px;
-	width: 670px;
+	height: 280px;
+	width: 600px;
 	border: 0;
-	border-bottom: 1px solid #d0d0d0;
+}
+
+#FirstPage .RoundedCornersContainer {
+    background: transparent;
 }
 
 .ContentPanel {
 	float: left;
-	width: 50%;
-	height: 330px;
+	width: 45%;
+	height: 270px;
+    margin-top: 20px;
+}
+
+#RightPanel {
+    float: right;
 }
 
 .ContentPanel * {
@@ -390,20 +406,20 @@ select:disabled {
 }
 
 .ContentPanel .Button {
-	margin-top: 35px;
+	margin-top: 25px;
 }
 
 .PanelImage {
 	width: 174px;
 	height: 124px;
 	background-repeat: no-repeat;
-	margin-top: 30px;
+	margin-top: 20px;
 	background-position: center; 
 }
 
 #LeftPaneImage {
 	background-image: url("res:/IMG/#202");
-	height: 99px;
+	height: 124px;
 }
 
 #RightPaneImage {
@@ -412,24 +428,25 @@ select:disabled {
 
 .PanelText {
 	width: 80%;
-	font-size: 13px;
-	margin-top: 25px;
+	font-size: 15px;
+	margin-top: 20px;
 	text-align: center;
-	height: 50px;
-}
-
-#LeftPanel .PanelText {
-	height: 75px;
+	height: 30px;
+    font-family: LatoBold;
 }
 
 #FirstPage .PageContent .FullWidthContent {
-	height: 25px;
+	/*height: 25px;*/
 	text-align: center;
 	padding-top: 10px;
 }
 
 .LanguageSelect {
 	width: 254px;	
+}
+
+#AdvancedInstallReminder {
+    font-size: 13px;
 }
 
 /* Select file Page */
@@ -529,10 +546,10 @@ select:disabled {
 	font-family: LatoBold;
 }
 
-#SelectFilePage .Fieldset .FieldsetTitle sup {
+/*#SelectFilePage .Fieldset .FieldsetTitle sup {
 	font-size: 16px;
 	font-family: LatoBold;
-}
+}*/
 
 #SelectFilePage .Fieldset .FieldsetSubtitle {
 	margin-top: 9px;
@@ -627,8 +644,10 @@ select:disabled {
 
 /* Select Storage Page */
 
-#StorageAgreementContainer {
-    padding-top: 50px;
+#StorageAgreementText {
+    padding-top: 10px;
+    font-size: 13px;
+	font-family: Lato;
 }
 
 #SelectStoragePage .ContentTitle {

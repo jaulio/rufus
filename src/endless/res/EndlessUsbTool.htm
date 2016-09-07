@@ -18,31 +18,29 @@
             </div>
 
             <div class="FullWidthContent PageContent">
-                <div class="ContentContainer" id="DualBootContainer">
-                    <div class="RoundedCornersContainer">
-                        <div id="LeftContent" class="DualBootPanel">
-                            <div id="DualBootContentTitle">Download and Install Endless on this PC</div>
-                            <div id="DualBootContentDescription">
-                                You will be able to choose between Endless and Windows when you start yout PC.<br />
-                                Under Windows, the apps and documents will not be altered.
-                            </div>
-                        </div>
-                        <div id="RightContent" class="DualBootPanel">
-                            <div class="Button ButtonBlue ButtonDisabled" id="DualBootInstallButonC"><div id="DualBootInstallButon">Install Endless</div></div>
-                            <div id="DualBootRecommendation">At least 32 GB free on the C:\ drive is recommended.</div>
-                        </div>
-                    </div>
-
-                    <div class="FullWidthContent" id="AdvancedOptionsText">
-                        To make an <b>Endless USB Stick</b> and see other install options <a id="AdvancedOptionsLink">click here</a>
-                    </div>
-                </div>
-                <div class="FullWidthContent">
+                <div class="FullWidthContent LanguageContainer">
+                    <label for="LanguageSelectDualBoot" id="DualBootLanguageLabel" class="LanguageLabel">Select Language</label>
                     <select id="LanguageSelectDualBoot" class="LanguageSelect">
                         <!-- These will be replaced at runtime by actual available languages in endless.loc -->
                         <option value="en_us">English (United States)</option>
                         <option value="ro_ro">Română (România)</option>
                     </select>
+                </div>
+                <div class="ContentContainer" id="DualBootContainer">
+                    <div class="RoundedCornersContainer">
+                        <div id="LeftContent" class="DualBootPanel">
+                            <div id="DualBootContentTitle">Download and Install Endless on this PC</div>
+                            <div id="DualBootContentDescription">Each time you start your PC, you will be able to choose between Endless and Windows. Your apps and files on Windows will not be affected.</div>
+                        </div>
+                        <div id="RightContent" class="DualBootPanel">
+                            <div class="Button ButtonBlue ButtonDisabled" id="DualBootInstallButonC"><div id="DualBootInstallButon">Install Endless</div></div>
+                            <div id="DualBootRecommendation">At least 32 GB free on the system drive is recommended.</div>
+                        </div>
+                    </div>
+
+                    <div class="FullWidthContent" id="AdvancedOptionsText">
+                        For advanced install options using an <b>Endless USB Stick</b>, <a id='AdvancedOptionsLink'>click here</a>.
+                    </div>
                 </div>
             </div>
 
@@ -62,31 +60,35 @@
             <div class="PageHeader">
                 <div class="Button"><div id="FirstPagePreviousButton">Previous</div></div>
 				<div class="Button ButtonRight ButtonClose" id="FirstPageCloseButton"></div>
-                <div id="FirstPageTitle" class="PageHeaderTitle">Endless USB Creator</div>
+                <div id="FirstPageTitle" class="PageHeaderTitle">Advanced Install Options</div>
             </div>
 
             <div class="FullWidthContent PageContent">
-				<div class="ContentContainer">
-					<div class="ContentPanel" id="LeftPanel">
-						<div class="PanelImage" id="LeftPaneImage"> </div>
-						<div class="PanelText" id="TryEndlessText">Run Endless directly from a USB drive. This option runs slower than the full install but you won't have to make changes to your computer.</div>
-						<div class="Button ButtonBlue"><div id="TryEndlessButton">Try Endless</div></div>
-					</div>
-					<div class="ContentPanel" id="RightPanel" >                    
-						<div class="PanelImage" id="RightPaneImage"></div>
-						<div class="PanelText" id="InstallEndlessText">To get our full experience, replace your current operating system and files with Endless OS and it's 100+ offline apps.</div>
-						<div class="Button ButtonBlue" id="InstallEndlessButtonC"><div id="InstallEndlessButton">Install Endless</div></div>
-					</div>
-				</div>
-                <div class="FullWidthContent">				
-                    <a id="CompareOptionsLink">Compare the two options</a>
-                </div>
-                <div class="FullWidthContent">
+                <div class="FullWidthContent LanguageContainer">
+                    <label for="LanguageSelect" id="AdvOptionsLanguageLabel" class="LanguageLabel">Select Language</label>
                     <select id="LanguageSelect" class="LanguageSelect">
                         <!-- These will be replaced at runtime by actual available languages in endless.loc -->
                         <option value="en_us">English (United States)</option>
                         <option value="ro_ro">Română (România)</option>
-                    </select> 
+                    </select>
+                </div>
+				<div class="ContentContainer">
+					<div class="ContentPanel RoundedCornersContainer" id="LeftPanel">
+                        <div class="PanelText" id="TryEndlessText">Try Endless OS by running it from a USB stick.</div>
+						<div class="PanelImage" id="LeftPaneImage"> </div>
+						<div class="Button ButtonBlue"><div id="TryEndlessButton">Create Live USB</div></div>
+					</div>
+					<div class="ContentPanel RoundedCornersContainer" id="RightPanel" >
+                        <div class="PanelText" id="InstallEndlessText">Install Endless OS on any computer using a USB stick.</div>
+						<div class="PanelImage" id="RightPaneImage"></div>
+						<div class="Button ButtonBlue" id="InstallEndlessButtonC"><div id="InstallEndlessButton">Create Reflasher USB</div></div>
+					</div>
+				</div>
+                <div class="FullWidthContent" id="AdvancedInstallReminder">
+                    To create an Endless USB Stick you will need a USB device with at least 8 GB of storage space.
+                </div>
+                <div class="FullWidthContent">
+                    <a id="CompareOptionsLink">Compare the two options</a>
                 </div>
             </div>
 
@@ -106,14 +108,14 @@
             <div class="PageHeader">
                 <div class="Button"><div id="SelectFilePreviousButton">Previous</div></div>
                 <div class="Button ButtonBlue ButtonRight" id="SelectFileNextButtonC"><div id="SelectFileNextButton">Next</div></div>
-                <div id="SelectFilePageTitle" class="PageHeaderTitle">Select Your OS</div>
+                <div id="SelectFilePageTitle" class="PageHeaderTitle">Select Your Endless OS Version</div>
             </div>
 
             <div class="PageContent">
                 <div class="FullWidthContent PageSubtitle">
 					<div id="SelectFileSubtitle">Select the Endless OS version you'd like to install.</div>
 					<div id="NoInternetConnection" class="hidden">
-						<div id="NoInternetConnectionTitle">Unfortunately, there is a problem connecting to the server.</div>
+						<div id="NoInternetConnectionTitle">Unfortunately, there was a problem connecting to the server.</div>
 						<div id="NoInternetConnectionSubtitle">Make sure you're <a id='ConnectedLink'>connected to the internet</a>, and if the problem persists, visit our <a id='ConnectedSupportLink'>support</a>.</div>
 					</div>
 				</div>
@@ -132,16 +134,16 @@
 				
 				<div class="ContentContainer" id="SelectFileLocalNotPresent">
 					<div class="Fieldset">
-						<div class="FieldsetTitle"><span>Endless OS <b id="LightVersionText">Light</b> <sup>beta</sup></span></div>
+						<div class="FieldsetTitle"><span>Endless OS <b id="LightVersionText">BASIC</b></span></div>
 						<div class="FieldsetSubtitle" id="LightDownloadSubtitle">---</div>
-						<div class="FieldsetDescription" id="LightDownloadDescription">This version is great for users who have access to the internet and can therefore install their favorite apps later. It does not contain any content pre-installed.</div>
+						<div class="FieldsetDescription" id="LightDownloadDescription">Includes basic features of Endless OS and the option to download more apps and content later. This version is best for computers with reliable internet access.</div>
 						<div id="DownloadLightButtonC" class="Button ButtonBlue ButtonDisabled"><div id="DownloadLightButton">Download EOS Light</div></div>
 					</div>
 					
 					<div class="Fieldset">
-						<div class="FieldsetTitle"><span>Endless OS <b id="FullVersionText">Full</b> <sup>beta</sup></span></div>
+						<div class="FieldsetTitle"><span>Endless OS <b id="FullVersionText">Full</b></span></div>
 						<div class="FieldsetSubtitle" id="FullDownloadSubtitle">---</div>
-						<div class="FieldsetDescription" id="FullDownloadDescription">Pre-loaded with over 100 apps and content., this version is great for installing with computers that won't have access to the internet.</div>
+						<div class="FieldsetDescription" id="FullDownloadDescription">Includes full Endless OS, preloaded with more than 100 apps and content. This version is ideal for computers without reliable internet access. Choose language for content and apps:</div>
 						<div class="FullWidthContent">
 							<select id="DownloadLanguageSelect" disabled="disabled" onchange="remoteSelectionChanged();">
 								<!-- These will be added at runtime -->
@@ -166,13 +168,13 @@
             <div class="PageHeader">
                 <div class="Button"><div id="SelectUSBPreviousButton">Previous</div></div>
                 <div id="SelectUSBNextButtonC" class="Button ButtonBlue ButtonRight ButtonDisabled"><div id="SelectUSBNextButton">Next</div></div>
-                <div id="SelectUSBPageTitle" class="PageHeaderTitle">Select USB Device</div>
+                <div id="SelectUSBPageTitle" class="PageHeaderTitle">Select USB Drive</div>
             </div>
 
             <div class="PageContent">
-                <div class="FullWidthContent PageSubtitle" id="SelectUSBSubtitle">Select the device where you'd like to install Endless OS.</div>
+                <div class="FullWidthContent PageSubtitle" id="SelectUSBSubtitle">Choose the USB device you would like to use.</div>
 				<div class="ContentContainer">
-                    <div class="ContentTitle" id="USBDisksFound">USB disk found:</div>
+                    <div class="ContentTitle" id="USBDisksFound">USB drive found:</div>
                     <select id="USBDiskSelect" disabled="disabled">
                         <!-- These will be added at runtime -->
                     </select>
@@ -192,7 +194,7 @@
 						You have a USB 3.0 device but it is inserted into a USB 2.0 port. Please insert it into a USB 3.0 port (usually blue) for the best experience.
 					</div>
                     <input type="checkbox" id="AgreementCheckbox" />
-                    <label for="AgreementCheckbox" id="AgreementCheckboxText">I agree to erase all of my files on this USB device.</label>
+                    <label for="AgreementCheckbox" id="AgreementCheckboxText">I understand that this will <b>erase all my files</b> on the USB device.</label>
                 </div>				
             </div>
 
@@ -209,17 +211,17 @@
         <div id="SelectStoragePage" class="WizardPage hidden">
             <div class="PageHeader">
                 <div class="Button"><div id="SelectStoragePreviousButton">Previous</div></div>
-                <div id="SelectStorageNextButtonC" class="Button ButtonBlue ButtonRight ButtonDisabled"><div id="SelectStorageNextButton">Next</div></div>
+                <div id="SelectStorageNextButtonC" class="Button ButtonBlue ButtonRight"><div id="SelectStorageNextButton">Next</div></div>
                 <div id="SelectStoragePageTitle" class="PageHeaderTitle">Storage Space for Endless OS</div>
             </div>
 
             <div class="PageContent">
                 <div class="FullWidthContent PageSubtitle">
-                    <div id="SelectStorageSubtitle">Select how much of your C:\ drive to dedicate to Endless OS.</div>
-                    <div id="SelectStorageAvailableSpace">You currently have X GB free on your Y GB C:\ drive.</div>
+                    <div id="SelectStorageSubtitle">Select how much of your Z:\ drive to dedicate to Endless OS.</div>
+                    <div id="SelectStorageAvailableSpace">You currently have X GB free on your Y GB Z:\ drive.</div>
                 </div>
                 <div class="ContentContainer">
-                    <div class="ContentTitle" id="StorageSpaceDescription">For Endless OS Full, we recommend selecting at least 32Gb of storage space.</div>
+                    <div class="ContentTitle" id="StorageSpaceDescription">For Endless OS (Basic / Full), we recommend selecting at least (16 GB / 32 GB) of storage space.</div>
                     <select id="StorageSpaceSelect">
                         <!-- These will be replaced at runtime -->
                         <option value="0">16 GB</option>
@@ -227,9 +229,8 @@
                         <option value="2">64 GB</option>
                     </select>
                 </div>
-                <div class="ContentContainer AgreementContainer" id="StorageAgreementContainer">
-                    <input type="checkbox" id="StorageAgreementCheckbox" />
-                    <label for="StorageAgreementCheckbox" id="StorageAgreementCheckboxText">I understand that this process could <b>delete some or all of my files</b>.</label>
+                <div class="ContentContainer AgreementContainer" id="StorageAgreementText">
+                    Note: We recommend backing up any important files before continuing. Should you experience any problems with your computer after installation, you can find help at <a id="StorageSupportLink">Endless Support</a>.
                 </div>
             </div>
 

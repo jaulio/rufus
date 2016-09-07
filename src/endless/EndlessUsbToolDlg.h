@@ -95,7 +95,6 @@ protected:
 	// Select Storage Page handlers
 	HRESULT OnSelectStoragePreviousClicked(IHTMLElement* pElement);
 	HRESULT OnSelectStorageNextClicked(IHTMLElement* pElement);
-	HRESULT OnStorageAgreementCheckboxChanged(IHTMLElement* pElement);
 	HRESULT OnSelectedStorageSizeChanged(IHTMLElement* pElement);
 
     // Install Page handlers

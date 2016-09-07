@@ -160,10 +160,11 @@ DWORD usbDevicesCount;
 //Select Storage page elements
 #define ELEMENT_SELSTORAGE_PREV_BUTTON  "SelectStoragePreviousButton"
 #define ELEMENT_SELSTORAGE_NEXT_BUTTON  "SelectStorageNextButton"
-#define ELEMENT_SELSTORAGE_AGREEMENT    "StorageAgreementCheckbox"
 #define ELEMENT_STORAGE_SELECT          "StorageSpaceSelect"
 #define ELEMENT_STORAGE_DESCRIPTION     "StorageSpaceDescription"
 #define ELEMENT_STORAGE_AVAILABLE       "SelectStorageAvailableSpace"
+#define ELEMENT_STORAGE_MESSAGE			"SelectStorageSubtitle"
+#define ELEMENT_STORAGE_SUPPORT_LINK	"StorageSupportLink"
 
 //Installing page elements
 #define ELEMENT_SECUREBOOT_HOWTO        "SecureBootHowTo"
@@ -450,8 +451,8 @@ BEGIN_DHTML_EVENT_MAP(CEndlessUsbToolDlg)
 	// Select Storage Page handlers
 	DHTML_EVENT_ONCLICK(_T(ELEMENT_SELSTORAGE_PREV_BUTTON), OnSelectStoragePreviousClicked)
 	DHTML_EVENT_ONCLICK(_T(ELEMENT_SELSTORAGE_NEXT_BUTTON), OnSelectStorageNextClicked)
-	DHTML_EVENT_ONCHANGE(_T(ELEMENT_SELSTORAGE_AGREEMENT), OnStorageAgreementCheckboxChanged)
 	DHTML_EVENT_ONCHANGE(_T(ELEMENT_STORAGE_SELECT), OnSelectedStorageSizeChanged)
+	DHTML_EVENT_ONCLICK(_T(ELEMENT_STORAGE_SUPPORT_LINK), OnLinkClicked)
 
 	// Installing Page handlers
 	DHTML_EVENT_ONCLICK(_T(ELEMENT_SECUREBOOT_HOWTO), OnLinkClicked)    
@@ -1879,8 +1880,11 @@ HRESULT CEndlessUsbToolDlg::OnLinkClicked(IHTMLElement* pElement)
         msg_id = MSG_314;
     } else if (id == _T(ELEMENT_CONNECTED_LINK)) {
         WinExec("c:\\windows\\system32\\control.exe ncpa.cpl", SW_NORMAL);
-    } else if (id == _T(ELEMENT_USBBOOT_HOWTO)) {
-        msg_id = MSG_329;
+	} else if (id == _T(ELEMENT_USBBOOT_HOWTO)) {
+		msg_id = MSG_329;
+	} else if (id == _T(ELEMENT_STORAGE_SUPPORT_LINK)) {
+		AfxMessageBox(L"Link not present yet.");
+		return S_OK;
     } else {
         msg_id = 0;
         uprintf("Unknown link clicked %ls", id);
@@ -2945,23 +2949,6 @@ HRESULT CEndlessUsbToolDlg::OnSelectStorageNextClicked(IHTMLElement *pElement)
 
 	return S_OK;
 }
-HRESULT CEndlessUsbToolDlg::OnStorageAgreementCheckboxChanged(IHTMLElement* pElement)
-{
-	FUNCTION_ENTER;
-
-	CComPtr<IHTMLOptionButtonElement> checkboxElem;
-	VARIANT_BOOL checked = VARIANT_FALSE;
-
-	HRESULT hr = pElement->QueryInterface(&checkboxElem);
-	IFFALSE_RETURN_VALUE(SUCCEEDED(hr) && checkboxElem != NULL, "Error querying for IHTMLOptionButtonElement.", S_OK);
-
-	hr = checkboxElem->get_checked(&checked);
-	IFFALSE_RETURN_VALUE(SUCCEEDED(hr), "Error querying for IHTMLOptionButtonElement.", S_OK);
-
-	CallJavascript(_T(JS_ENABLE_BUTTON), CComVariant(HTML_BUTTON_ID(_T(ELEMENT_SELSTORAGE_NEXT_BUTTON))), checked);
-
-	return S_OK;
-}
 
 HRESULT CEndlessUsbToolDlg::OnSelectedStorageSizeChanged(IHTMLElement* pElement)
 {
@@ -3036,7 +3023,6 @@ void CEndlessUsbToolDlg::GoToSelectStoragePage()
 
 	// Enable/disable ui elements based on space availability
 	CallJavascript(_T(JS_ENABLE_ELEMENT), CComVariant(_T(ELEMENT_STORAGE_SELECT)), CComVariant(enoughBytesAvailable));
-	CallJavascript(_T(JS_ENABLE_ELEMENT), CComVariant(_T(ELEMENT_SELSTORAGE_AGREEMENT)), CComVariant(enoughBytesAvailable));
 
 	// update messages with needed space based on selected version
 	CStringA osVersion = lmprintf(isBaseImage ? MSG_400 : MSG_316);
@@ -3044,8 +3030,11 @@ void CEndlessUsbToolDlg::GoToSelectStoragePage()
 	CString message = UTF8ToCString(lmprintf(MSG_337, osVersion, osSizeText));
 	SetElementText(_T(ELEMENT_STORAGE_DESCRIPTION), CComBSTR(message));
 
-	message = UTF8ToCString(lmprintf(MSG_341, freeSize, totalSize));
+	message = UTF8ToCString(lmprintf(MSG_341, freeSize, totalSize, "C:\\"));
 	SetElementText(_T(ELEMENT_STORAGE_AVAILABLE), CComBSTR(message));
+
+	message = UTF8ToCString(lmprintf(MSG_342, "C:\\"));
+	SetElementText(_T(ELEMENT_STORAGE_MESSAGE), CComBSTR(message));
 
 	// Clear existing elements from the drop down
 	hr = GetSelectElement(_T(ELEMENT_STORAGE_SELECT), selectElement);
