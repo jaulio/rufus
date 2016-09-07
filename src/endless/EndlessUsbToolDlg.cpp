@@ -4775,19 +4775,19 @@ error:
 bool CEndlessUsbToolDlg::Has64BitSupport()
 {
 	// MSDN: https://msdn.microsoft.com/en-us/library/hskdteyh%28v=vs.100%29.aspx?f=255&MSPPError=-2147217396
-	// In the example: "b64Available = (CPUInfo[3] & 0x20000000) || false;"
-	// Tested it on Windows 8.1 64 bit and it still says 64 bit is not supported
-	//int CPUInfo[4];
-	//__cpuid(CPUInfo, 0);
-	//return (CPUInfo[3] & 0x20000000) || false;
+	int CPUInfo[4];
 
-	// Tested on Windows 8 64 bit and Windows XP 32 bit
-	// Haven't tested it on a 64 bit system running a 32 bit OS
-	SYSTEM_INFO systemInfo;
-	GetNativeSystemInfo(&systemInfo);
-	uprintf("GetNativeSystemInfo: dwProcessorType=%d, wProcessorArchitecture=%hu", systemInfo.dwProcessorType, systemInfo.wProcessorArchitecture);
+	// first check if extended data is available, which is always true on 64-bit
+	__cpuid(CPUInfo, 0x80000000);
+	if (!(CPUInfo[0] & 0x80000000))
+		return false;
 
-	return systemInfo.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_AMD64;
+	// request extended data, bit 29 is set on 64-bit systems
+	__cpuid(CPUInfo, 0x80000001);
+	if (CPUInfo[3] & 0x20000000)
+		return true;
+
+	return false;
 }
 
 BOOL CEndlessUsbToolDlg::SetAttributesForFilesInFolder(CString path, bool addAttributes)
