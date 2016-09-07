@@ -3012,11 +3012,14 @@ void CEndlessUsbToolDlg::GoToSelectStoragePage()
 	neededSize += bytesInGig;
 	int neededGigs = (int) (neededSize / bytesInGig);
 
-	// get available space on C:
-	IFFALSE_RETURN(GetDiskFreeSpaceEx(L"C:\\", &freeBytesAvailable, &totalNumberOfBytes, &totalNumberOfFreeBytes) != 0, "Error on GetDiskFreeSpace");
+	CStringW systemDrive = GetSystemDrive();
+	CStringA systemDriveA = ConvertUnicodeToUTF8(systemDrive);
+
+	// get available space on system drive
+	IFFALSE_RETURN(GetDiskFreeSpaceEx(systemDrive, &freeBytesAvailable, &totalNumberOfBytes, &totalNumberOfFreeBytes) != 0, "Error on GetDiskFreeSpace");
 	totalSize = SizeToHumanReadable(totalNumberOfBytes.QuadPart, FALSE, use_fake_units);
 	freeSize = SizeToHumanReadable(freeBytesAvailable.QuadPart, FALSE, use_fake_units);
-	uprintf("Available space on drive C:\\ is %s out of %s; we need %s", freeSize, totalSize, SizeToHumanReadable(neededSize, FALSE, use_fake_units));
+	uprintf("Available space on drive %s is %s out of %s; we need %s", systemDrive, freeSize, totalSize, SizeToHumanReadable(neededSize, FALSE, use_fake_units));
 	maxAvailableGigs = (int) ((freeBytesAvailable.QuadPart - bytesInGig) / bytesInGig);
 
 	bool enoughBytesAvailable = (freeBytesAvailable.QuadPart - bytesInGig) > neededSize;
@@ -3030,10 +3033,10 @@ void CEndlessUsbToolDlg::GoToSelectStoragePage()
 	CString message = UTF8ToCString(lmprintf(MSG_337, osVersion, osSizeText));
 	SetElementText(_T(ELEMENT_STORAGE_DESCRIPTION), CComBSTR(message));
 
-	message = UTF8ToCString(lmprintf(MSG_341, freeSize, totalSize, "C:\\"));
+	message = UTF8ToCString(lmprintf(MSG_341, freeSize, totalSize, systemDriveA));
 	SetElementText(_T(ELEMENT_STORAGE_AVAILABLE), CComBSTR(message));
 
-	message = UTF8ToCString(lmprintf(MSG_342, "C:\\"));
+	message = UTF8ToCString(lmprintf(MSG_342, systemDriveA));
 	SetElementText(_T(ELEMENT_STORAGE_MESSAGE), CComBSTR(message));
 
 	// Clear existing elements from the drop down
@@ -4509,7 +4512,7 @@ DWORD WINAPI CEndlessUsbToolDlg::SetupDualBoot(LPVOID param)
 	wchar_t fileSystemType[MAX_PATH + 1];
 
 	// TODO: Should we detect what the system partition is or just assume it's on C:\?
-	systemDriveLetter = L"C:\\";
+	systemDriveLetter = GetSystemDrive();
 	endlessFilesPath = systemDriveLetter + PATH_ENDLESS_SUBDIRECTORY;
 
 	IFFALSE_PRINTERROR(ChangeAccessPermissions(endlessFilesPath, false), "Error on granting Endless files permissions.");
@@ -4944,4 +4947,20 @@ error:
 	if (hToken) CloseHandle(hToken);
 
 	return retResult;
+}
+
+CStringW CEndlessUsbToolDlg::GetSystemDrive()
+{
+	CStringW systemDrive(L"C:\\");
+	wchar_t windowsPath[MAX_PATH];
+	HRESULT hr = SHGetFolderPathW(NULL, CSIDL_WINDOWS, NULL, 0, windowsPath);
+
+	if (hr == S_OK) {
+		systemDrive = windowsPath;
+		systemDrive = systemDrive.Left(3);
+	} else {
+		uprintf("SHGetFolderPath returned %X", hr);
+	}
+
+	return systemDrive;
 }
