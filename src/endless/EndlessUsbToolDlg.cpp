@@ -4501,6 +4501,11 @@ error:
 #define DB_PROGRESS_COPY_GRUB_FOLDER	98
 #define DB_PROGRESS_MBR_OR_EFI_SETUP	100
 
+#define REGKEY_UTC_TIME_PATH	L"SYSTEM\\CurrentControlSet\\Control\\TimeZoneInformation"
+#define REGKEY_UTC_TIME			L"RealTimeIsUniversal"
+#define REGKEY_FASTBOOT_PATH	L"SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Power"
+#define REGKEY_FASTBOOT			L"HiberbootEnabled"
+
 DWORD WINAPI CEndlessUsbToolDlg::SetupDualBoot(LPVOID param)
 {
 	FUNCTION_ENTER;
@@ -4570,6 +4575,12 @@ DWORD WINAPI CEndlessUsbToolDlg::SetupDualBoot(LPVOID param)
 
 	// set Endless file permissions
 	IFFALSE_PRINTERROR(ChangeAccessPermissions(endlessFilesPath, true), "Error on setting Endless files permissions.");
+
+	// set the registry key for Windows clock in UTC
+	IFFALSE_PRINTERROR(SetEndlessRegistryKey(HKEY_LOCAL_MACHINE, REGKEY_UTC_TIME_PATH, REGKEY_UTC_TIME, CComVariant(1)), "Error on setting Windows clock to UTC.");
+
+	// disable Fast Start (aka Hiberboot) so that the NTFS partition is always cleanly unmounted at shutdown:
+	IFFALSE_PRINTERROR(SetEndlessRegistryKey(HKEY_LOCAL_MACHINE, REGKEY_FASTBOOT_PATH, REGKEY_FASTBOOT, CComVariant(1)), "Error on disabling fastboot.");
 
 	UpdateProgress(OP_SETUP_DUALBOOT, DB_PROGRESS_MBR_OR_EFI_SETUP);
 
@@ -4963,4 +4974,51 @@ CStringW CEndlessUsbToolDlg::GetSystemDrive()
 	}
 
 	return systemDrive;
+}
+
+#define REGKEY_BACKUP_PREFIX	L"EndlessBackup"
+
+BOOL CEndlessUsbToolDlg::SetEndlessRegistryKey(HKEY parentKey, const CString &keyPath, const CString &keyName, CComVariant keyValue, bool createBackup)
+{
+	CRegKey registryKey;
+	LSTATUS result;
+	CComVariant backupValue;
+
+	uprintf("SetEndlessRegistryKey called with path '%ls' and key '%ls'", keyPath, keyName);
+
+	result = registryKey.Open(parentKey, keyPath, KEY_ALL_ACCESS);
+	IFFALSE_RETURN_VALUE(result == ERROR_SUCCESS, "Error opening registry key.", FALSE);
+
+	backupValue.ChangeType(VT_NULL);
+	switch (keyValue.vt) {
+		case VT_I4:
+		case VT_UI4:
+			if (createBackup) {
+				DWORD dwValue;
+				result = registryKey.QueryDWORDValue(CString(REGKEY_BACKUP_PREFIX) + keyName, dwValue);
+				if (result == ERROR_SUCCESS) {
+					uprintf("There already is a backup created for '%ls' in '%ls'. Aborting creating a second backup", keyName, keyPath);
+					createBackup = false;
+					break;
+				}
+
+				result = registryKey.QueryDWORDValue(keyName, dwValue);
+				if (result == ERROR_SUCCESS) backupValue = dwValue;
+				else backupValue = DWORD_MAX;
+			}
+			result = registryKey.SetDWORDValue(keyName, keyValue.intVal);
+			break;
+		default:
+			uprintf("ERROR: variant type %d not handled", keyValue.vt);
+			return FALSE;
+	}
+
+	IFFALSE_RETURN_VALUE(result == ERROR_SUCCESS, "Error on setting key value", FALSE);
+
+	if (createBackup && backupValue.vt != VT_NULL) {
+		backupValue.vt = keyValue.vt;
+		IFFALSE_PRINTERROR(SetEndlessRegistryKey(parentKey, keyPath, CString(REGKEY_BACKUP_PREFIX) + keyName, backupValue, false), "Error on creating backup key");
+	}
+
+	return TRUE;
 }
