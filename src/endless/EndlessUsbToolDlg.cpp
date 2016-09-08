@@ -4,6 +4,7 @@
 #include "stdafx.h"
 #include "EndlessUsbTool.h"
 #include "EndlessUsbToolDlg.h"
+#include "Analytics.h"
 #include "afxdialogex.h"
 
 #include <windowsx.h>
@@ -1478,6 +1479,8 @@ void CEndlessUsbToolDlg::ChangePage(PCTSTR newPage)
     currentPage = newPage;
     CallJavascript(_T(JS_SHOW_ELEMENT), CComVariant(currentPage), CComVariant(TRUE));
 
+	Analytics::instance()->screenTracking(currentPage);
+
 	return;
 }
 
@@ -1553,6 +1556,34 @@ void CEndlessUsbToolDlg::ErrorOccured(ErrorCause_t errorCause)
     }
 
     ChangePage(_T(ELEMENT_ERROR_PAGE));
+
+	Analytics::instance()->exceptionTracking(ErrorCauseToStr(errorCause), FALSE);
+}
+
+HRESULT CEndlessUsbToolDlg::GetSelectedOptionElementText(CComPtr<IHTMLSelectElement> selectElem, CString &text)
+{
+	IHTMLOptionElement *optionElem;
+	HRESULT hr;
+	IDispatch *dispOpt;
+	long idx;
+	_variant_t index;
+	hr = selectElem->get_selectedIndex(&idx);
+	IFFALSE_GOTOERROR(SUCCEEDED(hr), "Error getting selected index");
+	index = idx;
+	hr = selectElem->item(index, index, &dispOpt);
+	IFFALSE_GOTOERROR(SUCCEEDED(hr), "Error accessing select element index");
+	hr = dispOpt->QueryInterface(IID_IHTMLOptionElement, (void **) &optionElem);
+	dispOpt->Release();
+	IFFALSE_GOTOERROR(SUCCEEDED(hr), "Error getting option element");
+	BSTR bstrText;
+	hr = optionElem->get_text(&bstrText);
+	optionElem->Release();
+	IFFALSE_GOTOERROR(SUCCEEDED(hr), "Error getting option text");
+	text = CString(bstrText);
+	SysFreeString(bstrText);
+
+error:
+	return hr;
 }
 
 HRESULT CEndlessUsbToolDlg::GetSelectElement(PCTSTR selectId, CComPtr<IHTMLSelectElement> &selectElem)
@@ -1664,6 +1695,8 @@ HRESULT CEndlessUsbToolDlg::OnTryEndlessSelected(IHTMLElement* pElement)
 {
     FUNCTION_ENTER;
 
+	Analytics::instance()->eventTracking(_T("UI"), _T("USBType"), _T("Live"));
+
     m_liveInstall = true;
     GoToSelectFilePage();
 
@@ -1675,6 +1708,8 @@ HRESULT CEndlessUsbToolDlg::OnInstallEndlessSelected(IHTMLElement* pElement)
     IFFALSE_RETURN_VALUE(!IsButtonDisabled(pElement), "OnInstallEndlessSelected: Button is disabled. ", S_OK);
 
     FUNCTION_ENTER;
+
+	Analytics::instance()->eventTracking(_T("UI"), _T("USBType"), _T("Installer"));
 
     m_liveInstall = false;
     GoToSelectFilePage();
@@ -2378,6 +2413,10 @@ HRESULT CEndlessUsbToolDlg::OnSelectFileNextClicked(IHTMLElement* pElement)
     SetElementText(_T(ELEMENT_SELUSB_NEW_DISK_NAME), CComBSTR(selectedImage));
     SetElementText(_T(ELEMENT_SELUSB_NEW_DISK_SIZE), CComBSTR(selectedSize));
 
+	CString imageType = _T("RemoteImage");
+	if (m_useLocalFile) imageType = _T("LocalImage");
+	Analytics::instance()->eventTracking(_T("UI"), imageType, selectedImage);
+
 	ChangePage(_T(ELEMENT_USB_PAGE));
 
 	return S_OK;
@@ -2497,12 +2536,11 @@ HRESULT CEndlessUsbToolDlg::OnDownloadFullButtonClicked(IHTMLElement* pElement)
     CComPtr<IHTMLEventObj> spEo;
     CComQIPtr<IHTMLDocument4> spDoc4(m_spHtmlDoc); // pDoc Document
     spDoc4->createEventObject(NULL, &spEo);
-
     CComQIPtr<IDispatch> spDisp(spEo);
     CComVariant var(spDisp);
     VARIANT_BOOL bCancel = VARIANT_FALSE;
     spElem3->fireEvent(L"onchange", &var, &bCancel);
-    
+ 
     OnSelectFileNextClicked(pElement);
 
     return S_OK;
@@ -2524,6 +2562,17 @@ HRESULT CEndlessUsbToolDlg::OnSelectUSBNextClicked(IHTMLElement* pElement)
     IFFALSE_RETURN_VALUE(!IsButtonDisabled(pElement), "OnSelectUSBNextClicked: Button is disabled. ", S_OK);
 
     FUNCTION_ENTER;
+
+	CComPtr<IHTMLSelectElement> selElem;
+	HRESULT hr;
+
+	hr = GetSelectElement(_T(ELEMENT_SELUSB_USB_DRIVES), selElem);
+	if (hr == S_OK) {
+		CString selUSBDrive;
+		hr = GetSelectedOptionElementText(selElem, selUSBDrive);
+		if (hr == S_OK)
+			Analytics::instance()->eventTracking(_T("UI"), _T("USBDisk"), selUSBDrive);
+	}
 
 	LeavingDevicesPage();
 
