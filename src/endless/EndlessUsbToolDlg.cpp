@@ -1833,6 +1833,7 @@ HRESULT CEndlessUsbToolDlg::OnLanguageChanged(IHTMLElement* pElement)
 	IFFALSE_GOTOERROR(SUCCEEDED(hr) && selectElement != NULL, "Error getting selected language value");
 
 	char* p = _com_util::ConvertBSTRToString(selectedValue);
+	Analytics::instance()->setLanguage(CString(p));
 	m_selectedLocale = get_locale_from_name(p, TRUE);
 	delete[] p;
 	selected_langid = get_language_id(m_selectedLocale);

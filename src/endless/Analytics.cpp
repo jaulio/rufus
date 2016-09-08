@@ -65,6 +65,7 @@ Analytics::Analytics()
 	FUNCTION_ENTER;
 	m_trackingId = CString(_T(TRACKING_ID));
 	loadUuid(m_clientId);
+	m_language = "en-US";
 	m_workerThread = AfxBeginThread(threadSendRequest, NULL);
 }
 
@@ -141,6 +142,11 @@ void Analytics::exceptionTracking(const CString &description, BOOL fatal)
 	sendRequest(body);
 }
 
+void Analytics::setLanguage(const CString &language)
+{
+	m_language = language;
+}
+
 void Analytics::sendRequest(const CString &body, BOOL lastRequest)
 {
 	FUNCTION_ENTER;
@@ -197,5 +203,5 @@ void Analytics::urlEncode(const CString &in, CString &out)
 
 void Analytics::prefixId(CString &id)
 {
-	id.Format(_T("v=1&tid=%s&cid=%s&an=Endless%%20Installer&av=%s&"), m_trackingId, m_clientId, _T(RELEASE_VER_STR));
+	id.Format(_T("v=1&tid=%s&cid=%s&an=Endless%%20Installer&av=%s&ul=%s&"), m_trackingId, m_clientId, _T(RELEASE_VER_STR), m_language);
 }

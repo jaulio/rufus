@@ -13,6 +13,8 @@ public:
 	void eventTracking(const CString &category, const CString &action, const CString &label = CString(), int value = -1);
 	void exceptionTracking(const CString &description, BOOL fatal);
 
+	void setLanguage(const CString &language);
+
 private:
 	void sendRequest(const CString &body, BOOL lastRequest = FALSE);
 	BOOL disabled();
@@ -24,5 +26,6 @@ private:
 	CString m_trackingId;
 	CString m_clientId;
 	BOOL m_disabled;
+	CString m_language;
 	CWinThread *m_workerThread;
 };
