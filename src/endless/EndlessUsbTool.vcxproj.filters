@@ -193,6 +193,9 @@
     </ClCompile>
     <ClCompile Include="Analytics.cpp">
       <Filter>Source Files</Filter>
+	</ClCompile>
+    <ClCompile Include="UEFIBootSetup.cpp">
+      <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -224,9 +227,6 @@
       <Filter>Resource Files\Fonts</Filter>
     </None>
     <None Include="res\EndlessFonts.css">
-      <Filter>Resource Files</Filter>
-    </None>
-    <None Include="..\..\res\uefi\uefi-ntfs.img">
       <Filter>Resource Files</Filter>
     </None>
     <None Include="res\endless.loc">

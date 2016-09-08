@@ -6,6 +6,8 @@
 
 #include "GeneralCode.h"
 
+#include <vector>
+
 /// IUnknown methods declaration macro
 #define DECLARE_IUNKNOWN \
     STDMETHOD_(ULONG, AddRef)(void); \
@@ -16,6 +18,7 @@ typedef enum DownloadType {
     DownloadTypeReleseJson,
     DownloadTypeLiveImage,
     DownloadTypeInstallerImage,
+	DownloadTypeDualBootFiles,
     DownloadTypeMax
 } DownloadType_t;
 
@@ -26,6 +29,7 @@ static LPCTSTR DownloadTypeToString(DownloadType_t type)
         TOSTR(DownloadTypeReleseJson);
         TOSTR(DownloadTypeLiveImage);
         TOSTR(DownloadTypeInstallerImage);
+		TOSTR(DownloadTypeDualBootFiles);
         default: return _T("UNKNOWN_DOWNLOAD_TYPE");
     }
 }
@@ -39,7 +43,7 @@ typedef struct DownloadStatus {
     HRESULT errorCode;
 } DownloadStatus_t;
 
-typedef std::initializer_list<LPCTSTR> ListOfStrings;
+typedef std::vector<CString> ListOfStrings;
 
 static const DownloadStatus_t DownloadStatusNull = { {0, 0, 0, 0}, false, false, L"" };
 

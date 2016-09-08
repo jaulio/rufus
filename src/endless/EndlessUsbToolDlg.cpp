@@ -10,6 +10,8 @@
 #include <windowsx.h>
 #include <dbt.h>
 #include <atlpath.h>
+#include <intrin.h>
+#include <Aclapi.h>
 
 #include "json/json.h"
 #include <fstream>
@@ -23,8 +25,11 @@ extern "C" {
 #include "msapi_utf8.h"
 #include "drive.h"
 #include "bled/bled.h"
+#include "file.h"
+#include "ms-sys/inc/br.h"
 
 #include "usb.h"
+#include "mbr_grub2.h"
 
 // RADU: try to remove the need for all of these
 OPENED_LIBRARIES_VARS;
@@ -90,9 +95,11 @@ DWORD usbDevicesCount;
 #define HTML_BUTTON_ID(__id__)          (__id__##"C")
 // HTML element ids and classes
 // pages
+#define ELEMENT_DUALBOOT_PAGE           "DualBootInstallPage"
 #define ELEMENT_FIRST_PAGE              "FirstPage"
 #define ELEMENT_FILE_PAGE               "SelectFilePage"
 #define ELEMENT_USB_PAGE                "SelectUSBPage"
+#define ELEMENT_STORAGE_PAGE            "SelectStoragePage"
 #define ELEMENT_INSTALL_PAGE            "InstallingPage"
 #define ELEMENT_SUCCESS_PAGE            "ThankYouPage"
 #define ELEMENT_ERROR_PAGE              "ErrorPage"
@@ -101,12 +108,21 @@ DWORD usbDevicesCount;
 #define CLASS_PAGE_HEADER_TITLE         "PageHeaderTitle"
 #define CLASS_PAGE_HEADER               "PageHeader"
 #define CLASS_BUTTON_DISABLED           "ButtonDisabled"
+
+//Dual boot elements
+#define ELEMENT_LANGUAGE_DUALBOOT       "LanguageSelectDualBoot"
+#define ELEMENT_DUALBOOT_CLOSE_BUTTON   "DualBootPageCloseButton"
+#define ELEMENT_DUALBOOT_ADVANCED_LINK  "AdvancedOptionsLink"
+#define ELEMENT_DUALBOOT_INSTALL_BUTTON "DualBootInstallButon"
+
 //First page elements
 #define ELEMENT_TRY_BUTTON              "TryEndlessButton"
 #define ELEMENT_INSTALL_BUTTON          "InstallEndlessButton"
 #define ELEMENT_COMPARE_OPTIONS         "CompareOptionsLink"
 #define ELEMENT_LANGUAGE_SELECT         "LanguageSelect"
 #define ELEMENT_FIRST_CLOSE_BUTTON      "FirstPageCloseButton"
+#define ELEMENT_FIRST_PREV_BUTTON       "FirstPagePreviousButton"
+
 //Select File page elements
 #define ELEMENT_SELFILE_PREV_BUTTON     "SelectFilePreviousButton"
 #define ELEMENT_SELFILE_NEXT_BUTTON     "SelectFileNextButton"
@@ -141,6 +157,15 @@ DWORD usbDevicesCount;
 #define ELEMENT_SELUSB_NEW_DISK_SIZE    "NewDiskSize"
 #define ELEMENT_SELUSB_AGREEMENT        "AgreementCheckbox"
 #define ELEMENT_SELUSB_SPEEDWARNING     "UsbSpeedWarning"
+
+//Select Storage page elements
+#define ELEMENT_SELSTORAGE_PREV_BUTTON  "SelectStoragePreviousButton"
+#define ELEMENT_SELSTORAGE_NEXT_BUTTON  "SelectStorageNextButton"
+#define ELEMENT_STORAGE_SELECT          "StorageSpaceSelect"
+#define ELEMENT_STORAGE_DESCRIPTION     "StorageSpaceDescription"
+#define ELEMENT_STORAGE_AVAILABLE       "SelectStorageAvailableSpace"
+#define ELEMENT_STORAGE_MESSAGE			"SelectStorageSubtitle"
+#define ELEMENT_STORAGE_SUPPORT_LINK	"StorageSupportLink"
 
 //Installing page elements
 #define ELEMENT_SECUREBOOT_HOWTO        "SecureBootHowTo"
@@ -236,6 +261,7 @@ enum endless_action_type {
     OP_VERIFYING_SIGNATURE,
     OP_FLASHING_DEVICE,
     OP_FILE_COPY,
+	OP_SETUP_DUALBOOT,
     OP_NO_OPERATION_IN_PROGRESS,
     OP_ENDLESS_MAX
 };
@@ -243,6 +269,8 @@ enum endless_action_type {
 #define TID_UPDATE_FILES                TID_REFRESH_TIMER + 1
 
 //#define ENABLE_JSON_COMPRESSION 1
+
+#define BOOT_COMPONENTS_FOLDER	"EndlessBoot"
 
 #define RELEASE_JSON_URLPATH    _T("https://d1anzknqnc1kmb.cloudfront.net/")
 #define JSON_LIVE_FILE          "releases-eos.json"
@@ -255,6 +283,8 @@ enum endless_action_type {
 #define JSON_URL(__file__)      RELEASE_JSON_URLPATH _T(__file__)
 #endif // ENABLE_JSON_COMPRESSION
 #define SIGNATURE_FILE_EXT      L".asc"
+#define	BOOT_ARCHIVE_SUFFIX		L".boot.zip"
+#define	IMAGE_FILE_EXT			L".img"
 
 #define ENDLESS_OS "Endless OS"
 #define EOS_PRODUCT_TEXT            "eos"
@@ -262,6 +292,14 @@ enum endless_action_type {
 #define EOS_NONFREE_PRODUCT_TEXT    "eosnonfree"
 #define EOS_OEM_PRODUCT_TEXT		"eosoem"
 const wchar_t* mainWindowTitle = L"Endless USB Creator";
+
+#define ALL_FILES					L"*.*"
+
+
+//#define HARDCODED_PATH L"release/3.0.2/eos-amd64-amd64/base/eos-eos3.0-amd64-amd64.160827-104530.base"
+#define HARDCODED_PATH L"eosnonfree-amd64-amd64/master/base/160830-025208/eosnonfree-master-amd64-amd64.160830-025208.base"
+CString hardcoded_BootPath(HARDCODED_PATH BOOT_ARCHIVE_SUFFIX);
+CString hardcoded_BootPathAsc(HARDCODED_PATH BOOT_ARCHIVE_SUFFIX SIGNATURE_FILE_EXT);
 
 // Radu: How much do we need to reserve for the exfat partition header?
 // reserve 10 mb for now; this will also include the signature file
@@ -328,6 +366,7 @@ static LPCTSTR OperationToStr(int op)
     TOSTR(OP_VERIFYING_SIGNATURE);
     TOSTR(OP_FLASHING_DEVICE);
     TOSTR(OP_FILE_COPY);
+	TOSTR(OP_SETUP_DUALBOOT);
     TOSTR(OP_NO_OPERATION_IN_PROGRESS);
     TOSTR(OP_ENDLESS_MAX);
     default: return _T("UNKNOWN_OPERATION");
@@ -374,7 +413,13 @@ extern "C" void UpdateProgress(int op, float percent)
 BEGIN_DHTML_EVENT_MAP(CEndlessUsbToolDlg)
 	// For dragging the window
 	DHTML_EVENT_CLASS(DISPID_HTMLELEMENTEVENTS_ONMOUSEDOWN, _T(CLASS_PAGE_HEADER_TITLE), OnHtmlMouseDown)
-    DHTML_EVENT_CLASS(DISPID_HTMLELEMENTEVENTS_ONMOUSEDOWN, _T(CLASS_PAGE_HEADER), OnHtmlMouseDown)
+	DHTML_EVENT_CLASS(DISPID_HTMLELEMENTEVENTS_ONMOUSEDOWN, _T(CLASS_PAGE_HEADER), OnHtmlMouseDown)
+
+	// Dual Boot Page handlers
+	DHTML_EVENT_ONCHANGE(_T(ELEMENT_LANGUAGE_DUALBOOT), OnLanguageChanged)
+	DHTML_EVENT_ONCLICK(_T(ELEMENT_DUALBOOT_CLOSE_BUTTON), OnCloseAppClicked)
+	DHTML_EVENT_ONCLICK(_T(ELEMENT_DUALBOOT_ADVANCED_LINK), OnAdvancedOptionsClicked)
+	DHTML_EVENT_ONCLICK(_T(ELEMENT_DUALBOOT_INSTALL_BUTTON), OnInstallDualBootClicked)
 
 	// First Page Handlers		
     DHTML_EVENT_ONCLICK(_T(ELEMENT_TRY_BUTTON), OnTryEndlessSelected)
@@ -382,6 +427,7 @@ BEGIN_DHTML_EVENT_MAP(CEndlessUsbToolDlg)
 	DHTML_EVENT_ONCHANGE(_T(ELEMENT_LANGUAGE_SELECT), OnLanguageChanged)
 	DHTML_EVENT_ONCLICK(_T(ELEMENT_COMPARE_OPTIONS), OnLinkClicked)
     DHTML_EVENT_ONCLICK(_T(ELEMENT_FIRST_CLOSE_BUTTON), OnCloseAppClicked)
+	DHTML_EVENT_ONCLICK(_T(ELEMENT_FIRST_PREV_BUTTON), OnFirstPagePreviousClicked)
 
 	// Select File Page handlers
 	DHTML_EVENT_ONCLICK(_T(ELEMENT_SELFILE_PREV_BUTTON), OnSelectFilePreviousClicked)
@@ -403,6 +449,12 @@ BEGIN_DHTML_EVENT_MAP(CEndlessUsbToolDlg)
     DHTML_EVENT_ONCHANGE(_T(ELEMENT_SELUSB_USB_DRIVES), OnSelectedUSBDiskChanged)
     DHTML_EVENT_ONCHANGE(_T(ELEMENT_SELUSB_AGREEMENT), OnAgreementCheckboxChanged)
 
+	// Select Storage Page handlers
+	DHTML_EVENT_ONCLICK(_T(ELEMENT_SELSTORAGE_PREV_BUTTON), OnSelectStoragePreviousClicked)
+	DHTML_EVENT_ONCLICK(_T(ELEMENT_SELSTORAGE_NEXT_BUTTON), OnSelectStorageNextClicked)
+	DHTML_EVENT_ONCHANGE(_T(ELEMENT_STORAGE_SELECT), OnSelectedStorageSizeChanged)
+	DHTML_EVENT_ONCLICK(_T(ELEMENT_STORAGE_SUPPORT_LINK), OnLinkClicked)
+
 	// Installing Page handlers
 	DHTML_EVENT_ONCLICK(_T(ELEMENT_SECUREBOOT_HOWTO), OnLinkClicked)    
     DHTML_EVENT_ONCLICK(_T(ELEMENT_INSTALL_CANCEL), OnInstallCancelClicked)
@@ -411,7 +463,6 @@ BEGIN_DHTML_EVENT_MAP(CEndlessUsbToolDlg)
 	DHTML_EVENT_ONCLICK(_T(ELEMENT_SECUREBOOT_HOWTO2), OnLinkClicked)
     DHTML_EVENT_ONCLICK(_T(ELEMENT_CLOSE_BUTTON), OnCloseAppClicked)
     DHTML_EVENT_ONCLICK(_T(ELEMENT_USBBOOT_HOWTO), OnLinkClicked)
-
     // Error Page handlers
     DHTML_EVENT_ONCLICK(_T(ELEMENT_ERROR_CLOSE_BUTTON), OnCloseAppClicked)
     DHTML_EVENT_ONCLICK(_T(ELEMENT_ENDLESS_SUPPORT), OnLinkClicked)
@@ -427,6 +478,12 @@ END_DISPATCH_MAP()
 CMap<CString, LPCTSTR, uint32_t, uint32_t> CEndlessUsbToolDlg::m_personalityToLocaleMsg;
 CMap<CStringA, LPCSTR, CString, LPCTSTR> CEndlessUsbToolDlg::m_localeToPersonality;
 CMap<CStringA, LPCSTR, CStringA, LPCSTR> CEndlessUsbToolDlg::m_localeToIniLocale;
+CString CEndlessUsbToolDlg::m_appDir;
+
+int CEndlessUsbToolDlg::ImageUnpackOperation;
+int CEndlessUsbToolDlg::ImageUnpackPercentStart;
+int CEndlessUsbToolDlg::ImageUnpackPercentEnd;
+ULONGLONG CEndlessUsbToolDlg::ImageUnpackFileSize;
 
 CEndlessUsbToolDlg::CEndlessUsbToolDlg(UINT globalMessage, bool enableLogDebugging, CWnd* pParent /*=NULL*/)
     : CDHtmlDialog(IDD_ENDLESSUSBTOOL_DIALOG, IDR_HTML_ENDLESSUSBTOOL_DIALOG, pParent),
@@ -538,6 +595,10 @@ void CEndlessUsbToolDlg::OnDocumentComplete(LPDISPATCH pDisp, LPCTSTR szUrl)
     StartCheckInternetConnectionThread();
     FindMaxUSBSpeed();
 
+	BOOL x64BitSupported = Has64BitSupport() ? TRUE :  FALSE;
+	uprintf("HW processor has 64 bit support: %s", x64BitSupported ? "YES" : "NO");
+	CallJavascript(_T(JS_ENABLE_BUTTON), CComVariant(HTML_BUTTON_ID(_T(ELEMENT_DUALBOOT_INSTALL_BUTTON))), CComVariant(x64BitSupported));
+
 	return;
 error:
 	uprintf("OnDocumentComplete Exit with error");
@@ -588,26 +649,40 @@ void CEndlessUsbToolDlg::InitRufus()
     //    uprintf("Could not load RichEdit library - some dialogs may not display: %s\n", WindowsErrorString());
     //}
 
-    // We use local group policies rather than direct registry manipulation
-    // 0x9e disables removable and fixed drive notifications
-    m_lgpSet = SetLGP(FALSE, &m_lgpExistingKey, "Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\Explorer", "NoDriveTypeAutorun", 0x9e);
-
-    if (nWindowsVersion > WINDOWS_XP) {
-        // Re-enable AutoMount if needed
-        if (!GetAutoMount(&m_automount)) {
-            uprintf("Could not get AutoMount status");
-            m_automount = TRUE;	// So that we don't try to change its status on exit
-        } else if (!m_automount) {
-            uprintf("AutoMount was detected as disabled - temporary re-enabling it");
-            if (!SetAutoMount(TRUE)) {
-                uprintf("Failed to enable AutoMount");
-            }
-        }
-    }
-
     PF_INIT(GetTickCount64, kernel32);    
 
     srand((unsigned int)_GetTickCount64());    
+}
+
+void CEndlessUsbToolDlg::ChangeDriveAutoRunAndMount(bool setEndlessValues)
+{
+	if (setEndlessValues) {
+		// We use local group policies rather than direct registry manipulation
+		// 0x9e disables removable and fixed drive notifications
+		m_lgpSet = SetLGP(FALSE, &m_lgpExistingKey, "Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\Explorer", "NoDriveTypeAutorun", 0x9e);
+
+		if (nWindowsVersion > WINDOWS_XP) {
+			// Re-enable AutoMount if needed
+			if (!GetAutoMount(&m_automount)) {
+				uprintf("Could not get AutoMount status");
+				m_automount = TRUE;	// So that we don't try to change its status on exit
+			}
+			else if (!m_automount) {
+				uprintf("AutoMount was detected as disabled - temporary re-enabling it");
+				if (!SetAutoMount(TRUE)) {
+					uprintf("Failed to enable AutoMount");
+				}
+			}
+		}
+	} else {
+		// revert settings we changed
+		if (m_lgpSet) {
+			SetLGP(TRUE, &m_lgpExistingKey, "Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\Explorer", "NoDriveTypeAutorun", 0);
+		}
+		if ((nWindowsVersion > WINDOWS_XP) && (!m_automount) && (!SetAutoMount(FALSE))) {
+			uprintf("Failed to restore AutoMount to disabled");
+		}
+	}
 }
 
 // The scanning process can be blocking for message processing => use a thread
@@ -755,14 +830,6 @@ void CEndlessUsbToolDlg::Uninit()
 
     StrArrayDestroy(&DriveID);
     StrArrayDestroy(&DriveLabel);
-
-    // revert settings we changed
-    if (m_lgpSet) {
-        SetLGP(TRUE, &m_lgpExistingKey, "Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\Explorer", "NoDriveTypeAutorun", 0);
-    }
-    if ((nWindowsVersion > WINDOWS_XP) && (!m_automount) && (!SetAutoMount(FALSE))) {
-        uprintf("Failed to restore AutoMount to disabled");
-    }
 
     // delete image file entries related memory
     CString currentPath;
@@ -1067,17 +1134,24 @@ LRESULT CEndlessUsbToolDlg::WindowProc(UINT message, WPARAM wParam, LPARAM lPara
             // Radu: pass all the files to be verified to verfication thread and do the percent calculation there
             // Not very happy about this but eh, needs refactoring
             if (op == OP_VERIFYING_SIGNATURE) {
-                if (!m_liveInstall) {
-                    ULONGLONG totalSize = m_selectedFileSize + m_localInstallerImage.size;
-                    ULONGLONG currentSize = 0;
-                    bool isInstallerImage = (m_localFile == m_localInstallerImage.filePath);
-                    if (isInstallerImage) {
-                        currentSize = m_selectedFileSize + (m_localInstallerImage.size * percent / 100);
-                    } else {
-                        currentSize = m_selectedFileSize * percent / 100;
-                    }
-                    percent = (int)(currentSize * 100 / totalSize);
-                }
+				if (m_dualBootSelected) {
+					// Radu: do we need to do anything special here?
+					// Does it make sense to add the boot archive signature verification to the percentage calculation also?
+					// We are talking about 6 MB compared to more than 2 GB
+				} else {
+					if (!m_liveInstall) {
+						ULONGLONG totalSize = m_selectedFileSize + m_localInstallerImage.size;
+						ULONGLONG currentSize = 0;
+						bool isInstallerImage = (m_localFile == m_localInstallerImage.filePath);
+						if (isInstallerImage) {
+							currentSize = m_selectedFileSize + (m_localInstallerImage.size * percent / 100);
+						}
+						else {
+							currentSize = m_selectedFileSize * percent / 100;
+						}
+						percent = (int)(currentSize * 100 / totalSize);
+					}
+				}
             }
             
             // Radu: maybe divide the progress bar also based on the size of the image to be copied to disk after format is complete
@@ -1092,7 +1166,7 @@ LRESULT CEndlessUsbToolDlg::WindowProc(UINT message, WPARAM wParam, LPARAM lPara
                 IFFALSE_BREAK(SUCCEEDED(hr), "Error when calling set progress.");
             }
 
-            if (op == OP_VERIFYING_SIGNATURE || op == OP_FORMAT || op == OP_FILE_COPY) {
+            if (op == OP_VERIFYING_SIGNATURE || op == OP_FORMAT || op == OP_FILE_COPY || op == OP_SETUP_DUALBOOT) {
                 CString downloadString;
                 downloadString.Format(L"%d%%", percent);
                 SetElementText(_T(ELEMENT_INSTALL_STATUS), CComBSTR(downloadString));
@@ -1154,9 +1228,11 @@ LRESULT CEndlessUsbToolDlg::WindowProc(UINT message, WPARAM wParam, LPARAM lPara
                     StartOperationThread(OP_VERIFYING_SIGNATURE, CEndlessUsbToolDlg::FileVerificationThread);
                 }
             } else {
+				CStringA part, total;
+				part = SizeToHumanReadable(downloadStatus->progress.BytesTransferred, FALSE, use_fake_units);
+				total = SizeToHumanReadable(downloadStatus->progress.BytesTotal, FALSE, use_fake_units);
                 uprintf("Download [%ls] progress %s of %s (%d of %d files)", downloadStatus->jobName,
-                    SizeToHumanReadable(downloadStatus->progress.BytesTransferred, FALSE, use_fake_units),
-                    SizeToHumanReadable(downloadStatus->progress.BytesTotal, FALSE, use_fake_units),
+                    part, total,
                     downloadStatus->progress.FilesTransferred, downloadStatus->progress.FilesTotal);
 
                 if (!isReleaseJsonDownload) {
@@ -1165,7 +1241,7 @@ LRESULT CEndlessUsbToolDlg::WindowProc(UINT message, WPARAM wParam, LPARAM lPara
 
                     RemoteImageEntry_t remote = m_remoteImages.GetAt(m_remoteImages.FindIndex(m_selectedRemoteIndex));
                     // we don't take the signature files into account but we are taking about ~2KB compared to >2GB
-                    ULONGLONG totalSize = remote.compressedSize + (m_liveInstall ? 0 : m_installerImage.compressedSize); 
+                    ULONGLONG totalSize = remote.compressedSize + (m_liveInstall || m_dualBootSelected ? 0 : m_installerImage.compressedSize);
                     ULONGLONG percent = downloadStatus->progress.BytesTransferred * 100 / totalSize;
                     PostMessage(WM_UPDATE_PROGRESS, (WPARAM)OP_DOWNLOADING_FILES, (LPARAM)percent);
 
@@ -1201,7 +1277,20 @@ LRESULT CEndlessUsbToolDlg::WindowProc(UINT message, WPARAM wParam, LPARAM lPara
                 uprintf("Verification passed.");
 
                 bool verifiedInstallerImage = (m_localFile == m_localInstallerImage.filePath);
-                if (!m_liveInstall && !verifiedInstallerImage) {
+				bool verifiedBootFilesZip = (m_localFile == m_bootArchive);
+
+				if (m_dualBootSelected) {
+					if (verifiedBootFilesZip) {
+						// we checked the boot archive signature, now check the image
+						m_localFile = UTF8ToCString(image_path);
+						m_localFileSig = m_localFile + SIGNATURE_FILE_EXT;
+						StartOperationThread(OP_VERIFYING_SIGNATURE, CEndlessUsbToolDlg::FileVerificationThread);
+					} else {
+						m_cancelImageUnpack = 0;
+						//StartOperationThread(OP_FLASHING_DEVICE, CEndlessUsbToolDlg::CreateUSBStick);
+						StartOperationThread(OP_SETUP_DUALBOOT, CEndlessUsbToolDlg::SetupDualBoot);
+					}
+				} else if (!m_liveInstall && !verifiedInstallerImage) {
                     safe_free(image_path);
                     image_path = wchar_to_utf8(m_localInstallerImage.filePath);
 
@@ -1215,7 +1304,6 @@ LRESULT CEndlessUsbToolDlg::WindowProc(UINT message, WPARAM wParam, LPARAM lPara
                     StartOperationThread(OP_VERIFYING_SIGNATURE, CEndlessUsbToolDlg::FileVerificationThread);
                 } else {
                     StartOperationThread(OP_FLASHING_DEVICE, CEndlessUsbToolDlg::RufusISOScanThread);
-                    //StartOperationThread(OP_FLASHING_DEVICE, CEndlessUsbToolDlg::CreateUSBStick);
                 }
             }
             else {
@@ -1242,6 +1330,8 @@ LRESULT CEndlessUsbToolDlg::WindowProc(UINT message, WPARAM wParam, LPARAM lPara
             m_currentStep = OP_NO_OPERATION_IN_PROGRESS;
 
             EnableHibernate();
+
+			if (!m_dualBootSelected) ChangeDriveAutoRunAndMount(false);
 
             switch (m_lastErrorCause) {
             case ErrorCause_t::ErrorCauseNone:
@@ -1445,13 +1535,18 @@ void CEndlessUsbToolDlg::AddLanguagesToUI()
 
 	loc_cmd* lcmd = NULL;
 	CComPtr<IHTMLSelectElement> selectElement;
-	CComPtr<IHTMLOptionElement> optionElement;
+	CComPtr<IHTMLSelectElement> selectElementDualBoot;
 	HRESULT hr;
 
 	hr = GetSelectElement(_T(ELEMENT_LANGUAGE_SELECT), selectElement);
 	IFFALSE_RETURN(SUCCEEDED(hr) && selectElement != NULL, "Error returned from GetSelectElement.");
 
 	hr = selectElement->put_length(0);
+
+	hr = GetSelectElement(_T(ELEMENT_LANGUAGE_DUALBOOT), selectElementDualBoot);
+	IFFALSE_RETURN(SUCCEEDED(hr) && selectElementDualBoot != NULL, "Error returned from GetSelectElement.");
+
+	hr = selectElementDualBoot->put_length(0);
 
 	int index = 0;
 	// Add languages to dropdown and apply localization
@@ -1460,6 +1555,9 @@ void CEndlessUsbToolDlg::AddLanguagesToUI()
 
 		hr = AddEntryToSelect(selectElement, UTF8ToBSTR(lcmd->txt[0]), UTF8ToBSTR(lcmd->txt[1]), NULL, m_selectedLocale == lcmd ? TRUE : FALSE);
 		IFFALSE_RETURN(SUCCEEDED(hr), "Error adding the new option element to the select element");
+
+		hr = AddEntryToSelect(selectElementDualBoot, UTF8ToBSTR(lcmd->txt[0]), UTF8ToBSTR(lcmd->txt[1]), NULL, m_selectedLocale == lcmd ? TRUE : FALSE);
+		IFFALSE_RETURN(SUCCEEDED(hr), "Error adding the new option element to the select element on the dual boot page");
 	}
 }
 
@@ -1467,7 +1565,7 @@ void CEndlessUsbToolDlg::ChangePage(PCTSTR newPage)
 {
     FUNCTION_ENTER;
 
-    static CString currentPage(ELEMENT_FIRST_PAGE);
+    static CString currentPage(ELEMENT_DUALBOOT_PAGE);
     uprintf("ChangePage requested from %ls to %ls", currentPage, newPage);
 
     if (currentPage == newPage) {
@@ -1547,7 +1645,7 @@ void CEndlessUsbToolDlg::ErrorOccured(ErrorCause_t errorCause)
                 size = remote.compressedSize;
             }
             // we don't take the signature files into account but we are taking about ~2KB compared to >2GB
-            ULONGLONG totalSize = size + (m_liveInstall ? 0 : m_installerImage.compressedSize);
+            ULONGLONG totalSize = size + (m_liveInstall || m_dualBootSelected ? 0 : m_installerImage.compressedSize);
             message = UTF8ToBSTR(lmprintf(suggestionMsgId, SizeToHumanReadable(totalSize, FALSE, use_fake_units)));
         } else {
             message = UTF8ToBSTR(lmprintf(suggestionMsgId));
@@ -1698,6 +1796,29 @@ bool CEndlessUsbToolDlg::IsButtonDisabled(IHTMLElement *pElement)
 //	return S_FALSE;
 //}
 
+// Dual Boot Page Handlers
+HRESULT CEndlessUsbToolDlg::OnAdvancedOptionsClicked(IHTMLElement* pElement)
+{
+	FUNCTION_ENTER;
+
+	m_dualBootSelected = false;
+	m_liveInstall = true;
+	ChangePage(_T(ELEMENT_FIRST_PAGE));
+
+	return S_OK;
+}
+
+HRESULT CEndlessUsbToolDlg::OnInstallDualBootClicked(IHTMLElement* pElement)
+{
+	IFFALSE_RETURN_VALUE(!IsButtonDisabled(pElement), "OnInstallDualBootClicked: Button is disabled. ", S_OK);
+
+	FUNCTION_ENTER;
+
+	m_dualBootSelected = true;
+	GoToSelectFilePage();
+
+	return S_OK;
+}
 
 // First Page Handlers
 HRESULT CEndlessUsbToolDlg::OnTryEndlessSelected(IHTMLElement* pElement)
@@ -1761,7 +1882,7 @@ void CEndlessUsbToolDlg::GoToSelectFilePage()
         r = m_remoteImages.GetAt(p);
 
         // Update light download size
-        ULONGLONG size = r.compressedSize + (m_liveInstall ? 0 : m_installerImage.compressedSize);
+        ULONGLONG size = r.compressedSize + (m_liveInstall || m_dualBootSelected ? 0 : m_installerImage.compressedSize);
         sizeText = UTF8ToBSTR(lmprintf(MSG_315, SizeToHumanReadable(size, FALSE, use_fake_units)));
         SetElementText(_T(ELEMENT_DOWNLOAD_LIGHT_SIZE), sizeText);
 
@@ -1790,21 +1911,21 @@ HRESULT CEndlessUsbToolDlg::OnLinkClicked(IHTMLElement* pElement)
     uint32_t msg_id = 0;
     char *url = NULL;
 
-    IFFALSE_RETURN_VALUE(pElement != NULL, "OnSelectedImageTypeChanged: Error getting element id", S_OK);
+    IFFALSE_RETURN_VALUE(pElement != NULL, "OnLinkClicked: Error getting element id", S_OK);
 
     hr = pElement->get_id(&id);
-    IFFALSE_RETURN_VALUE(SUCCEEDED(hr), "OnSelectedImageTypeChanged: Error getting element id", S_OK);
+    IFFALSE_RETURN_VALUE(SUCCEEDED(hr), "OnLinkClicked: Error getting element id", S_OK);
 
     if (id == _T(ELEMENT_COMPARE_OPTIONS)) {
         msg_id = MSG_312;
     } else if (id == _T(ELEMENT_SECUREBOOT_HOWTO) || id == _T(ELEMENT_SECUREBOOT_HOWTO2)) {
         msg_id = MSG_313;
-    } else if (id == _T(ELEMENT_ENDLESS_SUPPORT) || id == _T(ELEMENT_CONNECTED_SUPPORT_LINK)) {
+    } else if (id == _T(ELEMENT_ENDLESS_SUPPORT) || id == _T(ELEMENT_CONNECTED_SUPPORT_LINK) || id == _T(ELEMENT_STORAGE_SUPPORT_LINK)) {
         msg_id = MSG_314;
     } else if (id == _T(ELEMENT_CONNECTED_LINK)) {
         WinExec("c:\\windows\\system32\\control.exe ncpa.cpl", SW_NORMAL);
-    } else if (id == _T(ELEMENT_USBBOOT_HOWTO)) {
-        msg_id = MSG_329;
+	} else if (id == _T(ELEMENT_USBBOOT_HOWTO)) {
+		msg_id = MSG_329;
     } else {
         msg_id = 0;
         uprintf("Unknown link clicked %ls", id);
@@ -1869,7 +1990,7 @@ void CEndlessUsbToolDlg::UpdateFileEntries(bool shouldInit)
     CString currentPath;
     BOOL fileAccessException = false;
     CString currentInstallerVersion;
-    CString searchPath = GET_LOCAL_PATH(_T("*.*"));
+    CString searchPath = GET_LOCAL_PATH(ALL_FILES);
     HANDLE findFilesHandle = FindFirstFile(searchPath, &findFileData);
 
     m_localFilesScanned = true;
@@ -1928,6 +2049,7 @@ void CEndlessUsbToolDlg::UpdateFileEntries(bool shouldInit)
                     currentEntry->autoAdded = TRUE;
                     currentEntry->filePath = file.GetFilePath();
                     currentEntry->size = file.GetLength();
+					currentEntry->personality = personality;
                     AddEntryToSelect(selectElement, CComBSTR(currentEntry->filePath), CComBSTR(displayName), &currentEntry->htmlIndex, 0);
                     IFFALSE_RETURN(SUCCEEDED(hr), "Error adding item in image file list.");
 
@@ -1935,6 +2057,17 @@ void CEndlessUsbToolDlg::UpdateFileEntries(bool shouldInit)
                     m_imageIndexToPath.AddTail(currentEntry->filePath);
                 }
                 currentEntry->stillPresent = TRUE;
+				CString basePath = CSTRING_GET_PATH(CSTRING_GET_PATH(fullPathFile, '.'), '.');
+
+#if TEST_RELEASE_HARDCODED_STUFF
+				CString hardcodedPath = GET_LOCAL_PATH(CSTRING_GET_LAST(CString(HARDCODED_PATH), '/'));
+				currentEntry->hasBootArchive = PathFileExists(hardcodedPath + BOOT_ARCHIVE_SUFFIX);
+				currentEntry->hasBootArchiveSig = PathFileExists(hardcodedPath + BOOT_ARCHIVE_SUFFIX + SIGNATURE_FILE_EXT);
+#else
+				currentEntry->hasBootArchive = PathFileExists(basePath + BOOT_ARCHIVE_SUFFIX);
+				currentEntry->hasBootArchiveSig = PathFileExists(basePath + BOOT_ARCHIVE_SUFFIX + SIGNATURE_FILE_EXT);
+#endif
+				currentEntry->hasUnpackedImgSig = PathFileExists(basePath + IMAGE_FILE_EXT + SIGNATURE_FILE_EXT);
             }
 
 			uprintf("Found local image '%ls'", file.GetFilePath());
@@ -2122,7 +2255,7 @@ do { \
     uprintf("\t\t %s=%s", tag, parentValue[tag].toStyledString().c_str()); \
 } while(false);
 
-bool CEndlessUsbToolDlg::UnpackFile(LPCSTR archive, LPCSTR destination)
+bool CEndlessUsbToolDlg::UnpackFile(LPCSTR archive, LPCSTR destination, int compressionType, void* progress_function, unsigned long* cancel_request)
 {
     FUNCTION_ENTER;
 
@@ -2131,10 +2264,10 @@ bool CEndlessUsbToolDlg::UnpackFile(LPCSTR archive, LPCSTR destination)
     // RADU: provide a progress function and move this from UI thread
     // For initial release this is ok as the operation should be very fast for the JSON
     // Unpack the file
-    result = bled_init(_uprintf, NULL, NULL);
-    result = bled_uncompress(archive, destination, BLED_COMPRESSION_GZIP);
+    result = bled_init(_uprintf, (progress_t)progress_function, cancel_request);
+    result = bled_uncompress(archive, destination, compressionType);
     bled_exit();
-    return result != -1;
+    return result >= 0;
 }
 
 bool CEndlessUsbToolDlg::ParseJsonFile(LPCTSTR filename, bool isInstallerJson)
@@ -2147,9 +2280,16 @@ bool CEndlessUsbToolDlg::ParseJsonFile(LPCTSTR filename, bool isInstallerJson)
 
     std::ifstream jsonStream;
 
+#if TEST_RELEASE_HARDCODED_STUFF
+	const char *beginDoc = isInstallerJson ? eosinstaller_hardcoded_json : eos_hardcoded_json;
+	const char *endDoc = beginDoc + strlen(isInstallerJson ? eosinstaller_hardcoded_json : eos_hardcoded_json);
+
+	IFFALSE_GOTOERROR(reader.parse(beginDoc, endDoc, rootValue, false), "Parsing of JSON failed.");
+#else // TEST_RELEASE_HARDCODED_STUFF
     jsonStream.open(filename);
     IFFALSE_GOTOERROR(!jsonStream.fail(), "Opening JSON file failed.");
     IFFALSE_GOTOERROR(reader.parse(jsonStream, rootValue, false), "Parsing of JSON failed.");
+#endif //TEST_RELEASE_HARDCODED_STUFF
 
     // Print version
     jsonElem = rootValue[JSON_VERSION];
@@ -2250,7 +2390,7 @@ void CEndlessUsbToolDlg::UpdateDownloadOptions()
     filePath = GET_LOCAL_PATH(CString(JSON_LIVE_FILE));
 #ifdef ENABLE_JSON_COMPRESSION
     filePathGz = GET_LOCAL_PATH(CString(JSON_PACKED(JSON_LIVE_FILE)));
-    IFFALSE_GOTOERROR(UnpackFile(ConvertUnicodeToUTF8(filePathGz), ConvertUnicodeToUTF8(filePath)), "Error uncompressing eos JSON file.");
+    IFFALSE_GOTOERROR(UnpackFile(ConvertUnicodeToUTF8(filePathGz), ConvertUnicodeToUTF8(filePath), BLED_COMPRESSION_GZIP), "Error uncompressing eos JSON file.");
 #endif // ENABLE_JSON_COMPRESSION
     IFFALSE_GOTOERROR(ParseJsonFile(filePath, false), "Error parsing eos JSON file.");
 
@@ -2258,7 +2398,7 @@ void CEndlessUsbToolDlg::UpdateDownloadOptions()
     filePath = GET_LOCAL_PATH(CString(JSON_INSTALLER_FILE));
 #ifdef ENABLE_JSON_COMPRESSION
     filePathGz = GET_LOCAL_PATH(CString(JSON_PACKED(JSON_INSTALLER_FILE)));
-    IFFALSE_GOTOERROR(UnpackFile(ConvertUnicodeToUTF8(filePathGz), ConvertUnicodeToUTF8(filePath)), "Error uncompressing eosinstaller JSON file.");
+    IFFALSE_GOTOERROR(UnpackFile(ConvertUnicodeToUTF8(filePathGz), ConvertUnicodeToUTF8(filePath), BLED_COMPRESSION_GZIP), "Error uncompressing eosinstaller JSON file.");
 #endif // ENABLE_JSON_COMPRESSION
     IFFALSE_GOTOERROR(ParseJsonFile(filePath, true), "Error parsing eosinstaller JSON file.");
 
@@ -2298,7 +2438,7 @@ void CEndlessUsbToolDlg::AddDownloadOptionsToUI()
         IFFALSE_PRINTERROR(SUCCEEDED(hr), "Error adding remote image to list.");
 
         // option size
-        ULONGLONG size = imageEntry.compressedSize + (m_liveInstall ? 0 : m_installerImage.compressedSize);
+        ULONGLONG size = imageEntry.compressedSize + (m_liveInstall || m_dualBootSelected ? 0 : m_installerImage.compressedSize);
         CComBSTR sizeText = UTF8ToBSTR(lmprintf(MSG_315, SizeToHumanReadable(size, FALSE, use_fake_units)));
         const wchar_t *htmlElemId = NULL;
 
@@ -2332,12 +2472,19 @@ void CEndlessUsbToolDlg::AddDownloadOptionsToUI()
     }
 }
 
+HRESULT CEndlessUsbToolDlg::OnFirstPagePreviousClicked(IHTMLElement* pElement)
+{
+	ChangePage(_T(ELEMENT_DUALBOOT_PAGE));
+
+	return S_OK;
+}
+
 // Select File Page Handlers
 HRESULT CEndlessUsbToolDlg::OnSelectFilePreviousClicked(IHTMLElement* pElement)
 {
     FUNCTION_ENTER;
 
-    ChangePage(_T(ELEMENT_FIRST_PAGE));
+    ChangePage(m_dualBootSelected ? _T(ELEMENT_DUALBOOT_PAGE) : _T(ELEMENT_FIRST_PAGE));
 
 	return S_OK;
 }
@@ -2351,24 +2498,26 @@ HRESULT CEndlessUsbToolDlg::OnSelectFileNextClicked(IHTMLElement* pElement)
     
     IFFALSE_RETURN_VALUE(!IsButtonDisabled(pElement), "OnSelectFileNextClicked: Button is disabled. ", S_OK);
 
-    CallJavascript(_T(JS_RESET_CHECK), CComVariant(_T(ELEMENT_SELUSB_AGREEMENT)));
-    m_usbDeleteAgreement = false;
+	if (!m_dualBootSelected) {
+		CallJavascript(_T(JS_RESET_CHECK), CComVariant(_T(ELEMENT_SELUSB_AGREEMENT)));
+		m_usbDeleteAgreement = false;
 
-    // RADU: move this to another thread
-    GetUSBDevices(0);
-    OnSelectedUSBDiskChanged(NULL);
+		// RADU: move this to another thread
+		GetUSBDevices(0);
+		OnSelectedUSBDiskChanged(NULL);
 
-    PF_INIT(SHChangeNotifyRegister, shell32);
+		PF_INIT(SHChangeNotifyRegister, shell32);
 
-    // Register MEDIA_INSERTED/MEDIA_REMOVED notifications for card readers
-    if (pfSHChangeNotifyRegister && SUCCEEDED(SHGetSpecialFolderLocation(0, CSIDL_DESKTOP, &pidlDesktop))) {
-        NotifyEntry.pidl = pidlDesktop;
-        NotifyEntry.fRecursive = TRUE;
-        // NB: The following only works if the media is already formatted.
-        // If you insert a blank card, notifications will not be sent... :(
-        m_shellNotificationsRegister = pfSHChangeNotifyRegister(m_hWnd, 0x0001 | 0x0002 | 0x8000,
-            SHCNE_MEDIAINSERTED | SHCNE_MEDIAREMOVED, UM_MEDIA_CHANGE, 1, &NotifyEntry);
-    }
+		// Register MEDIA_INSERTED/MEDIA_REMOVED notifications for card readers
+		if (pfSHChangeNotifyRegister && SUCCEEDED(SHGetSpecialFolderLocation(0, CSIDL_DESKTOP, &pidlDesktop))) {
+			NotifyEntry.pidl = pidlDesktop;
+			NotifyEntry.fRecursive = TRUE;
+			// NB: The following only works if the media is already formatted.
+			// If you insert a blank card, notifications will not be sent... :(
+			m_shellNotificationsRegister = pfSHChangeNotifyRegister(m_hWnd, 0x0001 | 0x0002 | 0x8000,
+				SHCNE_MEDIAINSERTED | SHCNE_MEDIAREMOVED, UM_MEDIA_CHANGE, 1, &NotifyEntry);
+		}
+	}
 
     // Get display name with actual image size, not compressed
     CString selectedImage, personality, version, selectedSize;
@@ -2387,7 +2536,7 @@ HRESULT CEndlessUsbToolDlg::OnSelectFileNextClicked(IHTMLElement* pElement)
         m_selectedFileSize = localEntry->size;
     } else {
         RemoteImageEntry_t remote = m_remoteImages.GetAt(m_remoteImages.FindIndex(m_selectedRemoteIndex));
-        DownloadType_t downloadType = GetSelectedDownloadType();
+        //DownloadType_t downloadType = GetSelectedDownloadType();
         selectedImage = CSTRING_GET_LAST(remote.urlFile, '/');
         size = m_liveInstall ? remote.extractedSize : remote.compressedSize;
         
@@ -2420,8 +2569,14 @@ HRESULT CEndlessUsbToolDlg::OnSelectFileNextClicked(IHTMLElement* pElement)
         selectedImage = _T(ENDLESS_OS);
     }
 
-    SetElementText(_T(ELEMENT_SELUSB_NEW_DISK_NAME), CComBSTR(selectedImage));
-    SetElementText(_T(ELEMENT_SELUSB_NEW_DISK_SIZE), CComBSTR(selectedSize));
+	if (!m_dualBootSelected) {
+		SetElementText(_T(ELEMENT_SELUSB_NEW_DISK_NAME), CComBSTR(selectedImage));
+		SetElementText(_T(ELEMENT_SELUSB_NEW_DISK_SIZE), CComBSTR(selectedSize));
+
+		ChangePage(_T(ELEMENT_USB_PAGE));
+	} else {
+		GoToSelectStoragePage();
+	}
 
 	CString imageType = _T("RemoteImage");
 	if (m_useLocalFile) imageType = _T("LocalImage");
@@ -2491,7 +2646,7 @@ HRESULT CEndlessUsbToolDlg::OnSelectedRemoteFileChanged(IHTMLElement* pElement)
     uprintf("OnSelectedRemoteFileChanged to REMOTE [%ls]", r.displayName);
 
     if (r.personality != PERSONALITY_BASE) {
-        ULONGLONG size = r.compressedSize + (m_liveInstall ? 0 : m_installerImage.compressedSize);
+        ULONGLONG size = r.compressedSize + (m_liveInstall || m_dualBootSelected ? 0 : m_installerImage.compressedSize);
         CComBSTR sizeText = UTF8ToBSTR(lmprintf(MSG_315, SizeToHumanReadable(size, FALSE, use_fake_units)));
         SetElementText(_T(ELEMENT_DOWNLOAD_FULL_SIZE), sizeText);
     }
@@ -2585,108 +2740,145 @@ HRESULT CEndlessUsbToolDlg::OnSelectUSBNextClicked(IHTMLElement* pElement)
 	}
 
 	LeavingDevicesPage();
-
-    SetElementText(_T(ELEMENT_INSTALL_STATUS), CComBSTR(""));
-    SetElementText(_T(ELEMENT_INSTALL_DESCRIPTION), CComBSTR(""));
-
-    EnableHibernate(false);
-
-    // Radu: we need to download an installer if only a live image is found and full install was selected
-    if (m_useLocalFile) {
-        m_localFile = UTF8ToCString(image_path);
-        m_localFileSig = m_localFile + SIGNATURE_FILE_EXT;
-
-        StartOperationThread(OP_VERIFYING_SIGNATURE, CEndlessUsbToolDlg::FileVerificationThread);
-    } else {
-        UpdateCurrentStep(OP_DOWNLOADING_FILES);
-
-        RemoteImageEntry_t remote = m_remoteImages.GetAt(m_remoteImages.FindIndex(m_selectedRemoteIndex));
-        DownloadType_t downloadType = GetSelectedDownloadType();
-
-        // live image file
-        CString url = CString(RELEASE_JSON_URLPATH) + remote.urlFile;
-        m_localFile = GET_LOCAL_PATH(CSTRING_GET_LAST(remote.urlFile, '/'));
-        // live image signature file
-        CString urlAsc = CString(RELEASE_JSON_URLPATH) + remote.urlSignature;
-        m_localFileSig = GET_LOCAL_PATH(CSTRING_GET_LAST(remote.urlSignature, '/'));
-
-        // add image file path for Rufus
-        safe_free(image_path);
-        image_path = wchar_to_utf8(m_localFile);
-
-        // List of files to download
-        //ListOfStrings urls, files;
-        CString urlInstaller, urlInstallerAsc, installerFile, installerAscFile;
-        if (m_liveInstall) {
-            ListOfStrings urls = { url, urlAsc };
-            ListOfStrings files = { m_localFile, m_localFileSig };
-
-            // Try resuming the download if it exists
-            bool status = m_downloadManager.AddDownload(downloadType, urls, files, true, remote.downloadJobName);
-            if (!status) {
-                // start the download again
-                status = m_downloadManager.AddDownload(downloadType, urls, files, false, remote.downloadJobName);
-                if (!status) {
-                    ChangePage(_T(ELEMENT_INSTALL_PAGE));
-                    // RADU: add custom error values for each of the errors so we can identify them and show a custom message for each
-                    uprintf("Error adding files for download");
-                    FormatStatus = FORMAT_STATUS_CANCEL;
-                    m_lastErrorCause = ErrorCause_t::ErrorCauseDownloadFailed;
-                    PostMessage(WM_FINISHED_ALL_OPERATIONS, 0, 0);
-                    return S_OK;
-                }
-            }
-        } else {
-            // installer image file + signature
-            urlInstaller = CString(RELEASE_JSON_URLPATH) + m_installerImage.urlFile;
-            installerFile = GET_LOCAL_PATH(CSTRING_GET_LAST(m_installerImage.urlFile, '/'));
-
-            urlInstallerAsc = CString(RELEASE_JSON_URLPATH) + m_installerImage.urlSignature;
-            installerAscFile = GET_LOCAL_PATH(CSTRING_GET_LAST(m_installerImage.urlSignature, '/'));
-            
-            ListOfStrings urls = { url, urlAsc, urlInstaller, urlInstallerAsc};
-            ListOfStrings files = { m_localFile, m_localFileSig, installerFile, installerAscFile };
-
-            // Try resuming the download if it exists
-            bool status = m_downloadManager.AddDownload(downloadType, urls, files, true, remote.downloadJobName);
-            if (!status) {
-                // start the download again
-                status = m_downloadManager.AddDownload(downloadType, urls, files, false, remote.downloadJobName);
-                if (!status) {
-                    ChangePage(_T(ELEMENT_INSTALL_PAGE));
-                    // RADU: add custom error values for each of the errors so we can identify them and show a custom message for each
-                    uprintf("Error adding files for download");
-                    m_lastErrorCause = ErrorCause_t::ErrorCauseDownloadFailed;
-                    PostMessage(WM_FINISHED_ALL_OPERATIONS, (WPARAM)FALSE, 0);
-                    return S_OK;
-                }
-            }
-        }
-
-        // Create a thread to poll the download progress regularly as the event based BITS one is very irregular
-        if (m_downloadUpdateThread == INVALID_HANDLE_VALUE) {
-            m_downloadUpdateThread = CreateThread(NULL, 0, CEndlessUsbToolDlg::UpdateDownloadProgressThread, (LPVOID)this, 0, NULL);
-        }
-
-        // add remote installer data to local installer data
-        m_localInstallerImage.stillPresent = TRUE;
-        m_localInstallerImage.filePath = GET_LOCAL_PATH(CSTRING_GET_LAST(m_installerImage.urlFile, '/'));
-        m_localInstallerImage.size = m_installerImage.compressedSize;
-    }
-
-    ChangePage(_T(ELEMENT_INSTALL_PAGE));
-
-    // RADU: wait for File scanning thread
-    if (m_fileScanThread != INVALID_HANDLE_VALUE) {
-        SetEvent(m_closeFileScanThreadEvent);
-        uprintf("Waiting for scan files thread.");
-        WaitForSingleObject(m_fileScanThread, 5000);
-        m_fileScanThread = INVALID_HANDLE_VALUE;
-        CloseHandle(m_closeFileScanThreadEvent);
-        m_closeFileScanThreadEvent = INVALID_HANDLE_VALUE;
-    }
+	StartInstallationProcess();
 
 	return S_OK;
+}
+
+void CEndlessUsbToolDlg::StartInstallationProcess()
+{
+	SetElementText(_T(ELEMENT_INSTALL_STATUS), CComBSTR(""));
+	SetElementText(_T(ELEMENT_INSTALL_DESCRIPTION), CComBSTR(""));
+
+	EnableHibernate(false);
+
+	if(!m_dualBootSelected) ChangeDriveAutoRunAndMount(true);
+
+	// TODO: remove these once we parse proper JSON or discover local files
+	m_bootArchive = GET_LOCAL_PATH(CSTRING_GET_LAST(hardcoded_BootPath, '/'));
+	m_bootArchiveSig = GET_LOCAL_PATH(CSTRING_GET_LAST(hardcoded_BootPathAsc, '/'));
+	// END REMOVE
+
+	if (m_dualBootSelected && m_useLocalFile) {
+		pFileImageEntry_t localEntry = NULL;
+		CString selectedImage = UTF8ToCString(image_path);
+		if (m_imageFiles.Lookup(selectedImage, localEntry)) {
+			if(!localEntry->hasBootArchive || !localEntry->hasBootArchiveSig) m_useLocalFile = false;
+		} else {
+			m_useLocalFile = false;
+		}
+	}
+
+	// Radu: we need to download an installer if only a live image is found and full install was selected
+	if (m_useLocalFile) {
+		if (m_dualBootSelected) {
+			// get unpacked image signature file
+			CString basePath = CSTRING_GET_PATH(CSTRING_GET_PATH(UTF8ToCString(image_path), '.'), '.');
+			m_unpackedImageSig = basePath + IMAGE_FILE_EXT + SIGNATURE_FILE_EXT;
+
+			m_localFile = m_bootArchive;
+			m_localFileSig = m_bootArchiveSig;
+		} else {
+			m_localFile = UTF8ToCString(image_path);
+			m_localFileSig = m_localFile + SIGNATURE_FILE_EXT;
+		}
+
+		StartOperationThread(OP_VERIFYING_SIGNATURE, CEndlessUsbToolDlg::FileVerificationThread);
+	} else {
+		UpdateCurrentStep(OP_DOWNLOADING_FILES);
+
+		RemoteImageEntry_t remote = m_remoteImages.GetAt(m_remoteImages.FindIndex(m_selectedRemoteIndex));
+		DownloadType_t downloadType = GetSelectedDownloadType();
+
+		// live image file
+		CString url = CString(RELEASE_JSON_URLPATH) + remote.urlFile;
+		m_localFile = GET_LOCAL_PATH(CSTRING_GET_LAST(remote.urlFile, '/'));
+		// live image signature file
+		CString urlAsc = CString(RELEASE_JSON_URLPATH) + remote.urlSignature;
+		m_localFileSig = GET_LOCAL_PATH(CSTRING_GET_LAST(remote.urlSignature, '/'));
+
+		// get unpacked image signature file
+		CString basePath = CSTRING_GET_PATH(CSTRING_GET_PATH(remote.urlFile, '.'), '.');
+		m_unpackedImageSig = basePath + IMAGE_FILE_EXT + SIGNATURE_FILE_EXT;
+
+		// add image file path for Rufus
+		safe_free(image_path);
+		image_path = wchar_to_utf8(m_localFile);
+
+		// List of files to download
+		ListOfStrings urls, files;
+		CString urlInstaller, urlInstallerAsc, installerFile, installerAscFile;
+		CString urlBootFiles, urlBootFilesAsc, urlImageSig;
+		if (m_dualBootSelected) {
+			urlBootFiles = CString(RELEASE_JSON_URLPATH) + hardcoded_BootPath;
+			m_bootArchive = GET_LOCAL_PATH(CSTRING_GET_LAST(hardcoded_BootPath, '/'));
+
+			urlBootFilesAsc = CString(RELEASE_JSON_URLPATH) + hardcoded_BootPathAsc;
+			m_bootArchiveSig = GET_LOCAL_PATH(CSTRING_GET_LAST(hardcoded_BootPathAsc, '/'));
+
+			urlImageSig = CString(RELEASE_JSON_URLPATH) + m_unpackedImageSig;
+			m_unpackedImageSig = GET_LOCAL_PATH(CSTRING_GET_LAST(m_unpackedImageSig, '/'));
+
+			urls = { url, urlAsc, urlBootFiles, urlBootFilesAsc, urlImageSig };
+			files = { m_localFile, m_localFileSig, m_bootArchive, m_bootArchiveSig, m_unpackedImageSig };
+		} else if (m_liveInstall) {
+			urls = { url, urlAsc };
+			files = { m_localFile, m_localFileSig };
+		} else {
+			// installer image file + signature
+			urlInstaller = CString(RELEASE_JSON_URLPATH) + m_installerImage.urlFile;
+			installerFile = GET_LOCAL_PATH(CSTRING_GET_LAST(m_installerImage.urlFile, '/'));
+
+			urlInstallerAsc = CString(RELEASE_JSON_URLPATH) + m_installerImage.urlSignature;
+			installerAscFile = GET_LOCAL_PATH(CSTRING_GET_LAST(m_installerImage.urlSignature, '/'));
+
+			urls = { url, urlAsc, urlInstaller, urlInstallerAsc };
+			files = { m_localFile, m_localFileSig, installerFile, installerAscFile };
+		}
+
+		// Try resuming the download if it exists
+		bool status = m_downloadManager.AddDownload(downloadType, urls, files, true, remote.downloadJobName);
+		if (!status) {
+			// start the download again
+			status = m_downloadManager.AddDownload(downloadType, urls, files, false, remote.downloadJobName);
+			if (!status) {
+				ChangePage(_T(ELEMENT_INSTALL_PAGE));
+				// RADU: add custom error values for each of the errors so we can identify them and show a custom message for each
+				uprintf("Error adding files for download");
+				FormatStatus = FORMAT_STATUS_CANCEL;
+				m_lastErrorCause = ErrorCause_t::ErrorCauseDownloadFailed;
+				PostMessage(WM_FINISHED_ALL_OPERATIONS, 0, 0);
+				return;
+			}
+		}
+
+		// Create a thread to poll the download progress regularly as the event based BITS one is very irregular
+		if (m_downloadUpdateThread == INVALID_HANDLE_VALUE) {
+			m_downloadUpdateThread = CreateThread(NULL, 0, CEndlessUsbToolDlg::UpdateDownloadProgressThread, (LPVOID)this, 0, NULL);
+		}
+
+		// add remote installer data to local installer data
+		m_localInstallerImage.stillPresent = TRUE;
+		m_localInstallerImage.filePath = GET_LOCAL_PATH(CSTRING_GET_LAST(m_installerImage.urlFile, '/'));
+		m_localInstallerImage.size = m_installerImage.compressedSize;
+
+		if (m_dualBootSelected) {
+			m_localFile = m_bootArchive;
+			m_localFileSig = m_bootArchiveSig;
+		}
+	}
+
+	ChangePage(_T(ELEMENT_INSTALL_PAGE));
+
+	// RADU: wait for File scanning thread
+	if (m_fileScanThread != INVALID_HANDLE_VALUE) {
+		SetEvent(m_closeFileScanThreadEvent);
+		uprintf("Waiting for scan files thread.");
+		WaitForSingleObject(m_fileScanThread, 5000);
+		m_fileScanThread = INVALID_HANDLE_VALUE;
+		CloseHandle(m_closeFileScanThreadEvent);
+		m_closeFileScanThreadEvent = INVALID_HANDLE_VALUE;
+	}
 }
 
 void CEndlessUsbToolDlg::StartOperationThread(int operation, LPTHREAD_START_ROUTINE threadRoutine, LPVOID param)
@@ -2794,6 +2986,167 @@ void CEndlessUsbToolDlg::LeavingDevicesPage()
     }
 }
 
+// Select Storage Page Handlers
+HRESULT CEndlessUsbToolDlg::OnSelectStoragePreviousClicked(IHTMLElement* pElement)
+{
+	FUNCTION_ENTER;
+
+	ChangePage(_T(ELEMENT_FILE_PAGE));
+
+	return S_OK;
+}
+
+HRESULT CEndlessUsbToolDlg::OnSelectStorageNextClicked(IHTMLElement *pElement)
+{
+	IFFALSE_RETURN_VALUE(!IsButtonDisabled(pElement), "OnSelectStorageNextClicked: Button is disabled. ", S_OK);
+
+	FUNCTION_ENTER;
+
+	StartInstallationProcess();
+
+	return S_OK;
+}
+
+HRESULT CEndlessUsbToolDlg::OnSelectedStorageSizeChanged(IHTMLElement* pElement)
+{
+	FUNCTION_ENTER;
+
+	CComPtr<IHTMLSelectElement> selectElement;
+	CComBSTR selectedValue;
+
+	HRESULT hr = pElement->QueryInterface(IID_IHTMLSelectElement, (void**)&selectElement);
+	IFFALSE_RETURN_VALUE(SUCCEEDED(hr) && selectElement != NULL, "Error querying for IHTMLSelectElement interface", S_OK);
+
+	hr = selectElement->get_value(&selectedValue);
+	IFFALSE_RETURN_VALUE(SUCCEEDED(hr) && selectElement != NULL, "Error getting selected file value", S_OK);
+
+	m_nrGigsSelected = _wtoi(selectedValue);
+	uprintf("Number of Gb selected for the endless OS file: %d", m_nrGigsSelected);
+
+	return S_OK;
+}
+
+#define MIN_NO_OF_GIGS			8
+#define MAX_NO_OF_GIGS			256
+#define RECOMMENDED_GIGS_BASE	16
+#define RECOMMENDED_GIGS_FULL	32
+#define IS_MINIMUM_VALUE		1
+#define IS_MAXIMUM_VALUE		2
+#define IS_BASE_IMAGE			3
+
+#define BYTES_IN_GIGABYTE		(1024 *  1024 * 1024)
+
+void CEndlessUsbToolDlg::GoToSelectStoragePage()
+{
+	ULARGE_INTEGER freeBytesAvailable, totalNumberOfBytes, totalNumberOfFreeBytes;
+	CComPtr<IHTMLSelectElement> selectElement;
+	HRESULT hr;
+	int maxAvailableGigs = 0;
+	CStringA freeSize, totalSize;
+	bool isBaseImage = true;
+
+	// figure out how much space we need
+	ULONGLONG neededSize = 0;
+	ULONGLONG bytesInGig = BYTES_IN_GIGABYTE;
+	if (m_useLocalFile) {
+		pFileImageEntry_t localEntry = NULL;
+		CString selectedImage = UTF8ToCString(image_path);
+		neededSize = GetExtractedSize(selectedImage, FALSE);
+
+		if (!m_imageFiles.Lookup(selectedImage, localEntry)) {
+			uprintf("ERROR: Selected local file not found.");
+		} else {
+			isBaseImage = (localEntry->personality == PERSONALITY_BASE);
+		}
+	} else {
+		POSITION p = m_remoteImages.FindIndex(m_selectedRemoteIndex);
+		if (p != NULL) {
+			RemoteImageEntry_t remote = m_remoteImages.GetAt(p);
+			neededSize = remote.extractedSize;
+			isBaseImage = (remote.personality == PERSONALITY_BASE);
+		}
+	}
+	neededSize += bytesInGig;
+	int neededGigs = (int) (neededSize / bytesInGig);
+
+	CStringW systemDrive = GetSystemDrive();
+	CStringA systemDriveA = ConvertUnicodeToUTF8(systemDrive);
+
+	// get available space on system drive
+	IFFALSE_RETURN(GetDiskFreeSpaceEx(systemDrive, &freeBytesAvailable, &totalNumberOfBytes, &totalNumberOfFreeBytes) != 0, "Error on GetDiskFreeSpace");
+	totalSize = SizeToHumanReadable(totalNumberOfBytes.QuadPart, FALSE, use_fake_units);
+	freeSize = SizeToHumanReadable(freeBytesAvailable.QuadPart, FALSE, use_fake_units);
+	uprintf("Available space on drive %s is %s out of %s; we need %s", systemDrive, freeSize, totalSize, SizeToHumanReadable(neededSize, FALSE, use_fake_units));
+	maxAvailableGigs = (int) ((freeBytesAvailable.QuadPart - bytesInGig) / bytesInGig);
+
+	bool enoughBytesAvailable = (freeBytesAvailable.QuadPart - bytesInGig) > neededSize;
+
+	// Enable/disable ui elements based on space availability
+	CallJavascript(_T(JS_ENABLE_ELEMENT), CComVariant(_T(ELEMENT_STORAGE_SELECT)), CComVariant(enoughBytesAvailable));
+
+	// update messages with needed space based on selected version
+	CStringA osVersion = lmprintf(isBaseImage ? MSG_400 : MSG_316);
+	CStringA osSizeText = SizeToHumanReadable((isBaseImage ? RECOMMENDED_GIGS_BASE : RECOMMENDED_GIGS_FULL) * bytesInGig, FALSE, use_fake_units);
+	CString message = UTF8ToCString(lmprintf(MSG_337, osVersion, osSizeText));
+	SetElementText(_T(ELEMENT_STORAGE_DESCRIPTION), CComBSTR(message));
+
+	message = UTF8ToCString(lmprintf(MSG_341, freeSize, totalSize, systemDriveA));
+	SetElementText(_T(ELEMENT_STORAGE_AVAILABLE), CComBSTR(message));
+
+	message = UTF8ToCString(lmprintf(MSG_342, systemDriveA));
+	SetElementText(_T(ELEMENT_STORAGE_MESSAGE), CComBSTR(message));
+
+	// Clear existing elements from the drop down
+	hr = GetSelectElement(_T(ELEMENT_STORAGE_SELECT), selectElement);
+	IFFALSE_RETURN(SUCCEEDED(hr) && selectElement != NULL, "Error returned from GetSelectElement.");
+	hr = selectElement->put_length(0);
+
+	if (!enoughBytesAvailable) {
+		uprintf("Not enough bytes available.");
+		ChangePage(_T(ELEMENT_STORAGE_PAGE));
+		return;
+	}
+
+	// Add the entries
+	IFFALSE_RETURN(AddStorageEntryToSelect(selectElement, neededGigs, IS_MINIMUM_VALUE), "Error adding value to select.");
+
+	for (int nrGigs = MIN_NO_OF_GIGS; nrGigs < min(maxAvailableGigs, MAX_NO_OF_GIGS); nrGigs = nrGigs * 2) {
+		IFFALSE_CONTINUE(nrGigs > neededGigs, "");
+		IFFALSE_RETURN(AddStorageEntryToSelect(selectElement, nrGigs, isBaseImage ? IS_BASE_IMAGE : 0), "Error adding value to select.");
+	}
+
+	IFFALSE_RETURN(AddStorageEntryToSelect(selectElement, maxAvailableGigs, IS_MAXIMUM_VALUE), "Error adding value to select.");
+
+	ChangePage(_T(ELEMENT_STORAGE_PAGE));
+}
+
+BOOL CEndlessUsbToolDlg::AddStorageEntryToSelect(CComPtr<IHTMLSelectElement> &selectElement, int noOfGigs, uint8_t extraData)
+{
+	ULONGLONG size = noOfGigs;
+	size = size * BYTES_IN_GIGABYTE;
+	CStringA sizeText = SizeToHumanReadable(size, FALSE, use_fake_units);
+	CString value, text;
+	int locMsg = 0;
+	value.Format(L"%d", noOfGigs);
+
+	if (extraData == IS_MINIMUM_VALUE) locMsg = MSG_338;
+	else if (extraData == IS_MAXIMUM_VALUE) locMsg = MSG_340;
+	else if (extraData == IS_BASE_IMAGE && noOfGigs == RECOMMENDED_GIGS_BASE) locMsg = MSG_339;
+	else if (extraData == 0 && noOfGigs == RECOMMENDED_GIGS_FULL) locMsg = MSG_339;
+
+	if (locMsg != 0) {
+		text = UTF8ToCString(lmprintf(locMsg, sizeText));
+	} else {
+		text = UTF8ToCString(sizeText);
+	}
+
+	if (locMsg == MSG_339) {
+		m_nrGigsSelected = noOfGigs;
+	}
+
+	return SUCCEEDED(AddEntryToSelect(selectElement, CComBSTR(value), CComBSTR(text), NULL, locMsg == MSG_339));
+}
+
 // Install Page Handlers
 HRESULT CEndlessUsbToolDlg::OnInstallCancelClicked(IHTMLElement* pElement)
 {
@@ -2840,7 +3193,7 @@ HRESULT CEndlessUsbToolDlg::OnRecoverErrorButtonClicked(IHTMLElement* pElement)
     switch (errorCause) {
     case ErrorCause_t::ErrorCauseDownloadFailed:
     case ErrorCause_t::ErrorCauseDownloadFailedDiskFull:
-        OnSelectUSBNextClicked(NULL);
+        StartInstallationProcess();
         break;
     case ErrorCause_t::ErrorCauseWriteFailed:
         if (!m_liveInstall) {
@@ -2862,7 +3215,7 @@ HRESULT CEndlessUsbToolDlg::OnRecoverErrorButtonClicked(IHTMLElement* pElement)
     case ErrorCause_t::ErrorCauseCanceled:
     case ErrorCause_t::ErrorCauseJSONDownloadFailed:
     default:
-        ChangePage(_T(ELEMENT_FIRST_PAGE));
+        ChangePage(_T(ELEMENT_DUALBOOT_PAGE));
         break;
     }
 
@@ -2898,6 +3251,7 @@ bool CEndlessUsbToolDlg::CancelInstall()
                 uprintf("Cancel operation confirmed.");
                 CallJavascript(_T(JS_ENABLE_BUTTON), CComVariant(HTML_BUTTON_ID(_T(ELEMENT_INSTALL_CANCEL))), CComVariant(FALSE));
                 FormatStatus = FORMAT_STATUS_CANCEL;
+				m_cancelImageUnpack = 1;
                 m_lastErrorCause = ErrorCause_t::ErrorCauseCanceled;
                 uprintf("Cancelling current operation.");
                 CString str = UTF8ToCString(lmprintf(MSG_201));
@@ -2912,7 +3266,11 @@ bool CEndlessUsbToolDlg::CancelInstall()
 
 DownloadType_t CEndlessUsbToolDlg::GetSelectedDownloadType()
 {
-    return m_liveInstall ? DownloadType_t::DownloadTypeLiveImage : DownloadType_t::DownloadTypeInstallerImage;
+	if (m_dualBootSelected) {
+		return DownloadType_t::DownloadTypeDualBootFiles;
+	} else {
+		return m_liveInstall ? DownloadType_t::DownloadTypeLiveImage : DownloadType_t::DownloadTypeInstallerImage;
+	}
 }
 
 void CEndlessUsbToolDlg::OnClose()
@@ -2986,6 +3344,7 @@ void CEndlessUsbToolDlg::UpdateCurrentStep(int currentStep)
         break;
     case OP_FLASHING_DEVICE:
     case OP_FILE_COPY:
+	case OP_SETUP_DUALBOOT:
         locMsgIdTitle = MSG_311;
         locMsgIdSubtitle = MSG_309;
         nrCurrentStep = m_useLocalFile ? 2 : 3;
@@ -3041,7 +3400,10 @@ DWORD WINAPI CEndlessUsbToolDlg::FileVerificationThread(void* param)
     HCRYPTPROV hCryptProv = NULL;
     HCRYPTHASH hHash = NULL;
 
-	uprintf("Verifying file '%ls' with signature '%ls'", dlg->m_localFile, dlg->m_localFileSig);
+    uprintf("Verifying file '%ls' with signature '%ls'", dlg->m_localFile, dlg->m_localFileSig);
+
+    /*verificationResult = TRUE;
+    goto error;*/
 
     IFFALSE_GOTOERROR(0 == LoadSignature(signatureFilename, &p_sig), "Error on LoadSignature");
     IFFALSE_GOTOERROR(0 == parse_public_key(endless_public_key, sizeof(endless_public_key), &p_pkey, nullptr), "Error on parse_public_key");
@@ -3119,10 +3481,10 @@ DWORD WINAPI CEndlessUsbToolDlg::FileCopyThread(void* param)
     IFFALSE_GOTOERROR(hPhysical != INVALID_HANDLE_VALUE, "Error on acquiring disk handle.");
     
     result = DeviceIoControl(hPhysical, IOCTL_DISK_GET_DRIVE_GEOMETRY_EX, NULL, 0, geometry, sizeof(geometry), &size, NULL);
-    IFFALSE_GOTOERROR(result == TRUE && size > 0, "Error on querying disk geometry.");    
+    IFFALSE_GOTOERROR(result != 0 && size > 0, "Error on querying disk geometry.");
 
     result = DeviceIoControl(hPhysical, IOCTL_DISK_GET_DRIVE_LAYOUT_EX, NULL, 0, layout, sizeof(layout), &size, NULL);
-    IFFALSE_GOTOERROR(result == TRUE && size > 0, "Error on querying disk layout.");
+    IFFALSE_GOTOERROR(result != 0 && size > 0, "Error on querying disk layout.");
     
     IFFALSE_GOTOERROR(DriveLayout->PartitionStyle == PARTITION_STYLE_GPT, "Unexpected partition type.");
     IFFALSE_GOTOERROR(DriveLayout->PartitionCount == EXPECTED_NUMBER_OF_PARTITIONS, "Error: Unexpected number of partitions.");
@@ -3291,7 +3653,7 @@ void CEndlessUsbToolDlg::GetImgDisplayName(CString &displayName, const CString &
 {
     FUNCTION_ENTER;
 
-    ULONGLONG actualsize = m_liveInstall ? size : (size + m_installerImage.compressedSize);
+    ULONGLONG actualsize = m_liveInstall || m_dualBootSelected ? size : (size + m_installerImage.compressedSize);
     // Create display name
     displayName = _T(ENDLESS_OS);
     displayName += " ";
@@ -3523,6 +3885,7 @@ void CEndlessUsbToolDlg::CancelRunningOperation()
     FUNCTION_ENTER;
 
     SetEvent(m_cancelOperationEvent);
+	m_cancelImageUnpack = 1;
 
     FormatStatus = FORMAT_STATUS_CANCEL;
     if (m_currentStep != OP_FLASHING_DEVICE) {
@@ -3544,7 +3907,21 @@ bool CEndlessUsbToolDlg::CanUseLocalFile()
     bool hasLocalInstaller = m_liveInstall || (m_localInstallerImage.stillPresent == TRUE);
     bool hasLocalImages = (m_imageFiles.GetCount() != 0);
 
-    return !m_localFilesScanned || (hasLocalInstaller && hasLocalImages);
+	// If we have a local entry with all needed files
+	bool hasFilesForDualBoot = false;
+	if (m_dualBootSelected && hasLocalImages) {
+		pFileImageEntry_t currentEntry = NULL;
+		CString path;
+		for (POSITION position = m_imageFiles.GetStartPosition(); position != NULL; ) {
+			m_imageFiles.GetNextAssoc(position, path, currentEntry);
+			if (currentEntry->hasBootArchive && currentEntry->hasBootArchiveSig) {
+				hasFilesForDualBoot = true;
+				break;
+			}
+		}
+	}
+
+    return !m_localFilesScanned || (hasLocalInstaller && hasLocalImages) || hasFilesForDualBoot;
 }
 
 bool CEndlessUsbToolDlg::CanUseRemoteFile()
@@ -3694,6 +4071,20 @@ void CEndlessUsbToolDlg::JSONDownloadFailed()
 #define MBR_PART_LENGTH_BYTES		1048576
 #define EXFAT_PART_STARTING_SECTOR	131072
 
+#define EFI_BOOT_SUBDIRECTORY			L"EFI\\BOOT"
+#define ENDLESS_BOOT_SUBDIRECTORY		L"EFI\\Endless"
+#define PATH_ENDLESS_SUBDIRECTORY		L"endless\\"
+#define ENDLESS_IMG_FILE_NAME			L"endless.img"
+#define EXFAT_ENDLESS_LIVE_FILE_NAME	L"live"
+#define GRUB_BOOT_SUBDIRECTORY			L"grub"
+#define LIVE_BOOT_IMG_FILE				L"live\\boot.img"
+#define LIVE_CORE_IMG_FILE				L"live\\core.img"
+#define MAX_BOOT_IMG_FILE_SIZE			446
+#define NTFS_CORE_IMG_FILE				L"ntfs\\core.img"
+#define ENDLESS_BOOT_EFI_FILE			"bootx64.efi"
+
+#define CHECK_IF_CANCELED IFFALSE_GOTOERROR(dlg->m_cancelImageUnpack == 0 && WaitForSingleObject((HANDLE)dlg->m_cancelOperationEvent, 0) != WAIT_OBJECT_0, "Operation has been canceled")
+
 DWORD WINAPI CEndlessUsbToolDlg::CreateUSBStick(LPVOID param)
 {
 	FUNCTION_ENTER;
@@ -3706,7 +4097,17 @@ DWORD WINAPI CEndlessUsbToolDlg::CreateUSBStick(LPVOID param)
 	BYTE geometry[256] = { 0 }, layout[4096] = { 0 };
 	CREATE_DISK createDiskData;
 	CString driveLetter;
+	CString bootFilesPathGz = GET_LOCAL_PATH(dlg->m_bootArchive);
+	CString bootFilesPath = GET_LOCAL_PATH(CString(BOOT_COMPONENTS_FOLDER)) + L"\\";
+	CString usbFilesPath;
+	PDISK_GEOMETRY_EX DiskGeometry = (PDISK_GEOMETRY_EX)(void*)geometry;
 
+	// Unpack boot components
+	IFFALSE_GOTOERROR(UnpackBootComponents(bootFilesPathGz, bootFilesPath), "Error unpacking boot components.");
+
+	CHECK_IF_CANCELED;
+
+	// initialize create disk data
 	memset(&createDiskData, 0, sizeof(createDiskData));
 	createDiskData.PartitionStyle = PARTITION_STYLE_GPT;
 	createDiskData.Gpt.MaxPartitionCount = GPT_MAX_PARTITION_COUNT;
@@ -3721,20 +4122,35 @@ DWORD WINAPI CEndlessUsbToolDlg::CreateUSBStick(LPVOID param)
 
 	// get disk geometry information
 	result = DeviceIoControl(hPhysical, IOCTL_DISK_GET_DRIVE_GEOMETRY_EX, NULL, 0, geometry, sizeof(geometry), &size, NULL);
-	IFFALSE_GOTOERROR(result == TRUE && size > 0, "Error on querying disk geometry.");
+	IFFALSE_GOTOERROR(result != 0 && size > 0, "Error on querying disk geometry.");
 
 	// set initial drive layout data
 	memset(layout, 0, sizeof(layout));
 	IFFALSE_GOTOERROR(CreateFakePartitionLayout(hPhysical, layout, geometry), "Error on CreateFakePartitionLayout");
+
+	CHECK_IF_CANCELED;
+
+	// Write MBR and SBR to disk
+	IFFALSE_GOTOERROR(WriteMBRAndSBRToUSB(hPhysical, bootFilesPath, DiskGeometry->Geometry.BytesPerSector), "Error on WriteMBRAndSBRToUSB");
+
 	safe_closehandle(hPhysical);
+
+	CHECK_IF_CANCELED;
+
 	// Format and mount ESP
 	IFFALSE_GOTOERROR(FormatFirstPartitionOnDrive(DriveIndex, FS_FAT32, dlg->m_cancelOperationEvent, L""), "Error on FormatFirstPartitionOnDrive");
-	IFFALSE_GOTOERROR(MountFirstPartitionOnDrive(DriveIndex, driveLetter), "Error on MountFirstPartitionOnDrive");
 
-	// TODO: Copy files to the ESP partition
+	CHECK_IF_CANCELED;
+
+	IFFALSE_GOTOERROR(MountFirstPartitionOnDrive(DriveIndex, driveLetter), "Error on MountFirstPartitionOnDrive");	
+
+	// Copy files to the ESP partition
+	IFFALSE_GOTOERROR(CopyFilesToESP(bootFilesPath, driveLetter), "Error when trying to copy files to ESP partition.");
 
 	// Unmount ESP
 	if (!DeleteVolumeMountPoint(driveLetter)) uprintf("Failed to unmount volume: %s", WindowsErrorString());
+
+	CHECK_IF_CANCELED;
 
 	// get disk handle again
 	hPhysical = GetPhysicalHandle(DriveIndex, TRUE, TRUE);
@@ -3744,16 +4160,22 @@ DWORD WINAPI CEndlessUsbToolDlg::CreateUSBStick(LPVOID param)
 	IFFALSE_GOTOERROR(CreateCorrectPartitionLayout(hPhysical, layout, geometry), "Error on CreateFakePartitionLayout");
 	safe_closehandle(hPhysical);
 
+	CHECK_IF_CANCELED;
+
 	// Format and mount exFAT
 	IFFALSE_GOTOERROR(FormatFirstPartitionOnDrive(DriveIndex, FS_EXFAT, dlg->m_cancelOperationEvent, EXFAT_PARTITION_NAME_LIVE), "Error on FormatFirstPartitionOnDrive");
+
+	CHECK_IF_CANCELED;
+
 	IFFALSE_GOTOERROR(MountFirstPartitionOnDrive(DriveIndex, driveLetter), "Error on MountFirstPartitionOnDrive");
 
-	// TODO: Copy files to the exFAT partition
+	// Copy files to the exFAT partition
+	IFFALSE_GOTOERROR(CopyFilesToexFAT(dlg, bootFilesPath, driveLetter), "Error on CopyFilesToexFAT");
 
 	// Unmount exFAT
 	if (!DeleteVolumeMountPoint(driveLetter)) uprintf("Failed to unmount volume: %s", WindowsErrorString());
 
-	// TODO: Write MBR and SBR to disk
+	CHECK_IF_CANCELED;
 
 	goto done;
 
@@ -3763,7 +4185,11 @@ error:
 		dlg->m_lastErrorCause = ErrorCause_t::ErrorCauseWriteFailed;
 	}
 
+	// Unmount exFAT
+	if (!DeleteVolumeMountPoint(driveLetter)) uprintf("Failed to unmount volume: %s", WindowsErrorString());
+
 done:
+	RemoveNonEmptyDirectory(bootFilesPath);
 	safe_closehandle(hPhysical);
 	dlg->PostMessage(WM_FINISHED_ALL_OPERATIONS, 0, 0);
 	return 0;
@@ -3772,6 +4198,8 @@ done:
 
 bool CEndlessUsbToolDlg::CreateFakePartitionLayout(HANDLE hPhysical, PBYTE layout, PBYTE geometry)
 {
+	FUNCTION_ENTER;
+
 	PDRIVE_LAYOUT_INFORMATION_EX DriveLayout = (PDRIVE_LAYOUT_INFORMATION_EX)(void*)layout;
 	PDISK_GEOMETRY_EX DiskGeometry = (PDISK_GEOMETRY_EX)(void*)geometry;
 	PARTITION_INFORMATION_EX *currentPartition;
@@ -3815,6 +4243,8 @@ error:
 
 bool CEndlessUsbToolDlg::CreateCorrectPartitionLayout(HANDLE hPhysical, PBYTE layout, PBYTE geometry)
 {
+	FUNCTION_ENTER;
+
 	PARTITION_INFORMATION_EX exfatPartition;
 	PDRIVE_LAYOUT_INFORMATION_EX DriveLayout = (PDRIVE_LAYOUT_INFORMATION_EX)(void*)layout;
 	PDISK_GEOMETRY_EX DiskGeometry = (PDISK_GEOMETRY_EX)(void*)geometry;
@@ -3845,6 +4275,8 @@ error:
 
 bool CEndlessUsbToolDlg::FormatFirstPartitionOnDrive(DWORD DriveIndex, int fsToUse, HANDLE cancelEvent, const wchar_t *partLabel)
 {
+	FUNCTION_ENTER;
+
 	BOOL result;
 	int formatRetries = 5;
 	bool returnValue = false;
@@ -3872,6 +4304,8 @@ error:
 
 bool CEndlessUsbToolDlg::MountFirstPartitionOnDrive(DWORD DriveIndex, CString &driveLetter)
 {
+	FUNCTION_ENTER;
+
 	char *guid_volume = NULL;
 	bool returnValue = false;
 
@@ -3891,4 +4325,757 @@ bool CEndlessUsbToolDlg::MountFirstPartitionOnDrive(DWORD DriveIndex, CString &d
 error:
 	safe_free(guid_volume);
 	return returnValue;
+}
+
+bool CEndlessUsbToolDlg::UnpackZip(const CComBSTR source, const CComBSTR dest)
+{
+	FUNCTION_ENTER;
+
+	HRESULT					hResult;
+	CComPtr<IShellDispatch>	pISD;
+	CComPtr<Folder>			pToFolder, pFromFolder;
+	CComPtr<FolderItems>	folderItems;
+	bool					returnValue = false;
+
+	IFFALSE_GOTOERROR(SUCCEEDED(CoInitialize(NULL)), "Error on CoInitialize");
+	hResult = CoCreateInstance(CLSID_Shell, NULL, CLSCTX_INPROC_SERVER, IID_IShellDispatch, (void **)&pISD);
+	IFFALSE_GOTOERROR(SUCCEEDED(hResult), "Error on CoCreateInstance with IID_IShellDispatch");
+	IFFALSE_GOTOERROR(SUCCEEDED(pISD->NameSpace(CComVariant(dest), &pToFolder)), "Error on pISD->NameSpace for destination.");
+	IFFALSE_GOTOERROR(SUCCEEDED(pISD->NameSpace(CComVariant(source), &pFromFolder)), "Error on pISD->NameSpace for source.");
+
+	IFFALSE_GOTOERROR(SUCCEEDED(pFromFolder->Items(&folderItems)), "Error on pFromFolder->Items.");
+	IFFALSE_GOTOERROR(SUCCEEDED(pToFolder->CopyHere(CComVariant(folderItems), CComVariant(FOF_NO_UI))), "Error on pToFolder->CopyHere");
+
+	returnValue = true;
+error:
+	CoUninitialize();
+	return returnValue;
+}
+
+void CEndlessUsbToolDlg::RemoveNonEmptyDirectory(const CString directoryPath)
+{
+	FUNCTION_ENTER;
+
+	SHFILEOPSTRUCT fileOperation;
+	wchar_t dir[MAX_PATH + 1];
+	memset(dir, 0, sizeof(dir));
+	wsprintf(dir, L"%ls", directoryPath);
+
+	fileOperation.fFlags = FOF_SILENT | FOF_NOCONFIRMATION | FOF_NOERRORUI | FOF_NOCONFIRMMKDIR;
+	fileOperation.pFrom = dir;
+	fileOperation.pTo = NULL;
+	fileOperation.hwnd = NULL;
+	fileOperation.wFunc = FO_DELETE;
+
+	int result = SHFileOperation(&fileOperation);
+	uprintf("Removing directory '%ls' result=%d", directoryPath, result);
+}
+
+bool CEndlessUsbToolDlg::CopyFilesToESP(const CString &fromFolder, const CString &driveLetter)
+{
+	FUNCTION_ENTER;
+
+	CString espFolder = driveLetter + EFI_BOOT_SUBDIRECTORY;
+	SHFILEOPSTRUCT fileOperation;
+	wchar_t fromPath[MAX_PATH + 1], toPath[MAX_PATH + 1];
+	bool retResult = false;
+
+	int createDirResult = SHCreateDirectoryExW(NULL, espFolder, NULL);
+	IFFALSE_GOTOERROR(createDirResult == ERROR_SUCCESS || createDirResult == ERROR_FILE_EXISTS, "Error creating EFI directory in ESP partition.");
+
+	memset(fromPath, 0, sizeof(fromPath));
+	wsprintf(fromPath, L"%ls%ls\\%ls", fromFolder, EFI_BOOT_SUBDIRECTORY, ALL_FILES);
+	memset(toPath, 0, sizeof(fromPath));
+	wsprintf(toPath, L"%ls", espFolder);
+
+	fileOperation.fFlags = FOF_SILENT | FOF_NOCONFIRMATION | FOF_NOERRORUI | FOF_NOCONFIRMMKDIR;
+	fileOperation.pFrom = fromPath;
+	fileOperation.pTo = toPath;
+	fileOperation.hwnd = NULL;
+	fileOperation.wFunc = FO_COPY;
+
+	int result = SHFileOperation(&fileOperation);
+
+	retResult = result == ERROR_SUCCESS;
+
+error:
+	return retResult;
+}
+
+void CEndlessUsbToolDlg::ImageUnpackCallback(const uint64_t read_bytes)
+{
+	static int oldPercent = 0;
+	static int oldOp = -1;
+
+	float perecentageUnpacked = 100.0f * read_bytes / CEndlessUsbToolDlg::ImageUnpackFileSize;
+	float percentage = (float)CEndlessUsbToolDlg::ImageUnpackPercentStart;
+	percentage += (CEndlessUsbToolDlg::ImageUnpackPercentEnd - CEndlessUsbToolDlg::ImageUnpackPercentStart) * perecentageUnpacked / 100;
+
+	bool change = false;
+	if (CEndlessUsbToolDlg::ImageUnpackOperation != oldOp) {
+		oldOp = CEndlessUsbToolDlg::ImageUnpackOperation;
+		oldPercent = (int)floor(percentage);
+		change = true;
+	} else if (oldPercent != (int)floor(percentage)) {
+		oldPercent = (int)floor(percentage);
+		change = true;
+	}
+
+	if (change) {
+		uprintf("Operation %ls(%d) - unpacked %s",
+			OperationToStr(CEndlessUsbToolDlg::ImageUnpackOperation),
+			CEndlessUsbToolDlg::ImageUnpackOperation,
+			SizeToHumanReadable(read_bytes, FALSE, use_fake_units));
+	}
+	UpdateProgress(OP_SETUP_DUALBOOT, percentage);
+}
+
+bool CEndlessUsbToolDlg::CopyFilesToexFAT(CEndlessUsbToolDlg *dlg, const CString &fromFolder, const CString &driveLetter)
+{
+	FUNCTION_ENTER;
+
+	bool retResult = false;
+
+	CString usbFilesPath = driveLetter + PATH_ENDLESS_SUBDIRECTORY;
+
+	int createDirResult = SHCreateDirectoryExW(NULL, usbFilesPath, NULL);
+	IFFALSE_GOTOERROR(createDirResult == ERROR_SUCCESS || createDirResult == ERROR_FILE_EXISTS, "Error creating directory on USB drive.");
+
+	bool unpackResult = dlg->UnpackFile(ConvertUnicodeToUTF8(dlg->m_localFile), ConvertUnicodeToUTF8(usbFilesPath + ENDLESS_IMG_FILE_NAME), BLED_COMPRESSION_GZIP, ImageUnpackCallback, &dlg->m_cancelImageUnpack);
+	IFFALSE_GOTOERROR(unpackResult, "Error unpacking image to USB drive");
+
+	IFFALSE_GOTOERROR(0 != CopyFile(dlg->m_unpackedImageSig, usbFilesPath + CSTRING_GET_LAST(dlg->m_unpackedImageSig, '\\'), FALSE), "Error copying image signature file to drive.");
+
+	FILE *liveFile;
+	IFFALSE_GOTOERROR(0 == _wfopen_s(&liveFile, usbFilesPath + EXFAT_ENDLESS_LIVE_FILE_NAME, L"w"), "Error creating empty live file.");
+	fclose(liveFile);
+
+	// copy grub to USB drive
+	IFFALSE_GOTOERROR(CopyMultipleItems(fromFolder + GRUB_BOOT_SUBDIRECTORY, usbFilesPath), "Error copying grub folder to USB drive.");
+
+	retResult = true;
+
+error:
+	return retResult;
+}
+
+bool CEndlessUsbToolDlg::CopyMultipleItems(const CString &from, const CString &to)
+{
+	FUNCTION_ENTER;
+
+	SHFILEOPSTRUCT fileOperation;
+	wchar_t fromPath[MAX_PATH + 1], toPath[MAX_PATH + 1];
+
+	uprintf("Copying '%ls' to '%ls'", from, to);
+
+	memset(fromPath, 0, sizeof(fromPath));
+	wsprintf(fromPath, L"%ls", from);
+	memset(toPath, 0, sizeof(toPath));
+	wsprintf(toPath, L"%ls", to);
+
+	fileOperation.fFlags = FOF_SILENT | FOF_NOCONFIRMATION | FOF_NOERRORUI | FOF_NOCONFIRMMKDIR;
+	fileOperation.pFrom = fromPath;
+	fileOperation.pTo = toPath;
+	fileOperation.hwnd = NULL;
+	fileOperation.wFunc = FO_COPY;
+
+	int result = SHFileOperation(&fileOperation);
+
+	return result == 0;
+}
+
+bool CEndlessUsbToolDlg::WriteMBRAndSBRToUSB(HANDLE hPhysical, const CString &bootFilesPath, DWORD bytesPerSector)
+{
+	FUNCTION_ENTER;
+
+	FAKE_FD fake_fd = { 0 };
+	FILE* fp = (FILE*)&fake_fd;
+	FILE *bootImgFile = NULL, *coreImgFile = NULL;
+	CString bootImgFilePath = bootFilesPath + LIVE_BOOT_IMG_FILE;
+	CString coreImgFilePath = bootFilesPath + LIVE_CORE_IMG_FILE;
+	unsigned char endlessMBRData[MAX_BOOT_IMG_FILE_SIZE + 1];
+	unsigned char *endlessSBRData = NULL;
+	bool retResult = false;
+	size_t countRead, coreImgSize;
+	size_t mbrPartitionStart = bytesPerSector * MBR_PART_STARTING_SECTOR;
+
+	// Load boot.img from file
+	IFFALSE_GOTOERROR(0 == _wfopen_s(&bootImgFile, bootImgFilePath, L"rb"), "Error opening boot.img file");
+	countRead = fread(endlessMBRData, 1, sizeof(endlessMBRData), bootImgFile);
+	IFFALSE_GOTOERROR(countRead == MAX_BOOT_IMG_FILE_SIZE, "Size of boot.img is not what is expected.");
+
+	// write boot.img to USB drive
+	fake_fd._handle = (char*)hPhysical;
+	set_bytes_per_sector(SelectedDrive.Geometry.BytesPerSector);
+	IFFALSE_GOTOERROR(write_data(fp, 0x0, endlessMBRData, MAX_BOOT_IMG_FILE_SIZE) != 0, "Error on write_data with boot.img contents.");
+
+	// Read core.img data and write it to USB drive
+	IFFALSE_GOTOERROR(0 == _wfopen_s(&coreImgFile, coreImgFilePath, L"rb"), "Error opening core.img file");
+	fseek(coreImgFile, 0L, SEEK_END);
+	coreImgSize = ftell(coreImgFile);
+	rewind(coreImgFile);
+	uprintf("Size of SBR is %d bytes from %ls", coreImgSize, coreImgFilePath);
+	IFFALSE_GOTOERROR(coreImgSize <= MBR_PART_LENGTH_BYTES, "Error: SBR found in core.img is too big.");
+
+	endlessSBRData = (unsigned char*)malloc(bytesPerSector);
+	coreImgSize = 0;
+	while (!feof(coreImgFile) && coreImgSize < MBR_PART_LENGTH_BYTES) {
+		countRead = fread(endlessSBRData, 1, bytesPerSector, coreImgFile);
+		IFFALSE_GOTOERROR(write_data(fp, mbrPartitionStart + coreImgSize, endlessSBRData, countRead) != 0, "Error on write data with core.img contents.");
+		coreImgSize += countRead;
+		uprintf("Wrote %d bytes", coreImgSize);
+	}
+
+	retResult = true;
+
+	DWORD size;
+	// Tell the system we've updated the disk properties
+	if (!DeviceIoControl(hPhysical, IOCTL_DISK_UPDATE_PROPERTIES, NULL, 0, NULL, 0, &size, NULL))
+		uprintf("Failed to notify system about disk properties update: %s\n", WindowsErrorString());
+
+error:
+	if (bootImgFile != NULL) {
+		fclose(bootImgFile);
+		bootImgFile = NULL;
+	}
+
+	if (coreImgFile != NULL) {
+		fclose(coreImgFile);
+		coreImgFile = NULL;
+	}
+
+	if (endlessSBRData != NULL) {
+		safe_free(endlessSBRData);
+	}
+
+	return retResult;
+}
+
+// Below defines need to be in this order
+#define DB_PROGRESS_UNPACK_BOOT_ZIP		1
+#define DB_PROGRESS_CHECK_PARTITION		1
+#define DB_PROGRESS_FINISHED_UNPACK		95
+#define DB_PROGRESS_COPY_GRUB_FOLDER	98
+#define DB_PROGRESS_MBR_OR_EFI_SETUP	100
+
+#define REGKEY_UTC_TIME_PATH	L"SYSTEM\\CurrentControlSet\\Control\\TimeZoneInformation"
+#define REGKEY_UTC_TIME			L"RealTimeIsUniversal"
+#define REGKEY_FASTBOOT_PATH	L"SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Power"
+#define REGKEY_FASTBOOT			L"HiberbootEnabled"
+
+DWORD WINAPI CEndlessUsbToolDlg::SetupDualBoot(LPVOID param)
+{
+	FUNCTION_ENTER;
+
+	CEndlessUsbToolDlg *dlg = (CEndlessUsbToolDlg*)param;
+	CString systemDriveLetter;
+	CString endlessFilesPath;
+	CString bootFilesPath = GET_LOCAL_PATH(CString(BOOT_COMPONENTS_FOLDER)) + L"\\";
+	wchar_t fileSystemType[MAX_PATH + 1];
+
+	// TODO: Should we detect what the system partition is or just assume it's on C:\?
+	systemDriveLetter = GetSystemDrive();
+	endlessFilesPath = systemDriveLetter + PATH_ENDLESS_SUBDIRECTORY;
+
+	IFFALSE_PRINTERROR(ChangeAccessPermissions(endlessFilesPath, false), "Error on granting Endless files permissions.");
+
+	// Unpack boot components
+	IFFALSE_GOTOERROR(UnpackBootComponents(dlg->m_bootArchive, bootFilesPath), "Error unpacking boot components.");
+
+	UpdateProgress(OP_SETUP_DUALBOOT, DB_PROGRESS_UNPACK_BOOT_ZIP);
+	CHECK_IF_CANCELED;
+
+	// Verify that this is an NTFS C:\ partition
+	IFFALSE_GOTOERROR(GetVolumeInformation(systemDriveLetter, NULL, 0, NULL, NULL, NULL, fileSystemType, MAX_PATH + 1) != 0, "Error on GetVolumeInformation.");
+	uprintf("File system type '%ls'", fileSystemType);
+	IFFALSE_GOTOERROR(0 == wcscmp(fileSystemType, L"NTFS"), "File system type is not NTFS");
+
+	// TODO: Verify that the C:\ drive is not encrypted with BitLocker or similar
+
+	UpdateProgress(OP_SETUP_DUALBOOT, DB_PROGRESS_CHECK_PARTITION);
+
+	// Create endless folder
+	int createDirResult = SHCreateDirectoryExW(NULL, endlessFilesPath, NULL);
+	IFFALSE_GOTOERROR(createDirResult == ERROR_SUCCESS || createDirResult == ERROR_ALREADY_EXISTS, "Error creating directory on USB drive.");
+
+	// Unpack img file
+	CEndlessUsbToolDlg::ImageUnpackOperation = OP_SETUP_DUALBOOT;
+	CEndlessUsbToolDlg::ImageUnpackPercentStart = DB_PROGRESS_CHECK_PARTITION;
+	CEndlessUsbToolDlg::ImageUnpackPercentEnd = DB_PROGRESS_FINISHED_UNPACK;
+	CEndlessUsbToolDlg::ImageUnpackFileSize = dlg->m_selectedFileSize;
+	bool unpackResult = dlg->UnpackFile(ConvertUnicodeToUTF8(dlg->m_localFile), ConvertUnicodeToUTF8(endlessFilesPath + ENDLESS_IMG_FILE_NAME), BLED_COMPRESSION_GZIP, ImageUnpackCallback, &dlg->m_cancelImageUnpack);
+	IFFALSE_GOTOERROR(unpackResult, "Error unpacking image to endless folder.");
+
+	// extend this file with 0s so it reaches the required size
+	HANDLE endlessImage = CreateFile(endlessFilesPath + ENDLESS_IMG_FILE_NAME, GENERIC_WRITE, FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+	IFFALSE_GOTOERROR(endlessImage != INVALID_HANDLE_VALUE, "Error opening Endless image file.");
+	ULONGLONG selectedGigs = dlg->m_nrGigsSelected;
+	LARGE_INTEGER lsize;
+	lsize.QuadPart = selectedGigs * BYTES_IN_GIGABYTE;
+	uprintf("Trying to set size of Endless image to %I64i bytes which is about %s", lsize.QuadPart, SizeToHumanReadable(lsize.QuadPart, FALSE, use_fake_units));
+	IFFALSE_PRINTERROR(SetFilePointerEx(endlessImage, lsize, NULL, FILE_BEGIN) != 0, "Error on SetFilePointerEx");
+	IFFALSE_PRINTERROR(SetEndOfFile(endlessImage), "Error on SetEndOfFile");
+	IFFALSE_PRINTERROR(CloseHandle(endlessImage), "Error on CloseHandle.");
+	UpdateProgress(OP_SETUP_DUALBOOT, DB_PROGRESS_FINISHED_UNPACK);
+	CHECK_IF_CANCELED;
+
+	// Copy grub
+	IFFALSE_GOTOERROR(CopyMultipleItems(bootFilesPath + GRUB_BOOT_SUBDIRECTORY, endlessFilesPath), "Error copying grub folder to USB drive.");
+	UpdateProgress(OP_SETUP_DUALBOOT, DB_PROGRESS_COPY_GRUB_FOLDER);
+	CHECK_IF_CANCELED;
+
+	if (IsLegacyBIOSBoot()) {
+		IFFALSE_GOTOERROR(WriteMBRAndSBRToWinDrive(systemDriveLetter, bootFilesPath), "Error on WriteMBRAndSBRToWinDrive");
+	} else {
+		IFFALSE_GOTOERROR(SetupEndlessEFI(systemDriveLetter, bootFilesPath), "Error on SetupEndlessEFI");
+	}
+
+	// set Endless file permissions
+	IFFALSE_PRINTERROR(ChangeAccessPermissions(endlessFilesPath, true), "Error on setting Endless files permissions.");
+
+	// set the registry key for Windows clock in UTC
+	IFFALSE_PRINTERROR(SetEndlessRegistryKey(HKEY_LOCAL_MACHINE, REGKEY_UTC_TIME_PATH, REGKEY_UTC_TIME, CComVariant(1)), "Error on setting Windows clock to UTC.");
+
+	// disable Fast Start (aka Hiberboot) so that the NTFS partition is always cleanly unmounted at shutdown:
+	IFFALSE_PRINTERROR(SetEndlessRegistryKey(HKEY_LOCAL_MACHINE, REGKEY_FASTBOOT_PATH, REGKEY_FASTBOOT, CComVariant(1)), "Error on disabling fastboot.");
+
+	UpdateProgress(OP_SETUP_DUALBOOT, DB_PROGRESS_MBR_OR_EFI_SETUP);
+
+	goto done;
+
+error:
+	uprintf("SetupDualBoot exited with error.");
+	if (dlg->m_lastErrorCause == ErrorCause_t::ErrorCauseNone) {
+		dlg->m_lastErrorCause = ErrorCause_t::ErrorCauseWriteFailed;
+	}
+
+	RemoveNonEmptyDirectory(endlessFilesPath);
+
+done:
+	RemoveNonEmptyDirectory(bootFilesPath);
+	dlg->PostMessage(WM_FINISHED_ALL_OPERATIONS, 0, 0);
+	return 0;
+}
+
+bool CEndlessUsbToolDlg::UnpackBootComponents(const CString &bootFilesPathGz, const CString &bootFilesPath)
+{
+	FUNCTION_ENTER;
+	bool retResult = false;
+
+	RemoveNonEmptyDirectory(bootFilesPath);
+	int createDirResult = SHCreateDirectoryExW(NULL, bootFilesPath, NULL);
+	IFFALSE_GOTOERROR(createDirResult == ERROR_SUCCESS || createDirResult == ERROR_ALREADY_EXISTS, "Error creating local directory to unpack boot components.");
+	IFFALSE_GOTOERROR(UnpackZip(CComBSTR(bootFilesPathGz), CComBSTR(bootFilesPath)), "Error unpacking archive to local folder.");
+
+	retResult = true;
+error:
+	return retResult;
+}
+
+bool CEndlessUsbToolDlg::IsLegacyBIOSBoot()
+{
+	FUNCTION_ENTER;
+	// From https://msdn.microsoft.com/en-us/library/windows/desktop/ms724325(v=vs.85).aspx
+	// On a legacy BIOS-based system, or on a system that supports both legacy BIOS and UEFI where Windows was installed using legacy BIOS,
+	// the function will fail with ERROR_INVALID_FUNCTION. On a UEFI-based system, the function will fail with an error specific to the firmware,
+	// such as ERROR_NOACCESS, to indicate that the dummy GUID namespace does not exist.
+	DWORD result = GetFirmwareEnvironmentVariable(L"", L"{00000000-0000-0000-0000-000000000000}", NULL, 0);
+	return result == 0 && GetLastError() == ERROR_INVALID_FUNCTION;
+}
+
+bool CEndlessUsbToolDlg::WriteMBRAndSBRToWinDrive(const CString &systemDriveLetter, const CString &bootFilesPath)
+{
+	FUNCTION_ENTER;
+
+	bool retResult = false;
+	HANDLE hPhysical = INVALID_HANDLE_VALUE;
+	BYTE geometry[256] = { 0 };
+	PDISK_GEOMETRY_EX DiskGeometry = (PDISK_GEOMETRY_EX)(void*)geometry;
+	BYTE layout[4096] = { 0 };
+	PDRIVE_LAYOUT_INFORMATION_EX DriveLayout = (PDRIVE_LAYOUT_INFORMATION_EX)(void*)layout;
+	DWORD size;
+	BOOL result;
+	CString coreImgFilePath = bootFilesPath + NTFS_CORE_IMG_FILE;
+	FILE *coreImgFile = NULL;
+	FAKE_FD fake_fd = { 0 };
+	FILE* fp = (FILE*)&fake_fd;
+	size_t countRead, coreImgSize;
+	unsigned char *endlessSBRData = NULL;
+
+	// Get system disk handle
+	hPhysical = GetPhysicalFromDriveLetter(systemDriveLetter);
+	IFFALSE_GOTOERROR(hPhysical != INVALID_HANDLE_VALUE, "Error on acquiring disk handle.");
+
+	// Make sure there already is a MBR on this disk
+	IFFALSE_GOTOERROR(AnalyzeMBR(hPhysical, "Drive"), "Error: no MBR detected on drive. Returning so we don't break something else.");
+
+	// get disk geometry information
+	result = DeviceIoControl(hPhysical, IOCTL_DISK_GET_DRIVE_GEOMETRY_EX, NULL, 0, geometry, sizeof(geometry), &size, NULL);
+	IFFALSE_GOTOERROR(result != 0 && size > 0, "Error on querying disk geometry.");
+	set_bytes_per_sector(DiskGeometry->Geometry.BytesPerSector);
+
+	// get size of core.img
+	IFFALSE_GOTOERROR(0 == _wfopen_s(&coreImgFile, coreImgFilePath, L"rb"), "Error opening core.img file");
+	fseek(coreImgFile, 0L, SEEK_END);
+	coreImgSize = ftell(coreImgFile);
+	rewind(coreImgFile);
+	uprintf("Size of SBR is %d bytes from %ls", coreImgSize, coreImgFilePath);
+
+	// Check that SBR will "fit" before writing to disk
+	// Jira issue: https://movial.atlassian.net/browse/EOIFT-158
+	result = DeviceIoControl(hPhysical, IOCTL_DISK_GET_DRIVE_LAYOUT_EX, NULL, 0, layout, sizeof(layout), &size, NULL);
+	IFFALSE_GOTOERROR(result != 0 && size > 0, "Error on querying disk layout.");
+	IFFALSE_GOTOERROR(DriveLayout->PartitionCount > 0, "We don't have any partitions?");
+	uprintf("BytesPerSector=%d, coreImgSize=%d, PartitionEntry[0].StartingOffset=%I64i",
+		DiskGeometry->Geometry.BytesPerSector, coreImgSize, DriveLayout->PartitionEntry[0].StartingOffset.QuadPart);
+	IFFALSE_GOTOERROR(DiskGeometry->Geometry.BytesPerSector + coreImgSize < DriveLayout->PartitionEntry[0].StartingOffset.QuadPart, "Error: SBR found in core.img is too big.");
+
+	// I know it's hardcoded data but better safe than sorry
+	IFFALSE_GOTOERROR(sizeof(mbr_grub2_0x0) <= MAX_BOOT_IMG_FILE_SIZE, "Size of grub2 boot.img is not what is expected.");
+
+	// Write Rufus Grub2 MBR to disk
+	fake_fd._handle = (char*)hPhysical;
+	IFFALSE_GOTOERROR(write_grub2_mbr(fp) != 0, "Error on write_grub2_mbr.");
+
+	// Write Endless SBR to disk
+	uprintf("Writing core.img at position %d", DiskGeometry->Geometry.BytesPerSector);
+	endlessSBRData = (unsigned char*)malloc(DiskGeometry->Geometry.BytesPerSector);
+	coreImgSize = 0;
+	while (!feof(coreImgFile) && coreImgSize < MBR_PART_LENGTH_BYTES) {
+		countRead = fread(endlessSBRData, 1, DiskGeometry->Geometry.BytesPerSector, coreImgFile);
+		IFFALSE_GOTOERROR(write_data(fp, DiskGeometry->Geometry.BytesPerSector + coreImgSize, endlessSBRData, countRead) != 0, "Error on write data with core.img contents.");
+		coreImgSize += countRead;
+		uprintf("Wrote %d bytes", coreImgSize);
+	}
+
+	retResult = true;
+
+error:
+	safe_closehandle(hPhysical);
+
+	if (coreImgFile != NULL) {
+		fclose(coreImgFile);
+		coreImgFile = NULL;
+	}
+
+	return retResult;
+}
+
+bool CEndlessUsbToolDlg::SetupEndlessEFI(const CString &systemDriveLetter, const CString &bootFilesPath)
+{
+	FUNCTION_ENTER;
+
+	HANDLE hPhysical;
+	bool retResult = false;
+	BYTE layout[4096] = { 0 };
+	PDRIVE_LAYOUT_INFORMATION_EX DriveLayout = (PDRIVE_LAYOUT_INFORMATION_EX)(void*)layout;
+	DWORD size;
+	BOOL result;
+	CStringA systemDriveA;
+	CString windowsEspDriveLetter;
+	const char *espMountLetter = NULL;
+
+	hPhysical = GetPhysicalFromDriveLetter(systemDriveLetter);
+	IFFALSE_GOTOERROR(hPhysical != INVALID_HANDLE_VALUE, "Error on acquiring disk handle.");
+
+	// get partition layout
+	result = DeviceIoControl(hPhysical, IOCTL_DISK_GET_DRIVE_LAYOUT_EX, NULL, 0, layout, sizeof(layout), &size, NULL);
+	IFFALSE_GOTOERROR(result != 0 && size > 0, "Error on querying disk layout.");
+	IFFALSE_GOTOERROR(DriveLayout->PartitionStyle == PARTITION_STYLE_GPT, "Unexpected partition type. Partition style is not GPT");
+
+	DWORD efiPartitionNumber = -1;
+	PARTITION_INFORMATION_EX *partition = NULL;
+	for (DWORD index = 0; index < DriveLayout->PartitionCount; index++) {
+		partition = &(DriveLayout->PartitionEntry[index]);
+
+		if (partition->Gpt.PartitionType == PARTITION_SYSTEM_GUID) {
+			uprintf("Found ESP\r\nPartition %d:\r\n  Type: %s\r\n  Name: '%ls'\r\n ID: %s",
+				index + 1, GuidToString(&partition->Gpt.PartitionType), partition->Gpt.Name, GuidToString(&partition->Gpt.PartitionId));
+			efiPartitionNumber = partition->PartitionNumber;
+			break;
+		}
+	}
+	IFFALSE_GOTOERROR(efiPartitionNumber != -1, "ESP not found.");
+	// Fail if EFI partition number is bigger than we can fit in the
+	// uin8_t that AltMountVolume receives as parameter for partition number
+	IFFALSE_GOTOERROR(efiPartitionNumber <= 0xFF, "EFI partition number is bigger than 255.");
+
+	espMountLetter = AltMountVolume(ConvertUnicodeToUTF8(systemDriveLetter.Left(2)), (uint8_t)efiPartitionNumber);
+	IFFALSE_GOTOERROR(espMountLetter != NULL, "Error assigning a letter to the ESP.");
+	windowsEspDriveLetter = UTF8ToCString(espMountLetter);
+
+	IFFALSE_GOTOERROR(CopyMultipleItems(bootFilesPath + EFI_BOOT_SUBDIRECTORY + L"\\" + ALL_FILES, windowsEspDriveLetter + L"\\" + ENDLESS_BOOT_SUBDIRECTORY), "Error copying EFI folder to Windows ESP partition.");
+
+	IFFALSE_PRINTERROR(EFIRequireNeededPrivileges(), "Error on EFIRequireNeededPrivileges.")
+	IFFALSE_GOTOERROR(EFICreateNewEntry(windowsEspDriveLetter, CString(L"\\") + ENDLESS_BOOT_SUBDIRECTORY + L"\\" + ENDLESS_BOOT_EFI_FILE, L"Endless OS"), "Error on EFICreateNewEntry");
+
+	retResult = true;
+
+error:
+	safe_closehandle(hPhysical);
+	if (espMountLetter != NULL) AltUnmountVolume(espMountLetter);
+
+	return retResult;
+}
+
+HANDLE CEndlessUsbToolDlg::GetPhysicalFromDriveLetter(const CString &driveLetter)
+{
+	FUNCTION_ENTER;
+
+	HANDLE hPhysical = INVALID_HANDLE_VALUE;
+	CStringA logical_drive;
+
+	logical_drive.Format("\\\\.\\%lc:", driveLetter[0]);
+	hPhysical = CreateFileA(logical_drive, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+	IFFALSE_GOTOERROR(hPhysical != INVALID_HANDLE_VALUE, "CreateFileA call returned invalid handle.");
+
+	int drive_number = GetDriveNumber(hPhysical, logical_drive.GetBuffer());
+	drive_number += DRIVE_INDEX_MIN;
+	safe_closehandle(hPhysical);
+
+	hPhysical = GetPhysicalHandle(drive_number, TRUE, TRUE);
+	IFFALSE_GOTOERROR(hPhysical != INVALID_HANDLE_VALUE, "Error on acquiring disk handle.");
+
+error:
+	return hPhysical;
+}
+
+bool CEndlessUsbToolDlg::Has64BitSupport()
+{
+	// MSDN: https://msdn.microsoft.com/en-us/library/hskdteyh%28v=vs.100%29.aspx?f=255&MSPPError=-2147217396
+	int CPUInfo[4];
+
+	// first check if extended data is available, which is always true on 64-bit
+	__cpuid(CPUInfo, 0x80000000);
+	if (!(CPUInfo[0] & 0x80000000))
+		return false;
+
+	// request extended data, bit 29 is set on 64-bit systems
+	__cpuid(CPUInfo, 0x80000001);
+	if (CPUInfo[3] & 0x20000000)
+		return true;
+
+	return false;
+}
+
+BOOL CEndlessUsbToolDlg::SetAttributesForFilesInFolder(CString path, bool addAttributes)
+{
+	WIN32_FIND_DATA findFileData;
+	HANDLE findFilesHandle = FindFirstFile(path + ALL_FILES, &findFileData);
+	BOOL retValue = TRUE;
+	BOOL result;
+
+	uprintf("RestrictAccessToFilesInFolder called with '%ls'", path);
+
+	IFFALSE_PRINTERROR(SetFileAttributes(path + findFileData.cFileName, addAttributes ? FILE_ATTRIBUTE_SYSTEM | FILE_ATTRIBUTE_READONLY : FILE_ATTRIBUTE_NORMAL) != 0, "Error on SetFileAttributes");
+
+	if (findFilesHandle == INVALID_HANDLE_VALUE) {
+		uprintf("UpdateFileEntries: No files found in current directory [%ls]", path);
+	} else {
+		do {
+			if (findFileData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
+				if ((0 == wcscmp(findFileData.cFileName, L".") || 0 == wcscmp(findFileData.cFileName, L".."))) continue;
+
+				CString newFolder = path + findFileData.cFileName + L"\\";
+				IFFALSE_PRINTERROR(result = SetAttributesForFilesInFolder(newFolder, addAttributes), "Error on setting attributes.");
+				retValue = retValue && result;
+			} else {
+				IFFALSE_PRINTERROR(SetFileAttributes(path + findFileData.cFileName, addAttributes ? FILE_ATTRIBUTE_SYSTEM | FILE_ATTRIBUTE_READONLY | FILE_ATTRIBUTE_HIDDEN : FILE_ATTRIBUTE_NORMAL) != 0, "Error on SetFileAttributes");
+			}
+		} while (FindNextFile(findFilesHandle, &findFileData) != 0);
+
+		FindClose(findFilesHandle);
+	}
+
+	return retValue;
+}
+
+BOOL CEndlessUsbToolDlg::SetPrivilege(HANDLE hToken, LPCTSTR lpszPrivilege, BOOL bEnablePrivilege)
+{
+	TOKEN_PRIVILEGES tp;
+	LUID luid;
+	BOOL retResult = FALSE;
+
+	IFFALSE_GOTOERROR(LookupPrivilegeValue(NULL, lpszPrivilege, &luid) != 0, "LookupPrivilegeValue error");
+
+	tp.PrivilegeCount = 1;
+	tp.Privileges[0].Luid = luid;
+	tp.Privileges[0].Attributes = bEnablePrivilege ? SE_PRIVILEGE_ENABLED : 0;
+
+	// Enable the privilege or disable all privileges.
+	IFFALSE_GOTOERROR(AdjustTokenPrivileges(hToken, FALSE, &tp, sizeof(TOKEN_PRIVILEGES), (PTOKEN_PRIVILEGES)NULL, (PDWORD)NULL) != 0, "AdjustTokenPrivileges error");
+	IFTRUE_GOTOERROR(GetLastError() == ERROR_NOT_ALL_ASSIGNED, "The token does not have the specified privilege.");
+
+	retResult = TRUE;
+error:
+	return retResult;
+}
+
+
+BOOL CEndlessUsbToolDlg::ChangeAccessPermissions(CString path, bool restrictAccess)
+{
+	LPWSTR pFilename = path.GetBuffer();
+	BOOL retResult = FALSE;
+	PSID pSIDEveryone = NULL;
+	PSID pSIDAdmin = NULL;
+	SID_IDENTIFIER_AUTHORITY SIDAuthWorld = SECURITY_WORLD_SID_AUTHORITY;
+	SID_IDENTIFIER_AUTHORITY SIDAuthNT = SECURITY_NT_AUTHORITY;
+	const int NUM_ACES = 2;
+	EXPLICIT_ACCESS ea[NUM_ACES];
+	PACL pACL = NULL;
+	HANDLE hToken = NULL;
+
+	uprintf("RestrictFileAccess called with '%ls'", path);
+
+	// Mark files as system and read-only
+	if(restrictAccess) IFFALSE_PRINTERROR(SetAttributesForFilesInFolder(path, restrictAccess), "Error on SetFileAttributes");
+
+	// Specify the DACL to use.
+	// Create a SID for the Everyone group.
+	IFFALSE_GOTOERROR(AllocateAndInitializeSid(&SIDAuthWorld, 1, SECURITY_WORLD_RID, 0, 0, 0, 0, 0, 0, 0, &pSIDEveryone), "AllocateAndInitializeSid (Everyone) error");
+	// Create a SID for the BUILTIN\Administrators group.
+	IFFALSE_GOTOERROR(AllocateAndInitializeSid(&SIDAuthNT, 2, SECURITY_BUILTIN_DOMAIN_RID, DOMAIN_ALIAS_RID_ADMINS, 0, 0, 0, 0, 0, 0, &pSIDAdmin), "AllocateAndInitializeSid (Admin) error");
+
+	ZeroMemory(&ea, NUM_ACES * sizeof(EXPLICIT_ACCESS));
+
+	// Deny access for Everyone.
+	ea[0].grfAccessPermissions = restrictAccess ? DELETE | FILE_DELETE_CHILD | FILE_WRITE_ATTRIBUTES : STANDARD_RIGHTS_ALL;
+	ea[0].grfAccessMode = restrictAccess ? DENY_ACCESS : SET_ACCESS;
+	ea[0].grfInheritance = SUB_CONTAINERS_AND_OBJECTS_INHERIT;
+	ea[0].Trustee.TrusteeForm = TRUSTEE_IS_SID;
+	ea[0].Trustee.TrusteeType = TRUSTEE_IS_WELL_KNOWN_GROUP;
+	ea[0].Trustee.ptstrName = (LPTSTR)pSIDEveryone;
+
+	// Set full control for Administrators.
+	ea[1].grfAccessPermissions = GENERIC_ALL;
+	ea[1].grfAccessMode = SET_ACCESS;
+	ea[1].grfInheritance = NO_INHERITANCE;
+	ea[1].Trustee.TrusteeForm = TRUSTEE_IS_SID;
+	ea[1].Trustee.TrusteeType = TRUSTEE_IS_GROUP;
+	ea[1].Trustee.ptstrName = (LPTSTR)pSIDAdmin;
+
+	IFFALSE_GOTOERROR(ERROR_SUCCESS == SetEntriesInAcl(NUM_ACES, ea, NULL, &pACL), "Failed SetEntriesInAcl");
+
+	// Try to modify the object's DACL.
+	DWORD dwRes = SetNamedSecurityInfo(
+		pFilename,					// name of the object
+		SE_FILE_OBJECT,              // type of object
+		DACL_SECURITY_INFORMATION,   // change only the object's DACL
+		NULL, NULL,                  // do not change owner or group
+		pACL,                        // DACL specified
+		NULL);                       // do not change SACL
+	uprintf("Return value for first SetNamedSecurityInfo call %u", dwRes);
+	IFTRUE_GOTO(ERROR_SUCCESS == dwRes, "Successfully changed DACL", done);
+	IFFALSE_GOTOERROR(dwRes == ERROR_ACCESS_DENIED, "First SetNamedSecurityInfo call failed");
+
+	// If the preceding call failed because access was denied,
+	// enable the SE_TAKE_OWNERSHIP_NAME privilege, create a SID for
+	// the Administrators group, take ownership of the object, and
+	// disable the privilege. Then try again to set the object's DACL.
+
+	// Open a handle to the access token for the calling process.
+	IFFALSE_GOTOERROR(OpenProcessToken(GetCurrentProcess(), TOKEN_ADJUST_PRIVILEGES, &hToken) != 0, "OpenProcessToken failed");
+	// Enable the SE_TAKE_OWNERSHIP_NAME privilege.
+	IFFALSE_GOTOERROR(SetPrivilege(hToken, SE_TAKE_OWNERSHIP_NAME, TRUE), "You must be logged on as Administrator.");
+	// Set the owner in the object's security descriptor.
+	dwRes = SetNamedSecurityInfo(
+		pFilename,					// name of the object
+		SE_FILE_OBJECT,              // type of object
+		OWNER_SECURITY_INFORMATION,  // change only the object's owner
+		pSIDAdmin,                   // SID of Administrator group
+		NULL,
+		NULL,
+		NULL);
+	uprintf("Return value for second SetNamedSecurityInfo call %u", dwRes);
+	IFFALSE_GOTOERROR(ERROR_SUCCESS == dwRes, "Could not set owner.");
+
+	// Disable the SE_TAKE_OWNERSHIP_NAME privilege.
+	IFFALSE_GOTOERROR(SetPrivilege(hToken, SE_TAKE_OWNERSHIP_NAME, FALSE), "Failed SetPrivilege call unexpectedly.");
+
+	// Try again to modify the object's DACL, now that we are the owner.
+	dwRes = SetNamedSecurityInfo(
+		pFilename,					 // name of the object
+		SE_FILE_OBJECT,              // type of object
+		DACL_SECURITY_INFORMATION,   // change only the object's DACL
+		NULL, NULL,                  // do not change owner or group
+		pACL,                        // DACL specified
+		NULL);                       // do not change SACL
+	uprintf("Return value for third SetNamedSecurityInfo call %u", dwRes);
+	IFFALSE_GOTOERROR(ERROR_SUCCESS == dwRes, "Third SetNamedSecurityInfo call failed.");
+
+done:
+	// Remove system and read-only from files
+	if (!restrictAccess) IFFALSE_PRINTERROR(SetAttributesForFilesInFolder(path, restrictAccess), "Error on SetFileAttributes");
+
+	retResult = TRUE;
+error:
+	if (pSIDAdmin) FreeSid(pSIDAdmin);
+	if (pSIDEveryone) FreeSid(pSIDEveryone);
+	if (pACL) LocalFree(pACL);
+	if (hToken) CloseHandle(hToken);
+
+	return retResult;
+}
+
+CStringW CEndlessUsbToolDlg::GetSystemDrive()
+{
+	CStringW systemDrive(L"C:\\");
+	wchar_t windowsPath[MAX_PATH];
+	HRESULT hr = SHGetFolderPathW(NULL, CSIDL_WINDOWS, NULL, 0, windowsPath);
+
+	if (hr == S_OK) {
+		systemDrive = windowsPath;
+		systemDrive = systemDrive.Left(3);
+	} else {
+		uprintf("SHGetFolderPath returned %X", hr);
+	}
+
+	return systemDrive;
+}
+
+#define REGKEY_BACKUP_PREFIX	L"EndlessBackup"
+
+BOOL CEndlessUsbToolDlg::SetEndlessRegistryKey(HKEY parentKey, const CString &keyPath, const CString &keyName, CComVariant keyValue, bool createBackup)
+{
+	CRegKey registryKey;
+	LSTATUS result;
+	CComVariant backupValue;
+
+	uprintf("SetEndlessRegistryKey called with path '%ls' and key '%ls'", keyPath, keyName);
+
+	result = registryKey.Open(parentKey, keyPath, KEY_ALL_ACCESS);
+	IFFALSE_RETURN_VALUE(result == ERROR_SUCCESS, "Error opening registry key.", FALSE);
+
+	backupValue.ChangeType(VT_NULL);
+	switch (keyValue.vt) {
+		case VT_I4:
+		case VT_UI4:
+			if (createBackup) {
+				DWORD dwValue;
+				result = registryKey.QueryDWORDValue(CString(REGKEY_BACKUP_PREFIX) + keyName, dwValue);
+				if (result == ERROR_SUCCESS) {
+					uprintf("There already is a backup created for '%ls' in '%ls'. Aborting creating a second backup", keyName, keyPath);
+					createBackup = false;
+					break;
+				}
+
+				result = registryKey.QueryDWORDValue(keyName, dwValue);
+				if (result == ERROR_SUCCESS) backupValue = dwValue;
+				else backupValue = DWORD_MAX;
+			}
+			result = registryKey.SetDWORDValue(keyName, keyValue.intVal);
+			break;
+		default:
+			uprintf("ERROR: variant type %d not handled", keyValue.vt);
+			return FALSE;
+	}
+
+	IFFALSE_RETURN_VALUE(result == ERROR_SUCCESS, "Error on setting key value", FALSE);
+
+	if (createBackup && backupValue.vt != VT_NULL) {
+		backupValue.vt = keyValue.vt;
+		IFFALSE_PRINTERROR(SetEndlessRegistryKey(parentKey, keyPath, CString(REGKEY_BACKUP_PREFIX) + keyName, backupValue, false), "Error on creating backup key");
+	}
+
+	return TRUE;
 }

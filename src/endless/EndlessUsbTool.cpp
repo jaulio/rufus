@@ -90,8 +90,9 @@ BOOL CEndlessUsbToolApp::InitInstance()
 
 	Analytics::instance()->sessionControl(true);
 
-	if (singleInstanceMutex != NULL && GetLastError() != ERROR_ALREADY_EXISTS) {
-        CEndlessUsbToolDlg dlg(wndMsg, commandLineInfo.logDebugInfo);
+    if (singleInstanceMutex != NULL && GetLastError() != ERROR_ALREADY_EXISTS) {
+        //CEndlessUsbToolDlg dlg(wndMsg, commandLineInfo.logDebugInfo);
+		CEndlessUsbToolDlg dlg(wndMsg, true);
         m_pMainWnd = &dlg;
         INT_PTR nResponse = dlg.DoModal();
         if (nResponse == IDOK)

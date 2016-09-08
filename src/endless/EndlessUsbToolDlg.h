@@ -7,12 +7,19 @@
 #include "localization.h"
 #include "DownloadManager.h"
 
+// Remove this define to disable hardcoded stuff added for internal release on August 31st
+#define TEST_RELEASE_HARDCODED_STUFF 1
+
 typedef struct FileImageEntry {
     CString filePath;
     ULONGLONG size;
     BOOL autoAdded;
     LONG htmlIndex;
     BOOL stillPresent;
+	CString personality;
+	BOOL hasBootArchive;
+	BOOL hasBootArchiveSig;
+	BOOL hasUnpackedImgSig;
 } FileImageEntry_t, *pFileImageEntry_t;
 
 typedef enum ErrorCause {
@@ -58,11 +65,16 @@ protected:
 	//// Disable text selection
 	//HRESULT OnHtmlSelectStart(IHTMLElement* pElement);
 
+	// Dual Boot Page Handlers
+	HRESULT OnAdvancedOptionsClicked(IHTMLElement* pElement);
+	HRESULT OnInstallDualBootClicked(IHTMLElement* pElement);
+
 	// First Page Handlers
 	HRESULT OnTryEndlessSelected(IHTMLElement* pElement);
 	HRESULT OnInstallEndlessSelected(IHTMLElement* pElement);
 	HRESULT OnLinkClicked(IHTMLElement* pElement);
 	HRESULT OnLanguageChanged(IHTMLElement* pElement);
+	HRESULT OnFirstPagePreviousClicked(IHTMLElement* pElement);
 
 	// Select File Page Handlers
 	HRESULT OnSelectFilePreviousClicked(IHTMLElement* pElement);
@@ -79,6 +91,11 @@ protected:
 	HRESULT OnSelectUSBNextClicked(IHTMLElement* pElement);
     HRESULT OnSelectedUSBDiskChanged(IHTMLElement* pElement);
     HRESULT OnAgreementCheckboxChanged(IHTMLElement* pElement);
+
+	// Select Storage Page handlers
+	HRESULT OnSelectStoragePreviousClicked(IHTMLElement* pElement);
+	HRESULT OnSelectStorageNextClicked(IHTMLElement* pElement);
+	HRESULT OnSelectedStorageSizeChanged(IHTMLElement* pElement);
 
     // Install Page handlers
     HRESULT OnInstallCancelClicked(IHTMLElement* pElement);
@@ -115,6 +132,8 @@ protected:
 	void OnDocumentComplete(LPDISPATCH pDisp, LPCTSTR szUrl);
 
 private:
+	bool m_dualBootSelected;
+	int m_nrGigsSelected;
 	bool m_liveInstall;
 	loc_cmd* m_selectedLocale;
 	char m_localizationFile[MAX_PATH];
@@ -154,7 +173,11 @@ private:
 
     CString m_LiveFile;
     CString m_LiveFileSig;
-    CString m_appDir;
+    static CString m_appDir;
+
+	CString m_bootArchive;
+	CString m_bootArchiveSig;
+	CString m_unpackedImageSig;
 
 	CComPtr<IHTMLDocument3> m_spHtmlDoc3;
     CComPtr<IHTMLElement> m_spStatusElem;
@@ -170,8 +193,11 @@ private:
     CFile m_logFile;
     ErrorCause_t m_lastErrorCause;
     long m_maximumUSBVersion;
+	unsigned long m_cancelImageUnpack;
 
     void StartOperationThread(int operation, LPTHREAD_START_ROUTINE threadRoutine, LPVOID param = NULL);
+
+	void StartInstallationProcess();
 
 	void InitRufus();
     static DWORD WINAPI RufusISOScanThread(LPVOID param);
@@ -196,7 +222,7 @@ private:
 
     void StartJSONDownload();
     void UpdateDownloadOptions();
-    bool UnpackFile(LPCSTR archive, LPCSTR destination);
+    bool UnpackFile(LPCSTR archive, LPCSTR destination, int compressionType, void* progress_function = NULL, unsigned long* cancel_request = NULL);
     bool ParseJsonFile(LPCTSTR filename, bool isInstallerJson);
     void AddDownloadOptionsToUI();
 
@@ -247,9 +273,47 @@ private:
     void UpdateUSBSpeedMessage(DWORD deviceIndex);
     void JSONDownloadFailed();
 
+	void GoToSelectStoragePage();
+	BOOL AddStorageEntryToSelect(CComPtr<IHTMLSelectElement> &selectElement, int noOfGigs, uint8_t extraData);
+
+	void ChangeDriveAutoRunAndMount(bool setEndlessValues);
+
 	static DWORD WINAPI CreateUSBStick(LPVOID param);
 	static bool CreateFakePartitionLayout(HANDLE hPhysical, PBYTE layout, PBYTE geometry);
 	static bool FormatFirstPartitionOnDrive(DWORD DriveIndex, int fsToUse, HANDLE m_cancelOperationEvent, const wchar_t *partLabel);
 	static bool MountFirstPartitionOnDrive(DWORD DriveIndex, CString &driveLetter);
 	static bool CreateCorrectPartitionLayout(HANDLE hPhysical, PBYTE layout, PBYTE geometry);
+
+	static bool UnpackZip(const CComBSTR source, const CComBSTR dest);
+	static void RemoveNonEmptyDirectory(const CString directoryPath);
+	static bool CopyFilesToESP(const CString &fromFolder, const CString &driveLetter);
+	static void ImageUnpackCallback(const uint64_t read_bytes);
+	static bool CopyFilesToexFAT(CEndlessUsbToolDlg *dlg, const CString &fromFolder, const CString &driveLetter);
+	static bool WriteMBRAndSBRToUSB(HANDLE hPhysical, const CString &bootFilesPath, DWORD bytesPerSector);
+
+	static DWORD WINAPI SetupDualBoot(LPVOID param);
+
+	static bool UnpackBootComponents(const CString &bootFilesPathGz, const CString &bootFilesPath);
+	static bool CopyMultipleItems(const CString &fromPath, const CString &toPath);
+	static bool IsLegacyBIOSBoot();
+	static bool WriteMBRAndSBRToWinDrive(const CString &systemDriveLetter, const CString &bootFilesPath);
+	static bool SetupEndlessEFI(const CString &systemDriveLetter, const CString &bootFilesPath);
+	static HANDLE GetPhysicalFromDriveLetter(const CString &driveLetter);
+
+	// used by ImageUnpackCallback
+	// bled doesn't allow us to set a context variable for the callback
+	static int ImageUnpackOperation;
+	static int ImageUnpackPercentStart;
+	static int ImageUnpackPercentEnd;
+	static ULONGLONG ImageUnpackFileSize;
+
+	static bool Has64BitSupport();
+
+	static BOOL SetAttributesForFilesInFolder(CString path, bool addAttributes);
+	static BOOL SetPrivilege(HANDLE hToken, LPCTSTR lpszPrivilege, BOOL bEnablePrivilege);
+	static BOOL ChangeAccessPermissions(CString path, bool restrictAccess);
+
+	static CStringW GetSystemDrive();
+
+	static BOOL SetEndlessRegistryKey(HKEY parentKey, const CString &keyPath, const CString &keyName, CComVariant keyValue, bool createBackup = true);
 };
