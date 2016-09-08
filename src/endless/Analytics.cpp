@@ -197,5 +197,5 @@ void Analytics::urlEncode(const CString &in, CString &out)
 
 void Analytics::prefixId(CString &id)
 {
-	id.Format(_T("v=1&tid=%s&cid=%s&an=Endless%%20USB%%20Creator&av=%s&"), m_trackingId, m_clientId, _T(RELEASE_VER_STR));
+	id.Format(_T("v=1&tid=%s&cid=%s&an=Endless%%20Installer&av=%s&"), m_trackingId, m_clientId, _T(RELEASE_VER_STR));
 }
