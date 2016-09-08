@@ -21,7 +21,7 @@ static UINT threadSendRequest(LPVOID pParam)
 {
 	FUNCTION_ENTER;
 
-	CInternetSession session(_T("Endless USB Creator"));
+	CInternetSession session(_T("Endless Installer"));
 	MSG msg;
 
 	while (GetMessage(&msg, NULL, WM_APP, WM_APP+1)) {
