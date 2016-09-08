@@ -1876,15 +1876,12 @@ HRESULT CEndlessUsbToolDlg::OnLinkClicked(IHTMLElement* pElement)
         msg_id = MSG_312;
     } else if (id == _T(ELEMENT_SECUREBOOT_HOWTO) || id == _T(ELEMENT_SECUREBOOT_HOWTO2)) {
         msg_id = MSG_313;
-    } else if (id == _T(ELEMENT_ENDLESS_SUPPORT) || id == _T(ELEMENT_CONNECTED_SUPPORT_LINK)) {
+    } else if (id == _T(ELEMENT_ENDLESS_SUPPORT) || id == _T(ELEMENT_CONNECTED_SUPPORT_LINK) || id == _T(ELEMENT_STORAGE_SUPPORT_LINK)) {
         msg_id = MSG_314;
     } else if (id == _T(ELEMENT_CONNECTED_LINK)) {
         WinExec("c:\\windows\\system32\\control.exe ncpa.cpl", SW_NORMAL);
 	} else if (id == _T(ELEMENT_USBBOOT_HOWTO)) {
 		msg_id = MSG_329;
-	} else if (id == _T(ELEMENT_STORAGE_SUPPORT_LINK)) {
-		AfxMessageBox(L"Link not present yet.");
-		return S_OK;
     } else {
         msg_id = 0;
         uprintf("Unknown link clicked %ls", id);
