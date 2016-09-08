@@ -179,18 +179,14 @@ void Analytics::loadUuid(CString &uuid)
 
 void Analytics::createUuid(CString &uuid)
 {
-	const CString tokens = _T("0123456789abcdef");
-	srand((unsigned)time(NULL));
-	
-	// UUID v4 format xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx
-	uuid = _T("xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx");
-	int offset = 0;
-	for (int i = 0; i < 36; i++) {
-		if (i == 8 || i == 13 || i == 14 || i == 18 || i == 19 || i == 23)
-			continue;
-		int rnd = (int) ((double) rand() / (RAND_MAX + 1) * 16);
-		uuid.SetAt(i + offset, tokens.GetAt(rnd));
-	}
+	HRESULT hr;
+	GUID guid;
+	hr = CoCreateGuid(&guid);
+	if (hr == S_OK)
+		uuid.Format(_T("%08x-%04x-%04x-%02x%02x-%02x%02x%02x%02x%02x%02x"), guid.Data1, guid.Data2, guid.Data3, guid.Data4[0],
+			guid.Data4[1], guid.Data4[2], guid.Data4[3], guid.Data4[4], guid.Data4[5], guid.Data4[6], guid.Data4[7]);
+	else
+		uuid = _T("00000000-0000-4000-8000-000000000000");
 }
 
 void Analytics::urlEncode(const CString &in, CString &out)
