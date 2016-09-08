@@ -86,7 +86,7 @@ void Analytics::sessionControl(BOOL start)
 	CString body;
 	prefixId(body);
 	if (start) {
-		body = body + _T("t=screenview&cd=FirstPage&sc=start");
+		body = body + _T("t=screenview&cd=DualBootInstallPage&sc=start");
 		sendRequest(body);
 	}
 	else {

@@ -3002,6 +3002,10 @@ HRESULT CEndlessUsbToolDlg::OnSelectStorageNextClicked(IHTMLElement *pElement)
 
 	FUNCTION_ENTER;
 
+	CString selSpace;
+	selSpace.Format(_T("%d Gb"), m_nrGigsSelected);
+	Analytics::instance()->eventTracking(_T(ELEMENT_STORAGE_PAGE), _T("StorageSize"), selSpace);
+
 	StartInstallationProcess();
 
 	return S_OK;
