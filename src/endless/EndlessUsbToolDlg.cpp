@@ -1557,7 +1557,16 @@ void CEndlessUsbToolDlg::ErrorOccured(ErrorCause_t errorCause)
 
     ChangePage(_T(ELEMENT_ERROR_PAGE));
 
-	Analytics::instance()->exceptionTracking(ErrorCauseToStr(errorCause), FALSE);
+	bool fatal = FALSE;
+	switch (errorCause) {
+	case ErrorCause_t::ErrorCauseDownloadFailed:
+	case ErrorCause_t::ErrorCauseVerificationFailed:
+	case ErrorCause_t::ErrorCauseWriteFailed:
+		fatal = FALSE;
+	default:
+		fatal = TRUE;
+	}
+	Analytics::instance()->exceptionTracking(ErrorCauseToStr(errorCause), fatal);
 }
 
 HRESULT CEndlessUsbToolDlg::GetSelectedOptionElementText(CComPtr<IHTMLSelectElement> selectElem, CString &text)
