@@ -1704,7 +1704,7 @@ HRESULT CEndlessUsbToolDlg::OnTryEndlessSelected(IHTMLElement* pElement)
 {
     FUNCTION_ENTER;
 
-	Analytics::instance()->eventTracking(_T("UI"), _T("USBType"), _T("Live"));
+	Analytics::instance()->eventTracking(_T(ELEMENT_FIRST_PAGE), _T("USBType"), _T("Live"));
 
     m_liveInstall = true;
     GoToSelectFilePage();
@@ -1718,7 +1718,7 @@ HRESULT CEndlessUsbToolDlg::OnInstallEndlessSelected(IHTMLElement* pElement)
 
     FUNCTION_ENTER;
 
-	Analytics::instance()->eventTracking(_T("UI"), _T("USBType"), _T("Installer"));
+	Analytics::instance()->eventTracking(_T(ELEMENT_FIRST_PAGE), _T("USBType"), _T("Installer"));
 
     m_liveInstall = false;
     GoToSelectFilePage();
@@ -2424,7 +2424,7 @@ HRESULT CEndlessUsbToolDlg::OnSelectFileNextClicked(IHTMLElement* pElement)
 
 	CString imageType = _T("RemoteImage");
 	if (m_useLocalFile) imageType = _T("LocalImage");
-	Analytics::instance()->eventTracking(_T("UI"), imageType, selectedImage);
+	Analytics::instance()->eventTracking(_T(ELEMENT_FILE_PAGE), imageType, selectedImage);
 
 	ChangePage(_T(ELEMENT_USB_PAGE));
 
@@ -2580,7 +2580,7 @@ HRESULT CEndlessUsbToolDlg::OnSelectUSBNextClicked(IHTMLElement* pElement)
 		CString selUSBDrive;
 		hr = GetSelectedOptionElementText(selElem, selUSBDrive);
 		if (hr == S_OK)
-			Analytics::instance()->eventTracking(_T("UI"), _T("USBDisk"), selUSBDrive);
+			Analytics::instance()->eventTracking(_T(ELEMENT_USB_PAGE), _T("USBDisk"), selUSBDrive);
 	}
 
 	LeavingDevicesPage();
